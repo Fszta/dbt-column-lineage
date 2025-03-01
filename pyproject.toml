@@ -1,0 +1,22 @@
+[project]
+name = "dbt-column-lineage"
+version = "0.1.0"
+description = "A simple tool to extract dbt column lineage"
+authors = [
+    {name = "Fszta"}
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pydantic>=2.10.6,<3.0.0",
+    "pytest>=8.3.4,<9.0.0"
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "."
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
