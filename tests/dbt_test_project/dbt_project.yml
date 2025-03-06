@@ -1,0 +1,14 @@
+name: 'test_project'
+version: '1.0.0'
+config-version: 2
+
+profile: 'test'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+
+models:
+  test_project:
+    +materialized: view 
