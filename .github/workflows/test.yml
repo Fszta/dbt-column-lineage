@@ -45,4 +45,6 @@ jobs:
       run: poetry run test-unit
 
     - name: Run integration tests
+      env:
+        DBT_PROFILES_DIR: ${{ github.workspace }}/tests/resources/dbt_test_project
       run: poetry run test-integration
