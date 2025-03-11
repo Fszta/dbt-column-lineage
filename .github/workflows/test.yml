@@ -39,7 +39,7 @@ jobs:
 
     - name: Install dependencies
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-      run: poetry install --no-interaction --with test
+      run: poetry install --no-interaction
 
     - name: Run unit tests
       run: poetry run test-unit
