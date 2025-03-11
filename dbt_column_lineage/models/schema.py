@@ -31,7 +31,7 @@ class Model(BaseModel):
     )
 
     name: str
-    schema_name: str = Field(alias='schema') # Handle base model shadow attribute schema
+    schema_name: str = Field(alias='schema') # Handle base model shadow attribute `schema`
     database: str
     columns: Dict[str, Column] = Field(default_factory=dict)
     metadata: Optional[Dict] = None
@@ -39,4 +39,4 @@ class Model(BaseModel):
     upstream: Set[str] = Field(default_factory=set)
     downstream: Set[str] = Field(default_factory=set)
     compiled_sql: Optional[str] = None
-
+    

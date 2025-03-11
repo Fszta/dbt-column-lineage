@@ -36,3 +36,5 @@ final as (
     left join countries on accounts.country_id = countries.country_id
     left join account_totals on accounts.account_id = account_totals.account_id 
 )
+
+select * from final

@@ -6,5 +6,8 @@ sources:
     schema: main
     tables:
       - name: accounts
+        identifier: raw_accounts
       - name: transactions
+        identifier: raw_transactions
       - name: countries
+        identifier: raw_countries

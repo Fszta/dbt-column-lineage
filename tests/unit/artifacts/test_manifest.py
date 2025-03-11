@@ -1,7 +1,7 @@
 import json
 import pytest
 from pathlib import Path
-from src.artifacts.manifest import ManifestReader
+from dbt_column_lineage.artifacts.manifest import ManifestReader
 
 @pytest.fixture
 def sample_manifest(tmp_path):
@@ -21,16 +21,12 @@ def sample_manifest(tmp_path):
             "model.jaffle_shop.stg_customers": {
                 "name": "stg_customers",
                 "resource_type": "model",
-                "depends_on": {
-                    "nodes": []
-                }
+                "depends_on": {"nodes": []}
             },
             "model.jaffle_shop.stg_orders": {
                 "name": "stg_orders",
                 "resource_type": "model",
-                "depends_on": {
-                    "nodes": []
-                }
+                "depends_on": {"nodes": []}
             }
         }
     }
@@ -98,24 +94,27 @@ def real_manifest(tmp_path):
                     ]
                 },
                 "compiled_sql": """
-                    WITH monthly_orders AS (
-                        SELECT 
-                            user_id,
-                            DATE_TRUNC('month', order_date) as order_month,
-                            COUNT(*) as order_count,
-                            SUM(amount) as monthly_amount
-                        FROM orders
-                        GROUP BY 1, 2
+                    WITH customer_data AS (
+                        SELECT * FROM customers
+                    ),
+                    order_data AS (
+                        SELECT * FROM orders
                     )
                     SELECT 
-                        c.id,
+                        c.id as customer_id,
                         c.name,
-                        mo.order_month,
-                        mo.order_count,
-                        mo.monthly_amount
-                    FROM customers c
-                    JOIN monthly_orders mo ON mo.user_id = c.id
-                """
+                        COUNT(o.id) as order_count,
+                        SUM(o.amount) as total_amount
+                    FROM customer_data c
+                    LEFT JOIN order_data o ON o.user_id = c.id
+                    GROUP BY c.id, c.name
+                """,
+                "columns": {
+                    "customer_id": {"name": "customer_id", "description": "Customer ID"},
+                    "name": {"name": "name", "description": "Customer name"},
+                    "order_count": {"name": "order_count", "description": "Number of orders"},
+                    "total_amount": {"name": "total_amount", "description": "Total spent"}
+                }
             }
         }
     }
@@ -126,32 +125,24 @@ def real_manifest(tmp_path):
     
     return manifest_path
 
-def test_manifest_reader_initialization():
-    """Test ManifestReader initialization."""
+def test_manifest_reader_basics():
+    """Test ManifestReader initialization and error handling."""
     reader = ManifestReader("some/path")
     assert reader.manifest_path == Path("some/path")
     assert reader.manifest == {}
+    
+    with pytest.raises(FileNotFoundError):
+        ManifestReader("nonexistent/path").load()
 
-def test_manifest_reader_load(sample_manifest):
-    """Test loading manifest file."""
+def test_manifest_loading_and_dependencies(sample_manifest):
+    """Test loading manifest and extracting dependencies."""
     reader = ManifestReader(sample_manifest)
     reader.load()
     
     assert "nodes" in reader.manifest
     assert len(reader.manifest["nodes"]) == 3
-
-def test_manifest_reader_load_nonexistent_file():
-    """Test loading non-existent manifest file."""
-    reader = ManifestReader("nonexistent/path")
-    with pytest.raises(FileNotFoundError):
-        reader.load()
-
-def test_get_model_dependencies(sample_manifest):
-    """Test getting model dependencies."""
-    reader = ManifestReader(sample_manifest)
-    reader.load()
     
-    dependencies = reader.get_model_upstream()
+    dependencies = reader.get_model_dependencies()
     
     assert "model.jaffle_shop.customers" in dependencies
     assert dependencies["model.jaffle_shop.customers"] == {
@@ -162,52 +153,24 @@ def test_get_model_dependencies(sample_manifest):
     assert "model.jaffle_shop.stg_customers" in dependencies
     assert dependencies["model.jaffle_shop.stg_customers"] == set()
 
-def test_get_model_dependencies_empty_manifest():
-    """Test getting model dependencies with empty manifest."""
+def test_empty_manifest():
+    """Test handling of empty manifest."""
     reader = ManifestReader("some/path")
     reader.manifest = {"nodes": {}}
-    
-    dependencies = reader.get_model_upstream()
-    assert dependencies == {}
+    assert reader.get_model_dependencies() == {}
 
-def test_complex_model_dependencies(real_manifest):
+def test_complex_dependencies(real_manifest):
     """Test dependencies with a more complex model structure."""
     reader = ManifestReader(real_manifest)
     reader.load()
     
-    dependencies = reader.get_model_upstream()
+    dependencies = reader.get_model_dependencies()
     
-    # Test direct dependencies
-    assert dependencies["model.jaffle_shop.orders"] == {"raw_orders.raw_orders"}
-    assert dependencies["model.jaffle_shop.customers"] == {
-        "raw_customers.raw_customers",
-        "orders.orders"
+    dependency_tests = {
+        "model.jaffle_shop.orders": {"raw_orders.raw_orders"},
+        "model.jaffle_shop.customers": {"raw_customers.raw_customers", "orders.orders"},
+        "model.jaffle_shop.customer_orders": {"customers.customers", "orders.orders"}
     }
-    assert dependencies["model.jaffle_shop.customer_orders"] == {
-        "customers.customers",
-        "orders.orders"
-    }
-
-def test_model_chain_dependencies(real_manifest):
-    """Test chained model dependencies (models depending on other models)."""
-    reader = ManifestReader(real_manifest)
-    reader.load()
     
-    dependencies = reader.get_model_upstream()
-    
-    # customer_orders depends on customers which depends on orders
-    assert "orders.orders" in dependencies["model.jaffle_shop.customer_orders"]
-    assert "customers.customers" in dependencies["model.jaffle_shop.customer_orders"]
-
-def test_model_with_cte(real_manifest):
-    """Test model with CTE structure."""
-    reader = ManifestReader(real_manifest)
-    reader.load()
-    
-    dependencies = reader.get_model_upstream()
-    
-    # customer_orders uses a CTE but should still show correct dependencies
-    assert dependencies["model.jaffle_shop.customer_orders"] == {
-        "customers.customers",
-        "orders.orders"
-    } 
+    for model, expected_deps in dependency_tests.items():
+        assert dependencies[model] == expected_deps 
