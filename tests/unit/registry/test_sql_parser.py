@@ -1,4 +1,4 @@
-from dbt_column_lineage.registry.sql_parser import SQLColumnParser
+from dbt_column_lineage.parser.sql_parser import SQLColumnParser
 
 def test_simple_select_with_join():
     """Test parsing a simple SELECT statement with direct references and renames."""

@@ -1,5 +1,5 @@
 import pytest
-from dbt_column_lineage.registry.registry import ModelRegistry
+from dbt_column_lineage.artifacts.registry import ModelRegistry
 
 @pytest.fixture
 def registry(dbt_artifacts):
