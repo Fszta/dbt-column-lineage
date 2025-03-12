@@ -1,5 +1,4 @@
 test:
-  target: dev
   outputs:
     dev:
       type: sqlite
@@ -7,5 +6,6 @@ test:
       database: "target/test.db"
       schema: main
       schemas_and_paths:
-        main: "target/test.db"
-      schema_directory: "target" 
+        main: "{{ env_var('DBT_PROFILES_DIR') }}/test.db"
+      schema_directory: "{{ env_var('DBT_PROFILES_DIR') }}"
+  target: dev 

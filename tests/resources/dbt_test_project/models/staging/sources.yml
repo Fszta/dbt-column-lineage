@@ -2,7 +2,6 @@ version: 2
 
 sources:
   - name: raw
-    database: target/test.db
     schema: main
     tables:
       - name: accounts
