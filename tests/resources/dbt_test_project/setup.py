@@ -15,7 +15,7 @@ def setup_test_db(project_dir: Path):
     
     # Create tables
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS accounts (
+    CREATE TABLE IF NOT EXISTS raw_accounts (
         id INTEGER PRIMARY KEY,
         holder TEXT,
         country_id INTEGER
@@ -23,7 +23,7 @@ def setup_test_db(project_dir: Path):
     ''')
     
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS countries (
+    CREATE TABLE IF NOT EXISTS raw_countries (
         id INTEGER PRIMARY KEY,
         code TEXT,
         name TEXT
@@ -31,7 +31,7 @@ def setup_test_db(project_dir: Path):
     ''')
     
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS transactions (
+    CREATE TABLE IF NOT EXISTS raw_transactions (
         id INTEGER PRIMARY KEY,
         account_id INTEGER,
         amount REAL,
