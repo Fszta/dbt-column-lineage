@@ -1,6 +1,5 @@
 import sqlite3
 import os
-import subprocess
 from pathlib import Path
 from dbt.cli.main import dbtRunner
 
