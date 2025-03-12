@@ -9,11 +9,9 @@ def setup_test_db(project_dir: Path):
     """Set up a test SQLite database with sample data."""
     db_path = project_dir / "test.db"
     
-    # Create database connection
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # Create tables
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS raw_accounts (
         id INTEGER PRIMARY KEY,
@@ -40,11 +38,9 @@ def setup_test_db(project_dir: Path):
     )
     ''')
     
-    # Load data from CSV files
-    for table in ['accounts', 'countries', 'transactions']:
+    for table in ['raw_accounts', 'raw_countries', 'raw_transactions']:
         csv_path = project_dir / "raw_test_data" / f"{table}.csv"
         with open(csv_path, 'r') as f:
-            # Skip header
             next(f)
             for line in f:
                 values = line.strip().split(',')
@@ -60,7 +56,6 @@ def setup_dbt_project(project_dir: Path) -> dict:
     """Setup dbt project and return paths to artifacts."""
     dbt = dbtRunner()
     
-    # Save current directory to restore later
     original_dir = os.getcwd()
     
     try:
@@ -85,5 +80,4 @@ def setup_dbt_project(project_dir: Path) -> dict:
             "manifest_path": project_dir / "target" / "manifest.json"
         }
     finally:
-        # Restore original directory
         os.chdir(original_dir) 
