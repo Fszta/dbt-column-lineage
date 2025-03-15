@@ -30,12 +30,15 @@ class ModelRegistry:
             model.language = self.manifest_reader.get_model_language(model_name)
 
         for model_name, model in self._models.items():
-            compiled_sql = self.manifest_reader.get_compiled_sql(model_name)
-            if compiled_sql:
-                column_lineage = self.sql_parser.parse_column_lineage(compiled_sql)
-                for col_name, lineage in column_lineage.items():
-                    if col_name in model.columns:
-                        model.columns[col_name].lineage = lineage
+            if model.language == "sql":
+                compiled_sql = self.manifest_reader.get_compiled_sql(model_name)
+                if compiled_sql:
+                    column_lineage = self.sql_parser.parse_column_lineage(compiled_sql)
+                    for col_name, lineage in column_lineage.items():
+                        if col_name in model.columns:
+                            model.columns[col_name].lineage = lineage
+            else:
+                print(f"Skipping model {model_name} because it is not a SQL model, {model.language} is not supported")
 
     def _check_loaded(self):
         """Verify registry is loaded before operations"""
