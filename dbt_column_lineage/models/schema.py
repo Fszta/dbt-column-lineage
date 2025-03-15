@@ -39,4 +39,5 @@ class Model(BaseModel):
     upstream: Set[str] = Field(default_factory=set)
     downstream: Set[str] = Field(default_factory=set)
     compiled_sql: Optional[str] = None
+    language: Optional[str] = None
     

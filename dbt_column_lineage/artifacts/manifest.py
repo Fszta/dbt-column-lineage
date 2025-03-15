@@ -96,3 +96,10 @@ class ManifestReader:
             return None
             
         return node.get("path")
+
+    def get_model_language(self, model_name: str) -> Optional[str]:
+        """Get the language of a model from the manifest."""
+        node = self._find_node(model_name)
+        if not node:
+            return None
+        return node.get("language")

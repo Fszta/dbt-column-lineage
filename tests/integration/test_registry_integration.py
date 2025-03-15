@@ -27,7 +27,9 @@ def test_complete_lineage_chain(registry):
         model = models[model_name]
         column = model.columns[column_name]
         assert column.lineage
-        
+
+        assert model.language == "sql"
+
         sources = set()
         for lineage in column.lineage:
             sources.update(lineage.source_columns)

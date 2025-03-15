@@ -27,6 +27,9 @@ class ModelRegistry:
             model.downstream = downstream_deps.get(model_name, set())
 
         for model_name, model in self._models.items():
+            model.language = self.manifest_reader.get_model_language(model_name)
+
+        for model_name, model in self._models.items():
             compiled_sql = self.manifest_reader.get_compiled_sql(model_name)
             if compiled_sql:
                 column_lineage = self.sql_parser.parse_column_lineage(compiled_sql)
