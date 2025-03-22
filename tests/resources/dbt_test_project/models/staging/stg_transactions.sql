@@ -6,11 +6,11 @@ source as (
 
 renamed as (
     select
-        id as transaction_id,
-        account_id,
-        amount,
+        cast(id as integer) as transaction_id,
+        cast(account_id as integer) as account_id,
+        cast(amount as float) as amount,
         status,
-        transaction_date
+        cast(transaction_date as date) as transaction_date
     from source
 )
 

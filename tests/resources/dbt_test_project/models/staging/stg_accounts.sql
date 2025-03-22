@@ -6,9 +6,9 @@ source as (
 
 renamed as (
     select
-        id as account_id,
+        cast(id as integer) as account_id,
         holder as account_holder,
-        country_id
+        cast(country_id as integer) as country_id
     from source
 )
 
