@@ -13,9 +13,9 @@ class SQLColumnParser:
         cte_sources = self._build_cte_sources(parsed)
         
         columns = {}
+        
         for select in parsed.find_all(exp.Select):
             table_context = self._get_table_context(select)
-            
             for expr in select.expressions:
                 target_col = expr.alias_or_name
                 lineage = self._analyze_expression(expr, aliases, table_context, cte_sources, cte_to_model)
@@ -26,10 +26,16 @@ class SQLColumnParser:
     def _extract_cte_model_mappings(self, sql: str) -> Dict[str, str]:
         """Extract mappings from CTE names to model names."""
         mappings = {}
-        pattern = r'(\w+)\s+as\s*\(\s*select\b.*?\bfrom\s*\w+\."([^"]+)"\s*\)'
+        # Pattern to handle:
+        # - SQLite: from main."stg_transactions"
+        # - DuckDB: from "test"."main"."stg_transactions"
+        # - Snowflake: from test.main.stg_transactions
+        pattern = r'(\w+)\s+as\s*\(\s*select\b.*?\bfrom\s+(["\w\.]+(?:\."[^"]+"|[^"\s]+))\s*\)'
         matches = re.findall(pattern, sql, re.IGNORECASE | re.DOTALL)
         
-        for cte_name, model_name in matches:
+        for cte_name, full_table_ref in matches:
+            parts = re.findall(r'"([^"]+)"|([^"\s\.]+)', full_table_ref)
+            model_name = next(name for pair in reversed(parts) for name in pair if name)
             mappings[cte_name] = model_name
             
         return mappings
