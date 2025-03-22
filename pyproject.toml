@@ -14,7 +14,9 @@ dependencies = [
     "sqlglot (>=26.8.0,<27.0.0)",
     "dbt (>=1.0.0.38.29,<2.0.0.0.0)",
     "dbt-core (>=1.6.0)",
-    "dbt-sqlite (>=1.6.0)"
+    "dbt-sqlite (>=1.6.0)",
+    "dbt-duckdb (>=1.9.2,<2.0.0)",
+    "duckdb (>=1.2.1,<2.0.0)"
 ]
 
 [tool.poetry.scripts]
