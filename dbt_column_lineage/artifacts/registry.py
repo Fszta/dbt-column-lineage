@@ -1,77 +1,182 @@
 from typing import Dict, Optional
+from dataclasses import dataclass
+import logging
+
 from dbt_column_lineage.artifacts.catalog import CatalogReader
 from dbt_column_lineage.artifacts.manifest import ManifestReader
-from dbt_column_lineage.models.schema import Model
-from dbt_column_lineage.artifacts.exceptions import ModelNotFoundError, RegistryNotLoadedError
+from dbt_column_lineage.models.schema import Model, SQLParseResult, ColumnLineage
+from dbt_column_lineage.artifacts.exceptions import (
+    ModelNotFoundError,
+    RegistryNotLoadedError,
+    RegistryError
+)
 from dbt_column_lineage.parser.sql_parser import SQLColumnParser
+
+@dataclass
+class RegistryState:
+    """Immutable state of the registry."""
+    models: Dict[str, Model]
+    is_loaded: bool = False
 
 class ModelRegistry:
     def __init__(self, catalog_path: str, manifest_path: str):
-        self.catalog_reader = CatalogReader(catalog_path)
-        self.manifest_reader = ManifestReader(manifest_path)
-        self._models: Dict[str, Model] = {}
-        self.sql_parser = SQLColumnParser()
+        self._catalog_reader = CatalogReader(catalog_path)
+        self._manifest_reader = ManifestReader(manifest_path)
+        self._sql_parser = SQLColumnParser()
+        self._state = RegistryState(models={}, is_loaded=False)
 
-    def load(self):
-        self.catalog_reader.load()
-        self.manifest_reader.load()
+    @property
+    def is_loaded(self) -> bool:
+        return self._state.is_loaded
 
-        self._models = self.catalog_reader.get_models_nodes()
+    def _initialize_models(self) -> Dict[str, Model]:
+        """Initialize base model information from catalog."""
+        try:
+            models = self._catalog_reader.get_models_nodes()
+            if not models:
+                raise RegistryError("No models found in catalog")
+            return models
+        except Exception as e:
+            raise RegistryError(f"Failed to initialize models: {e}")
+
+    def _apply_dependencies(self, models: Dict[str, Model]) -> None:
+        """Apply upstream and downstream dependencies to models."""
+        try:
+            upstream_deps = self._manifest_reader.get_model_upstream()
+            downstream_deps = self._manifest_reader.get_model_downstream()
+
+            for model_name, model in models.items():
+                model.upstream = upstream_deps.get(model_name, set())
+                model.downstream = downstream_deps.get(model_name, set())
+                model.language = self._manifest_reader.get_model_language(model_name)
+        except Exception as e:
+            raise RegistryError(f"Failed to apply dependencies: {e}")
+
+    def _process_lineage(self, models: Dict[str, Model]) -> None:
+        """Process and apply column lineage to models.
         
-        upstream_deps = self.manifest_reader.get_model_upstream()
-        for model_name, model in self._models.items():
-            model.upstream = upstream_deps.get(model_name, set())
-            
-        downstream_deps = self.manifest_reader.get_model_downstream()
-        for model_name, model in self._models.items():
-            model.downstream = downstream_deps.get(model_name, set())
+        Processes each model's SQL to extract column lineage information.
+        Continues processing even if individual models fail to parse.
+        """
+        # First pass: Process explicit column references
+        for model_name, model in models.items():
+            if model.language != "sql":
+                continue
 
-        for model_name, model in self._models.items():
-            model.language = self.manifest_reader.get_model_language(model_name)
+            sql = self._manifest_reader.get_compiled_sql(model_name)
+            if not sql:
+                continue
 
-        for model_name, model in self._models.items():
-            if model.language == "sql":
-                compiled_sql = self.manifest_reader.get_compiled_sql(model_name)
-                if compiled_sql:
-                    column_lineage = self.sql_parser.parse_column_lineage(compiled_sql)
-                    for col_name, lineage in column_lineage.items():
-                        if col_name in model.columns:
-                            model.columns[col_name].lineage = lineage
-            else:
-                print(f"Skipping model {model_name} because it is not a SQL model, {model.language} is not supported")
+            try:
+                parse_result = self._sql_parser.parse_column_lineage(sql)
+                self._apply_column_lineage(model, parse_result)
+            except Exception as e:
+                logging.warning(
+                    f"Failed to process lineage for model {model_name}: {e}. Skipping..."
+                )
+                continue
+
+        # Second pass: Process star column references
+        try:
+            self._process_star_references(models)
+        except Exception as e:
+            logging.error(f"Failed to process star references: {e}")
+
+    def _apply_column_lineage(self, model: Model, parse_result: SQLParseResult) -> None:
+        """Apply parsed lineage to model columns."""
+        for col_name, lineage in parse_result.column_lineage.items():
+            if col_name in model.columns:
+                model.columns[col_name].lineage = lineage
+
+        if parse_result.star_sources:
+            model.metadata = model.metadata or {}
+            model.metadata['star_sources'] = list(parse_result.star_sources)
+
+    def _process_star_references(self, models: Dict[str, Model]) -> None:
+        """Process star references between models."""
+        for model in models.values():
+            if not model.metadata or 'star_sources' not in model.metadata:
+                continue
+
+            for source_name in model.metadata['star_sources']:
+                if source_name not in models:
+                    logging.warning(f"Source model {source_name} not found")
+                    continue
+
+                self._apply_star_columns(model, source_name, models[source_name])
+
+    def _apply_star_columns(self, target: Model, source_name: str, source: Model) -> None:
+        """Apply star columns from source to target model."""
+        for col_name, source_col in source.columns.items():
+            if col_name not in target.columns:
+                continue
+
+            target_col = target.columns[col_name]
+            if not target_col.lineage:
+                target_col.lineage = []
+
+            star_lineage = ColumnLineage(
+                source_columns={f"{source_name}.{col_name}"},
+                transformation_type="direct"
+            )
+
+            if not any(existing.source_columns == star_lineage.source_columns 
+                      for existing in target_col.lineage):
+                target_col.lineage.append(star_lineage)
+
+    def load(self) -> None:
+        """Load and initialize the registry."""
+        if self.is_loaded:
+            raise RegistryError("Registry has already been loaded")
+
+        try:
+            self._catalog_reader.load()
+            self._manifest_reader.load()
+
+            models = self._initialize_models()
+            self._apply_dependencies(models)
+            self._process_lineage(models)
+
+            self._state = RegistryState(models=models, is_loaded=True)
+        except Exception as e:
+            raise RegistryError(f"Failed to load registry: {e}")
+
+    def get_models(self) -> Dict[str, Model]:
+        """Get all models in the registry."""
+        if not self.is_loaded:
+            raise RegistryNotLoadedError("Registry must be loaded before accessing models")
+        return self._state.models
+
+    def get_model(self, model_name: str) -> Model:
+        """Get a specific model by name."""
+        if not self.is_loaded:
+            raise RegistryNotLoadedError("Registry must be loaded before accessing models")
+        
+        model = self._state.models.get(model_name)
+        if model is None:
+            raise ModelNotFoundError(f"Model '{model_name}' not found")
+        return model
 
     def _check_loaded(self):
         """Verify registry is loaded before operations"""
-        if not self._models:
+        if not self._state.models:
             raise RegistryNotLoadedError("Registry must be loaded before accessing models")
-
-    def get_models(self) -> Dict[str, Model]:
-        self._check_loaded()
-        return self._models
-
-    def get_model(self, model_name: str) -> Model:
-        self._check_loaded()
-        model = self._models.get(model_name)
-        if model is None:
-            raise ModelNotFoundError(f"Model '{model_name}' not found in registry")
-        return model
-    
 
     def _find_compiled_sql(self, model_name: str) -> Optional[str]:
         """Find compiled SQL for a model from manifest or target file."""
         self._check_loaded()
-        model = self._models.get(model_name)
+        model = self._state.models.get(model_name)
         if model is None:
             raise ModelNotFoundError(f"Model '{model_name}' not found in registry")
         
         # Find in manifest (meaning node has been executed)
-        manifest_sql = self.manifest_reader.get_compiled_sql(model_name)
+        manifest_sql = self._manifest_reader.get_compiled_sql(model_name)
         if manifest_sql:
             model.compiled_sql = manifest_sql
             return manifest_sql
         
         # If not in manifest, try to read from compiled target file
-        compiled_path = self.manifest_reader.get_model_path(model_name)
+        compiled_path = self._manifest_reader.get_model_path(model_name)
         if compiled_path:
             try:
                 with open(compiled_path, 'r') as f:
@@ -86,7 +191,7 @@ class ModelRegistry:
     def get_compiled_sql(self, model_name: str) -> str:
         """Get compiled SQL for a model, trying manifest first then target file."""
         self._check_loaded()
-        model = self._models.get(model_name)
+        model = self._state.models.get(model_name)
         if model is None:
             raise ModelNotFoundError(f"Model '{model_name}' not found in registry")
             

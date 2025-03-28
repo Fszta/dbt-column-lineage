@@ -12,7 +12,8 @@ def test_simple_select_with_join():
     """
     
     parser = SQLColumnParser()
-    lineage = parser.parse_column_lineage(sql)
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
     
     assert set(lineage.keys()) == {"customer_id", "name", "amount"}
     assert lineage["customer_id"][0].transformation_type == "renamed"
@@ -47,7 +48,8 @@ def test_cte_with_aggregation_and_table_aliases():
     """
     
     parser = SQLColumnParser()
-    lineage = parser.parse_column_lineage(sql)
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
     
     assert lineage["id"][0].source_columns == {"customers.id"}
     assert lineage["name"][0].source_columns == {"customers.name"}
@@ -95,7 +97,8 @@ def test_multiple_ctes():
     """
     
     parser = SQLColumnParser()
-    lineage = parser.parse_column_lineage(sql)
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
     
     assert lineage["order_count"][0].transformation_type == "derived"
     assert lineage["order_count"][0].source_columns == {"orders.id"}
@@ -132,7 +135,8 @@ def test_nested_ctes_with_transformations():
     """
     
     parser = SQLColumnParser()
-    lineage = parser.parse_column_lineage(sql)
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
     
     assert lineage["total_revenue"][0].source_columns == {"orders.amount"}
     assert lineage["revenue_hundreds"][0].source_columns == {"orders.amount"}
@@ -151,7 +155,8 @@ def test_window_functions():
     """
     
     parser = SQLColumnParser()
-    lineage = parser.parse_column_lineage(sql)
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
     
     assert lineage["customer_total"][0].transformation_type == "derived"
     assert lineage["customer_total"][0].source_columns == {"orders.amount", "orders.customer_id"}
@@ -177,7 +182,8 @@ def test_subqueries():
     """
     
     parser = SQLColumnParser()
-    lineage = parser.parse_column_lineage(sql)
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
     
     assert lineage["order_count"][0].transformation_type == "derived"
     assert "orders.customer_id" in lineage["order_count"][0].source_columns

@@ -87,16 +87,20 @@ def sample_manifest(tmp_path):
 def test_registry_basics(sample_catalog, sample_manifest):
     """Test registry initialization, loading, and error handling."""
     registry = ModelRegistry(sample_catalog, sample_manifest)
-    assert registry.catalog_reader is not None
-    assert registry.manifest_reader is not None
+    assert not registry.is_loaded
     
     with pytest.raises(RegistryNotLoadedError):
         registry.get_models()
     
     registry.load()
+    assert registry.is_loaded
+    
+    models = registry.get_models()
+    assert len(models) > 0
     
     model = registry.get_model("customers")
     assert model is not None
+    assert model.name == "customers"
     
     with pytest.raises(ModelNotFoundError):
         registry.get_model("foobar_model")

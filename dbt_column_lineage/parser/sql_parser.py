@@ -1,10 +1,10 @@
 import re
 from sqlglot import parse_one, exp
 from typing import Dict, List, Set, Optional
-from dbt_column_lineage.models.schema import ColumnLineage
+from dbt_column_lineage.models.schema import ColumnLineage, SQLParseResult
 
 class SQLColumnParser:
-    def parse_column_lineage(self, sql: str) -> Dict[str, List[ColumnLineage]]:
+    def parse_column_lineage(self, sql: str) -> SQLParseResult:
         """Parse SQL to extract column-level lineage using sqlglot."""
         cte_to_model = self._extract_cte_model_mappings(sql)
         parsed = parse_one(sql)
@@ -13,15 +13,28 @@ class SQLColumnParser:
         cte_sources = self._build_cte_sources(parsed)
         
         columns = {}
+        star_sources = set()  # Track tables/CTEs that are used in SELECT *
         
         for select in parsed.find_all(exp.Select):
             table_context = self._get_table_context(select)
             for expr in select.expressions:
-                target_col = expr.alias_or_name
+                if isinstance(expr, exp.Star):
+                    # Track the source of the SELECT *
+                    source_table = table_context
+                    if source_table in cte_to_model:
+                        source_table = cte_to_model[source_table]
+                    star_sources.add(source_table)
+                    continue
+                
+                # Normal column handling
+                target_col = expr.alias_or_name.lower()
                 lineage = self._analyze_expression(expr, aliases, table_context, cte_sources, cte_to_model)
                 columns[target_col] = lineage
-                
-        return columns
+        
+        return SQLParseResult(
+            column_lineage=columns,
+            star_sources=star_sources
+        )
     
     def _extract_cte_model_mappings(self, sql: str) -> Dict[str, str]:
         """Extract mappings from CTE names to model names."""
@@ -99,8 +112,6 @@ class SQLColumnParser:
             col_name = column
         else:
             table, col_name = column.split('.')
-            
-        # Check if this is a CTE reference
         if table in cte_sources and col_name in cte_sources[table]:
             return cte_sources[table][col_name]
         elif table and cte_to_model and table in cte_to_model:
@@ -122,16 +133,25 @@ class SQLColumnParser:
             table, col = source_col.split('.') if '.' in source_col else (table_context, source_col)
             resolved_source = self._resolve_column_source(source_col, table, cte_sources, cte_to_model)
             
+            # Normalize column names to lowercase
+            if '.' in resolved_source:
+                table_part, col_part = resolved_source.split('.')
+                resolved_source = f"{table_part}.{col_part.lower()}"
+            
             return [ColumnLineage(
                 source_columns={resolved_source},
                 transformation_type="renamed" if is_aliased else "direct"
             )]
             
         else:
-            # Any other expression is a derivation
             source_cols = self._extract_source_columns(expr, aliases, table_context, cte_sources, cte_to_model)
+            # Normalize all source columns TODO check
+            normalized_source_cols = {
+                s if '.' not in s else f"{s.split('.')[0]}.{s.split('.')[1].lower()}"
+                for s in source_cols
+            }
             return [ColumnLineage(
-                source_columns=source_cols,
+                source_columns=normalized_source_cols,
                 transformation_type="derived",
                 sql_expression=str(expr)
             )]

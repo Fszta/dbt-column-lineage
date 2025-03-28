@@ -27,8 +27,9 @@ class CatalogReader:
             }
             
             for col_name, col_data in model_data.get("columns", {}).items():
-                processed_data["columns"][col_name] = {
-                    "name": col_name,
+                normalized_col_name = col_name.lower()
+                processed_data["columns"][normalized_col_name] = {
+                    "name": normalized_col_name,
                     "model_name": processed_data["name"],
                     "description": col_data.get("description"),
                     "data_type": col_data.get("type") or col_data.get("data_type"),

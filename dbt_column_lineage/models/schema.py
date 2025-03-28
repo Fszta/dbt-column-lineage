@@ -40,4 +40,8 @@ class Model(BaseModel):
     downstream: Set[str] = Field(default_factory=set)
     compiled_sql: Optional[str] = None
     language: Optional[str] = None
+
+class SQLParseResult(BaseModel):
+    column_lineage: Dict[str, List[ColumnLineage]]
+    star_sources: Set[str] = Field(default_factory=set)
     
