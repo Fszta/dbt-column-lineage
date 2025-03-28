@@ -25,9 +25,29 @@ test = "run_tests:run_tests"
 test-unit = "run_tests:run_tests_unit"
 test-integration = "run_tests:run_tests_integration"
 
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.15.0"
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = "3.9"
+files = ["dbt_column_lineage", "tests"]
+show_error_codes = true
+pretty = true
+strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "sqlglot.*",
+    "dbt.*"
+]
+ignore_missing_imports = true
+
+[tool.poetry]
+license = "MIT"
