@@ -15,6 +15,9 @@ htmlcov/
 # SQLite
 *.db
 
+#DuckDB
+*.duckdb
+
 # IDE
 .idea/
 .vscode/
