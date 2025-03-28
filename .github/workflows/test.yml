@@ -3,8 +3,15 @@ name: Test
 on:
   push:
     branches: [ main ]
+    paths: &trigger_paths
+      - 'dbt_column_lineage/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - '.github/workflows/**'
   pull_request:
     branches: [ main ]
+    paths: *trigger_paths
 
 jobs:
   test:
