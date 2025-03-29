@@ -10,7 +10,7 @@ from dbt_column_lineage.artifacts.exceptions import (
     RegistryNotLoadedError,
     RegistryError
 )
-from dbt_column_lineage.parser.sql_parser import SQLColumnParser
+from dbt_column_lineage.artifacts.sql_parser import SQLColumnParser
 
 @dataclass
 class RegistryState:
@@ -53,11 +53,9 @@ class ModelRegistry:
             raise RegistryError(f"Failed to apply dependencies: {e}")
 
     def _process_lineage(self, models: Dict[str, Model]) -> None:
-        """Process and apply column lineage to models.
+        """Process and apply column lineage to models."""
+        logger = logging.getLogger(__name__)
         
-        Processes each model's SQL to extract column lineage information.
-        Continues processing even if individual models fail to parse.
-        """
         # First pass: Process explicit column references
         for model_name, model in models.items():
             if model.language != "sql":
@@ -71,16 +69,17 @@ class ModelRegistry:
                 parse_result = self._sql_parser.parse_column_lineage(sql)
                 self._apply_column_lineage(model, parse_result)
             except Exception as e:
-                logging.warning(
-                    f"Failed to process lineage for model {model_name}: {e}. Skipping..."
+                logger.warning(
+                    f"Failed to process lineage for model {model_name}: {e}",
+                    exc_info=True
                 )
                 continue
 
-        # Second pass: Process star column references
+        # Second pass: Process star references
         try:
             self._process_star_references(models)
         except Exception as e:
-            logging.error(f"Failed to process star references: {e}")
+            logger.error(f"Failed to process star references: {e}", exc_info=True)
 
     def _apply_column_lineage(self, model: Model, parse_result: SQLParseResult) -> None:
         """Apply parsed lineage to model columns."""
@@ -136,7 +135,6 @@ class ModelRegistry:
             models = self._initialize_models()
             self._apply_dependencies(models)
             self._process_lineage(models)
-
             self._state = RegistryState(models=models, is_loaded=True)
         except Exception as e:
             raise RegistryError(f"Failed to load registry: {e}")
