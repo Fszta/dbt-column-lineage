@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Set, Optional
+from typing import Dict, Set, Optional, Any, Union
 from dataclasses import dataclass
 import logging
 
@@ -38,7 +38,7 @@ class LineageService:
         self.registry = ModelRegistry(str(catalog_path), str(manifest_path))
         self.registry.load()
 
-    def get_model_info(self, selector: LineageSelector) -> Dict:
+    def get_model_info(self, selector: LineageSelector) -> Dict[str, Any]:
         """Get model information based on selector."""
         model = self.registry.get_model(selector.model)
         return {
@@ -50,7 +50,7 @@ class LineageService:
             'downstream': list(model.downstream) if selector.downstream else []
         }
 
-    def get_column_info(self, selector: LineageSelector) -> Dict:
+    def get_column_info(self, selector: LineageSelector) -> Dict[str, Any]:
         """Get column information and lineage based on selector."""
         model = self.registry.get_model(selector.model)
         if not selector.column or selector.column not in model.columns:
@@ -65,31 +65,36 @@ class LineageService:
             'downstream': self._get_downstream_lineage(selector.model, selector.column) if selector.downstream else {}
         }
 
-    def _process_source_reference(self, source: str, upstream_refs: Dict) -> None:
+    def _process_source_reference(self, source: str, upstream_refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]) -> None:
         """Process a source reference and add it to upstream_refs."""
         if 'sources' not in upstream_refs:
             upstream_refs['sources'] = set()
-        upstream_refs['sources'].add(source)
-        logger.debug(f"Added source reference: {source}")
+        
+        sources = upstream_refs['sources']
+        if isinstance(sources, set):
+            sources.add(source)
 
     def _process_model_reference(self, src_model: str, src_column: str, lineage: ColumnLineage, 
-                               upstream_refs: Dict, visited: Set[str]) -> None:
+                               upstream_refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]], 
+                               visited: Set[str]) -> None:
         """Process a model reference and add it to upstream_refs."""
         try:
             self.registry.get_model(src_model)
-            logger.debug(f"Found model {src_model} in registry")
             
             if src_model not in upstream_refs:
                 upstream_refs[src_model] = {}
-            upstream_refs[src_model][src_column] = lineage
+            
+            model_refs = upstream_refs[src_model]
+            if isinstance(model_refs, dict):
+                model_refs[src_column] = lineage
             
             self._get_upstream_lineage(src_model, src_column, visited)
             
         except Exception as e:
-            logger.debug(f"Processing as source: {src_model}.{src_column} (Error: {str(e)})")
             self._process_source_reference(f"{src_model}.{src_column}", upstream_refs)
 
-    def _get_upstream_lineage(self, model_name: str, column_name: str, visited: Optional[Set[str]] = None) -> Dict:
+    def _get_upstream_lineage(self, model_name: str, column_name: str, 
+                            visited: Optional[Set[str]] = None) -> Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]:
         """Recursively get all upstream column references."""
         if visited is None:
             visited = set()
@@ -99,7 +104,7 @@ class LineageService:
             return {}
         
         visited.add(current_ref)
-        upstream_refs = {}
+        upstream_refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]] = {}
         current_model = self.registry.get_model(model_name)
         
         try:
@@ -112,7 +117,9 @@ class LineageService:
                     if '.' not in source:
                         if 'direct_refs' not in upstream_refs:
                             upstream_refs['direct_refs'] = set()
-                        upstream_refs['direct_refs'].add(source)
+                        direct_refs = upstream_refs['direct_refs']
+                        if isinstance(direct_refs, set):
+                            direct_refs.add(source)
                         continue
                     
                     src_model, src_column = source.split('.')
@@ -124,7 +131,8 @@ class LineageService:
             
         return upstream_refs
 
-    def _get_downstream_lineage(self, model_name: str, column_name: str, visited: Optional[Set[str]] = None) -> Dict:
+    def _get_downstream_lineage(self, model_name: str, column_name: str, 
+                              visited: Optional[Set[str]] = None) -> Dict[str, Dict[str, ColumnLineage]]:
         """Get downstream column references following the model DAG."""
         if visited is None:
             visited = set()
@@ -134,7 +142,7 @@ class LineageService:
             return {}
         
         visited.add(current_ref)
-        downstream_refs = {}
+        downstream_refs: Dict[str, Dict[str, ColumnLineage]] = {}
         current_model = self.registry.get_model(model_name)
         
         try:

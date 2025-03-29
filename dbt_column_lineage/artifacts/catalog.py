@@ -1,14 +1,14 @@
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Any, Optional
 import json
 from dbt_column_lineage.models.schema import Model
 
 class CatalogReader:
-    def __init__(self, catalog_path: Optional[str] = None):
+    def __init__(self, catalog_path: str):
         self.catalog_path = Path(catalog_path)
-        self.catalog: Dict = {}
+        self.catalog: Dict[str, Any] = {}
 
-    def load(self):
+    def load(self) -> None:
         if not self.catalog_path.exists():
             raise FileNotFoundError(f"Catalog file not found: {self.catalog_path}")
         with open(self.catalog_path, "r") as f:

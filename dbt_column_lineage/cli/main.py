@@ -1,10 +1,10 @@
 import sys
-import logging
 from pathlib import Path
 import click
 
 from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay
 from dbt_column_lineage.lineage.service import LineageService, LineageSelector
+from dbt_column_lineage.lineage.display.base import LineageDisplay
 
 @click.command()
 @click.option(
@@ -32,7 +32,7 @@ from dbt_column_lineage.lineage.service import LineageService, LineageSelector
               help='Output format (text or dot graph)')
 @click.option('--output', '-o', default='lineage',
               help='Output file name for dot format (without extension)')
-def cli(select: str, catalog: str, manifest: str, format: str, output: str):
+def cli(select: str, catalog: str, manifest: str, format: str, output: str) -> None:
     """DBT Column Lineage - Generate column-level lineage for DBT models."""
     try:
         selector = LineageSelector.from_string(select)
@@ -43,6 +43,7 @@ def cli(select: str, catalog: str, manifest: str, format: str, output: str):
             if selector.column in model.columns:
                 column = model.columns[selector.column]
                 
+                display: LineageDisplay
                 if format == 'dot':
                     display = DotDisplay(output, registry=service.registry)
                     display.main_model = selector.model
@@ -87,7 +88,7 @@ def cli(select: str, catalog: str, manifest: str, format: str, output: str):
         click.echo(f"Error: {str(e)}", err=True)
         sys.exit(1)
 
-def main():
+def main() -> None:
     cli()
 
 if __name__ == "__main__":

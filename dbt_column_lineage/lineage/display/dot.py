@@ -1,11 +1,11 @@
-from typing import Dict, Set
-from graphviz import Digraph
+from typing import Dict, Set, Optional, Any, Union
+from graphviz import Digraph  # type: ignore  # missing stubs for graphviz
 from dbt_column_lineage.models.schema import Column, ColumnLineage
 from dbt_column_lineage.artifacts.registry import ModelRegistry
 from dbt_column_lineage.lineage.display.base import LineageDisplay
 
 class DotDisplay(LineageDisplay):
-    def __init__(self, output_file: str = "lineage.dot", registry: ModelRegistry = None):
+    def __init__(self, output_file: str = "lineage.dot", registry: Optional[ModelRegistry] = None):
         self.dot = Digraph(comment='Column Lineage')
         self.dot.attr(rankdir='LR')
         self.dot.attr('node', fontname='Helvetica')
@@ -13,15 +13,17 @@ class DotDisplay(LineageDisplay):
         self.dot.attr(nodesep='1.0')
         self.dot.attr(ranksep='1.0')
         self.output_file = output_file
-        self.models = {}
+        self.models: Dict[str, Any] = {}
         self.registry = registry
-        self.model_columns = {}
-        self.edges = set()
+        self.model_columns: Dict[str, Dict[str, str]] = {}
+        self.edges: Set[tuple[str, str]] = set()
+        self.main_model: str = ""
+        self.main_column: str = ""
 
     def display_column_info(self, column: Column) -> None:
         self._add_column_to_model(column.model_name, column.name, column.data_type)
 
-    def _add_column_to_model(self, model_name: str, col_name: str, data_type: str = None) -> None:
+    def _add_column_to_model(self, model_name: str, col_name: str, data_type: Optional[str] = None) -> None:
         if model_name not in self.model_columns:
             self.model_columns[model_name] = {}
         
@@ -62,7 +64,10 @@ class DotDisplay(LineageDisplay):
             self.edges.add(edge)
 
     def _process_model_chain(self, current_model_name: str, current_col_name: str, 
-                           model_refs: Dict, processed: Set[str] = None) -> None:
+                           model_refs: Dict[str, Dict[str, ColumnLineage]], processed: Optional[Set[str]] = None) -> None:
+        if self.registry is None:
+            return
+        
         if processed is None:
             processed = set()
 
@@ -93,8 +98,10 @@ class DotDisplay(LineageDisplay):
         for model_name in self.model_columns:
             self._create_model_subgraph(model_name, model_name == self.main_model)
 
-    def display_upstream(self, refs: Dict[str, Dict[str, ColumnLineage]]) -> None:
-        self._add_refs(refs, direction='upstream')
+    def display_upstream(self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]) -> None:
+        model_refs = {k: v for k, v in refs.items()
+                     if k not in ('sources', 'direct_refs') and isinstance(v, dict)}
+        self._add_refs(model_refs, direction='upstream')
 
     def display_downstream(self, refs: Dict[str, Dict[str, ColumnLineage]]) -> None:
         self._add_refs(refs, direction='downstream')

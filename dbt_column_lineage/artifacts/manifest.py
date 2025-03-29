@@ -32,7 +32,7 @@ class ManifestReader:
         dependencies = {}
         for model_id, model_data in self.manifest.get("nodes", {}).items():
             depends_on = set(
-                f"{dep['alias']}.{dep['alias']}"  # Format as "model.model"
+                f"{dep['alias']}.{dep['alias']}"
                 for dep in model_data.get("depends_on", {}).get("nodes", [])
             )
             dependencies[model_id] = depends_on
@@ -50,16 +50,13 @@ class ManifestReader:
                 
                 upstream[model_name] = set()
                 
-                # Add model dependencies
                 depends_on = node.get("depends_on", {})
                 for dep_id in depends_on.get("nodes", []):
-                    # Check if dependency is a model
                     if dep_id.startswith("model."):
                         dep_name = dep_id.split(".")[-1]
                         upstream[model_name].add(dep_name)
-                    # Check if dependency is a source
                     elif dep_id.startswith("source."):
-                        source_name = dep_id.split(".")[-1]  # Just use the source name as-is
+                        source_name = dep_id.split(".")[-1]
                         upstream[model_name].add(source_name)
         
         return upstream
@@ -105,4 +102,4 @@ class ManifestReader:
         node = self.manifest.get('nodes', {}).get(node_id)
         if node is None:
             return None
-        return dict(node)  # explicitly convert to dict
+        return dict(node)

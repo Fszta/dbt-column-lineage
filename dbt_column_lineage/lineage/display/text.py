@@ -1,36 +1,47 @@
+from typing import Dict, Set, Union
 import click
-from typing import Dict
 from dbt_column_lineage.models.schema import Column, ColumnLineage
-from dbt_column_lineage.lineage.display.base import LineageDisplay
+from .base import LineageDisplay
 
 class TextDisplay(LineageDisplay):
     def display_column_info(self, column: Column) -> None:
         click.echo(f"\nColumn: {column.name}")
-        click.echo(f"Data type: {column.data_type}")
+        click.echo(f"Type: {column.data_type}")
         if column.description:
             click.echo(f"Description: {column.description}")
 
-    def display_upstream(self, refs: Dict[str, Dict[str, ColumnLineage]]) -> None:
-        click.echo("\nUpstream Lineage:")
-        self._display_refs(refs)
+    def display_upstream(self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]) -> None:
+        if not refs:
+            return
+
+        click.echo("\nUpstream dependencies:")
+        
+        if 'sources' in refs and isinstance(refs['sources'], set) and refs['sources']:
+            click.echo("  Sources:")
+            for source in sorted(refs['sources']):
+                click.echo(f"    {source}")
+
+        if 'direct_refs' in refs and isinstance(refs['direct_refs'], set) and refs['direct_refs']:
+            click.echo("  Direct references:")
+            for ref in sorted(refs['direct_refs']):
+                click.echo(f"    {ref}")
+
+        for model_name, columns in refs.items():
+            if model_name not in ('sources', 'direct_refs') and isinstance(columns, dict):
+                click.echo(f"  Model {model_name}:")
+                for col_name, lineage in columns.items():
+                    click.echo(f"    {col_name}")
 
     def display_downstream(self, refs: Dict[str, Dict[str, ColumnLineage]]) -> None:
-        click.echo("\nDownstream Lineage:")
-        self._display_refs(refs)
-
-    def _display_refs(self, refs: Dict[str, Dict[str, ColumnLineage]]) -> None:
         if not refs:
-            click.echo("  No lineage information available")
             return
+            
+        click.echo("\nDownstream dependencies:")
+        for model_name, columns in refs.items():
+            click.echo(f"  Model {model_name}:")
+            for col_name, lineage in columns.items():
+                click.echo(f"    {col_name}")
 
-        model_refs = {k: v for k, v in refs.items() if k not in ('sources', 'direct_refs')}
-        if not model_refs:
-            return
-
-        for model_name, columns in sorted(model_refs.items()):
-            click.echo(f"\n  Model: {model_name}")
-            for col_name, lineage in sorted(columns.items()):
-                click.echo(f"    Column: {col_name}")
-                click.echo(f"      Transformation: {lineage.transformation_type}")
-                if lineage.sql_expression:
-                    click.echo(f"      SQL: {lineage.sql_expression}")
+    def save(self) -> None:
+        """No-op for text display as output is immediate."""
+        pass

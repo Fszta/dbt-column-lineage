@@ -153,7 +153,7 @@ class ModelRegistry:
             raise ModelNotFoundError(f"Model '{model_name}' not found")
         return model
 
-    def _check_loaded(self):
+    def _check_loaded(self) -> None:
         """Verify registry is loaded before operations"""
         if not self._state.models:
             raise RegistryNotLoadedError("Registry must be loaded before accessing models")

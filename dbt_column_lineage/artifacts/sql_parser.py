@@ -1,7 +1,7 @@
 import re
 import logging
 from sqlglot import parse_one, exp
-from typing import Dict, List, Set, Optional
+from typing import Dict, List, Set, Optional, Any
 from dbt_column_lineage.models.schema import ColumnLineage, SQLParseResult
 
 logging.getLogger('sqlglot').setLevel(logging.ERROR)
@@ -66,7 +66,7 @@ class SQLColumnParser:
             
         return mappings
     
-    def _get_table_aliases(self, parsed) -> Dict[str, str]:
+    def _get_table_aliases(self, parsed: Any) -> Dict[str, str]:
         """Build mapping of alias -> real table name."""
         aliases = {}
         for table in parsed.find_all((exp.Table, exp.From, exp.Join)):
@@ -74,13 +74,13 @@ class SQLColumnParser:
                 aliases[table.alias] = table.name
         return aliases
     
-    def _get_table_context(self, select) -> str:
+    def _get_table_context(self, select: Any) -> str:
         """Get the main table being selected from."""
         from_clause = select.find(exp.From)
         if from_clause:
             table = from_clause.find(exp.Table)
             if table:
-                return table.name
+                return str(table.name)
         return ""
     
     def _normalize_table_ref(self, column: str, aliases: Dict[str, str], table_context: str) -> str:
@@ -90,9 +90,9 @@ class SQLColumnParser:
         table, col = column.split('.')
         return f"{aliases.get(table, table)}.{col}"
     
-    def _build_cte_sources(self, parsed) -> Dict[str, Dict[str, str]]:
+    def _build_cte_sources(self, parsed: Any) -> Dict[str, Dict[str, str]]:
         """Build mapping of CTE columns to their original sources."""
-        cte_sources = {}
+        cte_sources: Dict[str, Dict[str, str]] = {}
         
         # Process CTEs in order to build up dependencies
         for cte in parsed.find_all(exp.CTE):
@@ -130,7 +130,7 @@ class SQLColumnParser:
             return f"{table}.{col_name}"
         return column
     
-    def _analyze_expression(self, expr, aliases: Dict[str, str], table_context: str, 
+    def _analyze_expression(self, expr: Any, aliases: Dict[str, str], table_context: str, 
                           cte_sources: Dict[str, Dict[str, str]], cte_to_model: Optional[Dict[str, str]] = None, 
                           is_aliased: bool = False) -> List[ColumnLineage]:
         """Analyze expression to determine column lineage."""
@@ -154,7 +154,6 @@ class SQLColumnParser:
             
         else:
             source_cols = self._extract_source_columns(expr, aliases, table_context, cte_sources, cte_to_model)
-            # Normalize all source columns TODO check
             normalized_source_cols = {
                 s if '.' not in s else f"{s.split('.')[0]}.{s.split('.')[1].lower()}"
                 for s in source_cols
@@ -165,7 +164,7 @@ class SQLColumnParser:
                 sql_expression=str(expr)
             )]
     
-    def _extract_source_columns(self, expr, aliases: Dict[str, str], table_context: str, 
+    def _extract_source_columns(self, expr: Any, aliases: Dict[str, str], table_context: str, 
                               cte_sources: Dict[str, Dict[str, str]], cte_to_model: Optional[Dict[str, str]] = None) -> Set[str]:
         """Extract all source column references from an expression."""
         columns = set()
