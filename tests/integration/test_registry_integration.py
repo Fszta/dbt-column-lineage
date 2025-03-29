@@ -49,9 +49,9 @@ def test_model_dependencies(registry):
     models = registry.get_models()
     
     upstream_tests = [
-        ("stg_transactions", ["raw_transactions"]),
-        ("stg_accounts", ["raw_accounts"]),
-        ("stg_countries", ["raw_countries"]),
+        ("stg_transactions", ["transactions"]),
+        ("stg_accounts", ["accounts"]),
+        ("stg_countries", ["countries"]),
 
         
         ("int_monthly_account_metrics", ["int_transactions_enriched"]),

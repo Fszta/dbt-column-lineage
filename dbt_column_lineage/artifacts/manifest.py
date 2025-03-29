@@ -6,9 +6,9 @@ from pathlib import Path
 class ManifestReader:
     def __init__(self, manifest_path: Optional[str] = None):
         self.manifest_path = Path(manifest_path) if manifest_path else None
-        self.manifest: Dict = {}
+        self.manifest: Dict[str, Any] = {}
 
-    def load(self):
+    def load(self) -> None:
         if not self.manifest_path or not self.manifest_path.exists():
             raise FileNotFoundError(f"Manifest file not found: {self.manifest_path}")
         with open(self.manifest_path, "r") as f:
@@ -20,7 +20,7 @@ class ManifestReader:
             return None
         for _, node in self.manifest.get("nodes", {}).items():
             if node.get("name") == model_name:
-                return node
+                return dict(node)
         return None
 
     def get_model_dependencies(self) -> Dict[str, Set[str]]:
@@ -40,7 +40,7 @@ class ManifestReader:
 
     def get_model_upstream(self) -> Dict[str, Set[str]]:
         """Get upstream dependencies for each model."""
-        upstream = {}
+        upstream: Dict[str, Set[str]] = {}
         
         for _, node in self.manifest.get("nodes", {}).items():
             if node.get("resource_type") == "model":
@@ -59,17 +59,14 @@ class ManifestReader:
                         upstream[model_name].add(dep_name)
                     # Check if dependency is a source
                     elif dep_id.startswith("source."):
-                        # Extract source name (e.g., "raw_accounts" from "source.test_project.raw.accounts")
-                        parts = dep_id.split(".")
-                        if len(parts) >= 4:
-                            source_name = f"raw_{parts[-1]}"  # Convert "accounts" to "raw_accounts"
-                            upstream[model_name].add(source_name)
+                        source_name = dep_id.split(".")[-1]  # Just use the source name as-is
+                        upstream[model_name].add(source_name)
         
         return upstream
     
     def get_model_downstream(self) -> Dict[str, Set[str]]:
         """Return a dictionary of model downstream dependencies."""
-        downstream = {}
+        downstream: Dict[str, Set[str]] = {}
         
         upstream_deps = self.get_model_upstream()
         
@@ -103,3 +100,9 @@ class ManifestReader:
         if not node:
             return None
         return node.get("language")
+
+    def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
+        node = self.manifest.get('nodes', {}).get(node_id)
+        if node is None:
+            return None
+        return dict(node)  # explicitly convert to dict
