@@ -1,4 +1,4 @@
-from dbt_column_lineage.parser.sql_parser import SQLColumnParser
+from dbt_column_lineage.artifacts.sql_parser import SQLColumnParser
 
 def test_simple_select_with_join():
     """Test parsing a simple SELECT statement with direct references and renames."""
@@ -193,3 +193,43 @@ def test_subqueries():
     assert "orders.customer_id" in lineage["has_large_orders"][0].source_columns
     assert "customers.id" in lineage["has_large_orders"][0].source_columns
     
+def test_star_sources_should_not_include_ctes():
+    """Test that star sources only include actual table references, not CTEs."""
+    parser = SQLColumnParser()
+    
+    sql = """
+    with source as (
+        select * from raw_transactions
+    ),
+    final as (
+        select * from source
+    )
+    select * from final
+    """
+    
+    result = parser.parse_column_lineage(sql)
+    
+    assert result.star_sources == {'raw_transactions'}
+
+
+def test_star_sources_with_multiple_base_tables():
+    """Test star sources with multiple base tables through CTEs."""
+    parser = SQLColumnParser()
+    
+    sql = """
+    with transactions as (
+        select * from raw_transactions
+    ),
+    accounts as (
+        select * from raw_accounts
+    ),
+    enriched as (
+        select t.*, a.* 
+        from transactions t
+        join accounts a on a.id = t.account_id
+    )
+    select * from enriched
+    """
+    
+    result = parser.parse_column_lineage(sql)
+    assert result.star_sources == {'raw_transactions', 'raw_accounts'}
