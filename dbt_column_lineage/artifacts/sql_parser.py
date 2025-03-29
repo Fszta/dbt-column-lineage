@@ -1,7 +1,11 @@
 import re
+import logging
 from sqlglot import parse_one, exp
 from typing import Dict, List, Set, Optional
 from dbt_column_lineage.models.schema import ColumnLineage, SQLParseResult
+
+logging.getLogger('sqlglot').setLevel(logging.ERROR)
+
 
 class SQLColumnParser:
     def parse_column_lineage(self, sql: str) -> SQLParseResult:

@@ -70,8 +70,7 @@ class ModelRegistry:
                 self._apply_column_lineage(model, parse_result)
             except Exception as e:
                 logger.warning(
-                    f"Failed to process lineage for model {model_name}: {e}",
-                    exc_info=True
+                    f"Failed to process lineage for model {model_name}, skipping..."
                 )
                 continue
 
@@ -99,7 +98,6 @@ class ModelRegistry:
 
             for source_name in model.metadata['star_sources']:
                 if source_name not in models:
-                    logging.warning(f"Source model {source_name} not found")
                     continue
 
                 self._apply_star_columns(model, source_name, models[source_name])
