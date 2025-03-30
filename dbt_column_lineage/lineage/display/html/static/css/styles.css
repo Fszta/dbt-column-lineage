@@ -277,26 +277,31 @@ html, body {
 .node-info {
   background: white;
   border-radius: 6px;
-  padding: 15px;
+  padding: 20px;
   box-shadow: 0 2px 8px var(--shadow);
+  margin-top: 10px;
 }
 
 .node-info-placeholder {
   color: var(--text-light);
   font-style: italic;
+  padding: 10px 0;
 }
 
 .node-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 15px;
 }
 
 .node-label {
   font-weight: 600;
   font-size: 16px;
   color: var(--primary);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 85%;
 }
 
 .node-badge {
@@ -306,16 +311,26 @@ html, body {
   border-radius: 12px;
   font-size: 11px;
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .node-detail {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   display: flex;
+  flex-wrap: wrap;
 }
 
 .detail-label {
   width: 80px;
   color: var(--text-light);
+  flex-shrink: 0;
+}
+
+.node-detail span:last-child {
+  flex: 1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  padding-right: 5px;
 }
 
 .focus-button {

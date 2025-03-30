@@ -263,23 +263,25 @@ function updateNodeInfo(node) {
     if (!nodeInfoDiv) return;
     
     if (!node) {
-        nodeInfoDiv.innerHTML = 'Select a column to see details';
+        nodeInfoDiv.innerHTML = '<div class="node-info-placeholder">Select a column to see details</div>';
         return;
     }
     
     let html = `
         <div class="node-detail">
-            <strong>${node.label || ''}</strong>
+            <strong class="node-label">${node.label || ''}</strong>
         </div>
         <div class="node-detail">
-            <span class="detail-label">Model:</span> ${node.model || ''}
+            <span class="detail-label">Model:</span>
+            <span>${node.model || ''}</span>
         </div>
     `;
     
     if (node.data_type) {
         html += `
             <div class="node-detail">
-                <span class="detail-label">Data Type:</span> ${node.data_type}
+                <span class="detail-label">Data Type:</span>
+                <span>${node.data_type}</span>
             </div>
         `;
     }

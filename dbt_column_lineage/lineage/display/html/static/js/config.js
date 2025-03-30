@@ -25,7 +25,7 @@ function createConfig(container) {
             column: '#f0f0f0',
             columnHover: '#e0e0e0',
             edge: '#999',
-            edgeDimmed: '#ddd',
+            edgeDimmed: '#97a4b0',
             edgeHighlight: '#ff6b6b',
             selectedColumn: '#ffcccb',
             relatedColumn: '#fff0c0',
