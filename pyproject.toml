@@ -1,5 +1,5 @@
 [project]
-name = "dbt-column-lineage"
+name = "dbt-col-lineage"
 version = "0.1.0"
 description = "A simple tool to extract dbt column lineage"
 authors = [
@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [tool.poetry.scripts]
-dbt-column-lineage = "dbt_column_lineage.cli.main:main"
+dbt-col-lineage = "dbt_column_lineage.cli.main:main"
 test = "run_tests:run_tests"
 test-unit = "run_tests:run_tests_unit"
 test-integration = "run_tests:run_tests_integration"
@@ -53,4 +53,8 @@ module = [
 ignore_missing_imports = true
 
 [tool.poetry]
+name = "dbt-col-lineage"
+packages = [
+    {include = "dbt_column_lineage"}
+]
 license = "MIT"
