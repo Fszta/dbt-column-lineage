@@ -13,7 +13,7 @@ The tool currently supports three output formats:
 - **Text**: Simple console output showing upstream and downstream dependencies
 
 
-![DBT Column Lineage Demo](https://raw.githubusercontent.com/Fszta/dbt-column-lineage/main/assets/demo_lineage.gif)
+![DBT Column Lineage Demo](assets/demo_lineage.gif)
 
 
 ## Installation
@@ -55,6 +55,15 @@ dbt-col-lineage --select stg_transactions.amount+ \
 ## Limitations
 - Doesn't support python models
 - Some functions/syntax cannot be parsed properly, leading to models being skipped
+
+## Compatibility
+
+The tool has been tested with the following dbt adapters:
+- Snowflake
+- SQLite
+- DuckDB
+
+While it should work with other adapters as well (since it relies on dbt artifacts), these are the ones that have been specifically tested.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
