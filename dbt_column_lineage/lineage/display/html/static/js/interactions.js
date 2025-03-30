@@ -11,23 +11,63 @@ function setupInteractions(svg, g, data, state, config, edges) {
         
     svg.call(zoom);
     
-    // Zoom control buttons
-    document.getElementById('zoomIn').addEventListener('click', () => {
+    // Add background for drag/pan interactions
+    svg.insert('rect', ':first-child')
+        .attr('class', 'background')
+        .attr('width', config.width)
+        .attr('height', config.height)
+        .attr('fill', 'transparent')
+        .style('cursor', 'move');
+    
+    // Enable dragging on background to pan the entire graph
+    svg.on('mousedown', function(event) {
+        if (event.target.classList.contains('background')) {
+            event.preventDefault();
+            
+            const startX = event.clientX;
+            const startY = event.clientY;
+            const transform = d3.zoomTransform(svg.node());
+            
+            function mousemove(event) {
+                const dx = event.clientX - startX;
+                const dy = event.clientY - startY;
+                svg.call(
+                    zoom.transform,
+                    transform.translate(dx / transform.k, dy / transform.k)
+                );
+            }
+            
+            function mouseup() {
+                svg.on('mousemove', null);
+                svg.on('mouseup', null);
+                document.removeEventListener('mousemove', mousemove);
+                document.removeEventListener('mouseup', mouseup);
+            }
+            
+            svg.on('mousemove', mousemove);
+            svg.on('mouseup', mouseup);
+            document.addEventListener('mousemove', mousemove);
+            document.addEventListener('mouseup', mouseup);
+        }
+    });
+    
+    // Define reusable functions
+    function zoomIn() {
         svg.transition().duration(300).call(zoom.scaleBy, 1.2);
-    });
-
-    document.getElementById('zoomOut').addEventListener('click', () => {
+    }
+    
+    function zoomOut() {
         svg.transition().duration(300).call(zoom.scaleBy, 0.8);
-    });
-
-    document.getElementById('resetView').addEventListener('click', () => {
+    }
+    
+    function resetView() {
         const graphBox = g.node().getBBox();
         const scale = Math.min(
             config.width / graphBox.width, 
             config.height / graphBox.height
         ) * 0.9;
         
-        svg.transition()
+        return svg.transition()
             .duration(500)
             .call(zoom.transform, d3.zoomIdentity
                 .translate(
@@ -35,10 +75,9 @@ function setupInteractions(svg, g, data, state, config, edges) {
                     (config.height - graphBox.height * scale) / 2
                 )
                 .scale(scale));
-    });
-
-    // Relayout button
-    document.getElementById('relayout').addEventListener('click', () => {
+    }
+    
+    function relayout() {
         positionModels(state, config);
         
         // Update node positions with animation
@@ -61,7 +100,32 @@ function setupInteractions(svg, g, data, state, config, edges) {
         edges.transition()
             .duration(500)
             .attr('d', d => createEdgePath(d, state, config));
-    });
+    }
+    
+    // Attach event listeners
+    document.getElementById('zoomIn').addEventListener('click', zoomIn);
+    document.getElementById('zoomOut').addEventListener('click', zoomOut);
+    document.getElementById('resetView').addEventListener('click', resetView);
+    document.getElementById('relayout').addEventListener('click', relayout);
+    
+    // Add CSS to make drag smoother
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .background {
+            pointer-events: all;
+        }
+        svg {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Save zoom for other functions to use
+    state.zoom = zoom;
+    
+    // Initialize view to show the entire graph
+    setTimeout(resetView, 100);
 }
 
 // Create drag behavior for models
@@ -145,7 +209,7 @@ function highlightLineage(columnId, state, config) {
     d3.selectAll('.edge').transition().duration(200)
         .style('stroke', config.colors.edgeDimmed)
         .style('stroke-width', 1)
-        .style('stroke-opacity', 0.7)
+        .style('stroke-opacity', 0.9)
         .attr('marker-end', 'url(#arrowhead)');
     
     // Highlight relevant edges
@@ -192,4 +256,33 @@ function handleColumnClick(columnId, modelName, state, config) {
             data_type: column.dataType
         });
     }
+}
+
+function updateNodeInfo(node) {
+    const nodeInfoDiv = document.getElementById('nodeInfo');
+    if (!nodeInfoDiv) return;
+    
+    if (!node) {
+        nodeInfoDiv.innerHTML = 'Select a column to see details';
+        return;
+    }
+    
+    let html = `
+        <div class="node-detail">
+            <strong>${node.label || ''}</strong>
+        </div>
+        <div class="node-detail">
+            <span class="detail-label">Model:</span> ${node.model || ''}
+        </div>
+    `;
+    
+    if (node.data_type) {
+        html += `
+            <div class="node-detail">
+                <span class="detail-label">Data Type:</span> ${node.data_type}
+            </div>
+        `;
+    }
+    
+    nodeInfoDiv.innerHTML = html;
 }

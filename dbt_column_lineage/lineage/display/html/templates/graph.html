@@ -22,9 +22,25 @@
                 <button id="relayout">Re-layout</button>
             </div>
             <div class="info-panel">
-                <h3>Node Information</h3>
-                <div id="nodeInfo">
-                    Select a node to see details
+                <h3>Column Details</h3>
+                <div id="nodeInfo" class="node-info">
+                    <div class="node-info-placeholder">
+                        Select a column to see details
+                    </div>
+                    <div class="node-info-content" style="display: none;">
+                        <div class="node-header">
+                            <span id="nodeLabel" class="node-label"></span>
+                            <span id="nodeType" class="node-badge"></span>
+                        </div>
+                        <div class="node-detail">
+                            <span class="detail-label">Model:</span>
+                            <span id="nodeModel"></span>
+                        </div>
+                        <div class="node-detail">
+                            <span class="detail-label">Data Type:</span>
+                            <span id="nodeDataType"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

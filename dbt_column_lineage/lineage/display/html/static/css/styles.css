@@ -1,9 +1,28 @@
+/* Add CSS Variables for consistent colors */
+:root {
+  --primary: #4a6fa5;
+  --primary-light: #6989b9;
+  --secondary: #f8f9fa;
+  --accent: #ff9100;
+  --text-dark: #333;
+  --text-light: #666;
+  --border: #e0e0e0;
+  --shadow: rgba(0,0,0,0.1);
+  --model-bg: #ffffff;
+  --column-bg: #f8fafc;
+  --edge-color: #9eb3c6;
+  --edge-highlight: #ff9100;
+}
+
 /* Base styles */
 html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #f8f9fa;
+    color: var(--text-dark);
 }
 
 /* Layout */
@@ -16,12 +35,12 @@ html, body {
 .sidebar {
     width: 250px;
     padding: 20px;
-    background: #ffffff;
-    border-right: 1px solid #e0e0e0;
+    background: white;
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     gap: 20px;
-    box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+    box-shadow: 2px 0 8px var(--shadow);
 }
 
 #graph {
@@ -38,19 +57,20 @@ html, body {
 
 .controls button {
     padding: 8px 16px;
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
+    background: var(--secondary);
+    border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
-    color: #333;
-    transition: all 0.2s ease;
+    color: var(--primary);
+    font-weight: 500;
+    transition: all 0.2s;
 }
 
 .controls button:hover {
-    background: #f5f5f5;
-    border-color: #2196f3;
-    color: #2196f3;
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
 }
 
 /* Info panel */
@@ -82,27 +102,28 @@ html, body {
 }
 
 .model-container {
-    fill: #ffffff;
-    stroke: #cccccc;
+    fill: var(--model-bg);
+    stroke: var(--border);
     stroke-width: 1px;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+    rx: 8px;
+    ry: 8px;
 }
 
-.model-title {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    fill: #333;
-    pointer-events: none;
-    font-weight: 600;
-    font-size: 14px;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
-    max-width: 230px;
+.model-header {
+    stroke: none;
 }
 
 .title-divider {
-    stroke: #e0e0e0;
+    stroke: var(--border);
     stroke-width: 1px;
+    stroke-opacity: 0.5;
+}
+
+.model-title {
+    fill: var(--primary);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.2px;
 }
 
 /* Graph Columns */
@@ -112,18 +133,21 @@ html, body {
 }
 
 .column-bg {
-    fill: #ffffff;
-    stroke: #e0e0e0;
+    fill: var(--column-bg);
+    stroke: var(--border);
     stroke-width: 1px;
+    rx: 4px;
+    ry: 4px;
+    transition: all 0.2s ease;
 }
 
 .column-group:hover .column-bg {
-    fill: #f5f5f5;
-    stroke: #2196f3;
+    fill: #f0f4f8;
+    stroke: var(--primary-light);
+    filter: brightness(1.02);
 }
 
 .column-name {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 12px;
     fill: #333;
     pointer-events: none;
@@ -134,7 +158,6 @@ html, body {
 }
 
 .column-type {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 10px;
     fill: #666;
     pointer-events: none;
@@ -142,7 +165,7 @@ html, body {
 
 /* Graph Edges */
 .edge {
-    stroke: #999;
+    stroke: var(--edge-color);
     stroke-width: 1.5px;
     stroke-opacity: 0.9;
     fill: none;
@@ -150,7 +173,7 @@ html, body {
 }
 
 .edge:hover {
-    stroke: #2196f3;
+    stroke: var(--edge-highlight);
     stroke-width: 2px;
     stroke-opacity: 1;
 }
@@ -197,7 +220,6 @@ html, body {
 }
 
 .model text {
-    font-family: 'Helvetica', sans-serif;
     font-size: 14px;
 }
 
@@ -214,4 +236,99 @@ html, body {
     z-index: 100;
     white-space: nowrap;
     pointer-events: none;
+}
+
+/* Add styles for the sidebar toggle */
+.sidebar-toggle {
+  text-align: right;
+  margin-bottom: 15px;
+}
+
+.sidebar-toggle button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.sidebar-toggle button:hover {
+  background: var(--secondary);
+}
+
+.sidebar.collapsed {
+  width: 50px;
+  padding: 15px 10px;
+}
+
+.sidebar.collapsed .controls h3,
+.sidebar.collapsed .info-panel h3,
+.sidebar.collapsed .controls button,
+.sidebar.collapsed #nodeInfo,
+.sidebar.collapsed .info-panel {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-toggle button svg {
+  transform: rotate(180deg);
+}
+
+/* Add these styles for the improved node info panel */
+.node-info {
+  background: white;
+  border-radius: 6px;
+  padding: 15px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.node-info-placeholder {
+  color: var(--text-light);
+  font-style: italic;
+}
+
+.node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.node-label {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--primary);
+}
+
+.node-badge {
+  background: var(--primary-light);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.node-detail {
+  margin-bottom: 8px;
+  display: flex;
+}
+
+.detail-label {
+  width: 80px;
+  color: var(--text-light);
+}
+
+.focus-button {
+  margin-top: 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.focus-button:hover {
+  background: var(--primary-light);
 } 

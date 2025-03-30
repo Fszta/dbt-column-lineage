@@ -43,7 +43,7 @@ def cli(select: str, catalog: str, manifest: str, format: str, output: str, port
         selector = LineageSelector.from_string(select)
         service = LineageService(Path(catalog), Path(manifest))
         model = service.registry.get_model(selector.model)
-
+    
         if selector.column:
             if selector.column in model.columns:
                 column = model.columns[selector.column]

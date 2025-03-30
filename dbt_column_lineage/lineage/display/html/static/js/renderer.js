@@ -4,94 +4,121 @@
 
 // Set up SVG container and markers
 function setupSvg(config) {
-    const svg = d3.select(config.container)
+    const svg = d3.select('#graph')
         .append('svg')
         .attr('width', config.width)
-        .attr('height', config.height)
-
-    // Add arrow markers
-    const defs = svg.append("defs");
+        .attr('height', config.height);
     
-    defs.append("marker")
-        .attr("id", "arrowhead")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 10)
-        .attr("refY", 0)
-        .attr("markerWidth", 6)
-        .attr("markerHeight", 6)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", config.colors.edge);
-
-    defs.append("marker")
-        .attr("id", "arrowhead-highlighted")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 10)
-        .attr("refY", 0)
-        .attr("markerWidth", 6)
-        .attr("markerHeight", 6)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", config.colors.edgeHighlight);
+    // Add SVG definitions for arrows and effects
+    const defs = svg.append('defs');
+    
+    // Create a cleaner, subtle drop shadow
+    const cleanShadow = defs.append('filter')
+        .attr('id', 'clean-shadow')
+        .attr('x', '-5%')
+        .attr('y', '-5%')
+        .attr('width', '110%')
+        .attr('height', '110%');
         
-    return svg;
+    cleanShadow.append('feDropShadow')
+        .attr('dx', '0')
+        .attr('dy', '1')
+        .attr('stdDeviation', '2')
+        .attr('flood-color', 'rgba(0,0,0,0.15)')
+        .attr('flood-opacity', '0.5');
+    
+    // Create a subtle gradient for model headers
+    const headerGradient = defs.append('linearGradient')
+        .attr('id', 'header-gradient')
+        .attr('x1', '0%')
+        .attr('y1', '0%')
+        .attr('x2', '0%')
+        .attr('y2', '100%');
+        
+    headerGradient.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', 'var(--primary-light)')
+        .attr('stop-opacity', '0.2');
+        
+    headerGradient.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', 'var(--primary-light)')
+        .attr('stop-opacity', '0.05');
+    
+    // Arrow markers (regular and highlighted)
+    defs.append('marker')
+        .attr('id', 'arrowhead')
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 10)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', 'var(--edge-color)');
+    
+    defs.append('marker')
+        .attr('id', 'arrowhead-highlighted')
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 10)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', 'var(--edge-highlight)');
+    
+    return svg.append('g');
 }
 
 // Draw model boxes
 function drawModels(g, state, config, dragBehavior) {
-    const nodes = g.selectAll('.model')
+    const models = g.selectAll('.model')
         .data(state.models)
-        .join('g')
+        .enter()
+        .append('g')
         .attr('class', 'model')
         .attr('transform', d => `translate(${d.x},${d.y - d.height/2})`)
-        .call(dragBehavior)
-        .style('cursor', 'move');
+        .call(dragBehavior);
 
-    // Model container
-    nodes.append('rect')
+    // Main container with rounded corners
+    models.append('rect')
         .attr('class', 'model-container')
         .attr('width', config.box.width)
         .attr('height', d => d.height)
-        .attr('rx', config.box.cornerRadius)
-        .attr('fill', config.colors.model)
-        .attr('stroke', '#333')
-        .attr('stroke-width', 1);
+        .attr('rx', 8)
+        .attr('ry', 8)
+        .attr('filter', 'url(#clean-shadow)');
 
-    // Title background
-    nodes.append('rect')
+    // Add a header section with a subtle gradient
+    models.append('rect')
+        .attr('class', 'model-header')
         .attr('width', config.box.width)
         .attr('height', config.box.titleHeight)
-        .attr('rx', config.box.cornerRadius)
-        .attr('fill', config.colors.title);
+        .attr('rx', 8)
+        .attr('ry', 8)
+        .attr('fill', 'url(#header-gradient)');
 
-    // Title divider
-    nodes.append('line')
+    // Title separator line
+    models.append('line')
         .attr('class', 'title-divider')
         .attr('x1', 0)
         .attr('y1', config.box.titleHeight)
         .attr('x2', config.box.width)
         .attr('y2', config.box.titleHeight)
-        .attr('stroke', '#ccc');
+        .attr('stroke', 'var(--border)')
+        .attr('stroke-width', 1);
 
     // Model title
-    nodes.append('text')
+    models.append('text')
         .attr('class', 'model-title')
-        .attr('x', config.box.width / 2)
-        .attr('y', config.box.titleHeight / 2)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .attr('font-weight', 'bold')
-        .attr('font-size', '14px')
-        .text(function(d) {
-            // Truncate with ellipsis if too long
-            const maxLength = 25;
-            return d.name.length > maxLength ? d.name.substring(0, maxLength) + '...' : d.name;
-        })
-        .attr('data-original-text', d => d.name); // For full text on hover
-        
-    return nodes;
+        .attr('x', config.box.padding)
+        .attr('y', config.box.titleHeight / 2 + 5)
+        .text(d => d.name);
+
+    return models;
 }
 
 // Draw columns inside model boxes
@@ -201,9 +228,17 @@ function createEdgePath(d, state, config) {
     
     const sourceX = sourcePos.x + config.box.width - config.box.padding;
     const targetX = targetPos.x + config.box.padding;
-    const midX = (sourceX + targetX) / 2;
     
-    return `M${sourceX},${sourcePos.y} C${midX},${sourcePos.y} ${midX},${targetPos.y} ${targetX},${targetPos.y}`;
+    // Calculate control points for a smoother curve
+    const dx = targetX - sourceX;
+    const dy = targetPos.y - sourcePos.y;
+    const controlX1 = sourceX + dx * 0.4;
+    const controlX2 = sourceX + dx * 0.6;
+    
+    return `M${sourceX},${sourcePos.y} 
+            C${controlX1},${sourcePos.y} 
+             ${controlX2},${targetPos.y} 
+             ${targetX},${targetPos.y}`;
 }
 
 // Store references to edges for efficient dragging
