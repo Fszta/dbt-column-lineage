@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 import click
 
-from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay
+from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay, HTMLDisplay
 from dbt_column_lineage.lineage.service import LineageService, LineageSelector
 from dbt_column_lineage.lineage.display.base import LineageDisplay
 
@@ -28,11 +28,16 @@ from dbt_column_lineage.lineage.display.base import LineageDisplay
     default="target/manifest.json",
     help="Path to the dbt manifest file"
 )
-@click.option('--format', '-f', type=click.Choice(['text', 'dot']), default='text',
-              help='Output format (text or dot graph)')
+@click.option('--format', '-f', 
+              type=click.Choice(['text', 'dot', 'html']), 
+              default='text',
+              help='Output format (text, dot graph, or interactive html)')
 @click.option('--output', '-o', default='lineage',
               help='Output file name for dot format (without extension)')
-def cli(select: str, catalog: str, manifest: str, format: str, output: str) -> None:
+@click.option('--port', '-p', 
+              default=8000,
+              help='Port to run the HTML server (only used with html format)')
+def cli(select: str, catalog: str, manifest: str, format: str, output: str, port: int) -> None:
     """DBT Column Lineage - Generate column-level lineage for DBT models."""
     try:
         selector = LineageSelector.from_string(select)
@@ -48,6 +53,10 @@ def cli(select: str, catalog: str, manifest: str, format: str, output: str) -> N
                     display = DotDisplay(output, registry=service.registry)
                     display.main_model = selector.model
                     display.main_column = selector.column
+                elif format == 'html':
+                    display = HTMLDisplay(port=port)
+                    display.main_model = selector.model
+                    display.main_column = selector.column
                 else:
                     display = TextDisplay()
 
@@ -61,7 +70,7 @@ def cli(select: str, catalog: str, manifest: str, format: str, output: str) -> N
                     downstream_refs = service._get_downstream_lineage(selector.model, selector.column)
                     display.display_downstream(downstream_refs)
 
-                if format == 'dot':
+                if format in ('dot', 'html'):
                     display.save()
             else:
                 available_columns = ", ".join(model.columns.keys())

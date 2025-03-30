@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import logging
 
 from dbt_column_lineage.artifacts.registry import ModelRegistry
-from dbt_column_lineage.models.schema import Column, ColumnLineage
+from dbt_column_lineage.models.schema import ColumnLineage
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ class LineageService:
             
             self._get_upstream_lineage(src_model, src_column, visited)
             
-        except Exception as e:
+        except Exception:
             self._process_source_reference(f"{src_model}.{src_column}", upstream_refs)
 
     def _get_upstream_lineage(self, model_name: str, column_name: str, 
