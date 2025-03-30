@@ -19,7 +19,7 @@ The tool currently supports three output formats:
 ## Installation
 
 ```bash
-pip install dbt-col-lineage==0.1.0
+pip install dbt-col-lineage==0.1.1
 ```
 
 ## Usage
@@ -63,7 +63,6 @@ The tool has been tested with the following dbt adapters:
 - SQLite
 - DuckDB
 
-While it should work with other adapters as well (since it relies on dbt artifacts), these are the ones that have been specifically tested.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
