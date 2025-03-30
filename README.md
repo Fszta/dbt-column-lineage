@@ -13,7 +13,7 @@ The tool currently supports three output formats:
 - **Text**: Simple console output showing upstream and downstream dependencies
 
 
-![DBT Column Lineage Demo](assets/demo_lineage.gif)
+![DBT Column Lineage Demo](https://raw.githubusercontent.com/Fszta/dbt-column-lineage/main/assets/demo_lineage.gif)
 
 
 ## Installation
