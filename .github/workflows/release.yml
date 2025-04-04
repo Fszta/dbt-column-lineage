@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'dbt_column_lineage/**'
+      - 'pyproject.toml'
+
+      - '!.github/**'
+      - '!tests/**'
+      - '!*.md'
+      - '!.gitignore'
+      - '!LICENSE'
+      - '!poetry.lock'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Skip if commit message contains "chore(release)" to avoid loops
+    if: "!contains(github.event.head_commit.message, 'chore(release)')"
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conventional Changelog Action
+        id: changelog
+        uses: TriPSs/conventional-changelog-action@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-file: './pyproject.toml'
+          version-path: 'project.version'
+          skip-changelog: 'false'
+          skip-version-file: 'false'
+          skip-commit: 'false'
+          git-message: 'chore(release): {version}'
+          git-user-name: 'Fszta'
+          fallback-version: '0.1.1'
+
+      - name: Create Release
+        if: steps.changelog.outputs.skipped != 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.changelog.outputs.version }}
+          name: Release v${{ steps.changelog.outputs.version }}
+          body: ${{ steps.changelog.outputs.clean_changelog }}
+          draft: false
+          prerelease: false
+
+      - name: Trigger publish workflow
+        if: steps.changelog.outputs.skipped != 'true'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: trigger-publish 

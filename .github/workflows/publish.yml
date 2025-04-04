@@ -2,7 +2,9 @@ name: Publish Python Package
 
 on:
   release:
-    types: [created]
+    types: [published]
+  repository_dispatch:
+    types: [trigger-publish]
   # Allow manual triggers for testing the workflow
   workflow_dispatch:
 
@@ -28,26 +30,29 @@ jobs:
     - name: Check Poetry version
       run: poetry --version
     
+    - name: Update poetry.lock
+      run: poetry lock
+    
     - name: Install dependencies
       run: poetry install --no-interaction
     
     - name: Run tests
       run: poetry run pytest
     
-    - name: Extract version from tag
-      if: github.event_name == 'release'
+    - name: Extract version
       id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-    
-    - name: Update version in pyproject.toml if from tag
-      if: github.event_name == 'release'
-      run: poetry version ${{ steps.get_version.outputs.VERSION }}
+      run: |
+        # Always get the version from the pyproject.toml file
+        # This should be correct since we're checking out the repo after the version bump
+        VERSION=$(poetry version -s)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Using version: $VERSION"
     
     - name: Build package
       run: poetry build
-    
-    - name: Publish to PyPI
-      if: github.event_name == 'release' && success()
-      env:
-        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
-      run: poetry publish
+
+     - name: Publish to PyPI
+       if: success()
+       env:
+         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+       run: poetry publish
