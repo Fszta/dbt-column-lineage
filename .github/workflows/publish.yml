@@ -51,8 +51,8 @@ jobs:
     - name: Build package
       run: poetry build
 
-     - name: Publish to PyPI
-       if: success()
-       env:
-         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
-       run: poetry publish
+    - name: Publish to PyPI
+      if: success()
+      env:
+        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+      run: poetry publish
