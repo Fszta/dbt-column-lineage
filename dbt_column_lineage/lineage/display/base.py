@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Union, Set
 from dbt_column_lineage.models.schema import Column, ColumnLineage
 
-class LineageDisplay(ABC):
+class LineageStaticDisplay(ABC):
     """Abstract base class for lineage display strategies."""
     
     @abstractmethod

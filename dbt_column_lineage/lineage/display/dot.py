@@ -2,9 +2,9 @@ from typing import Dict, Set, Optional, Any, Union
 from graphviz import Digraph  # type: ignore  # missing stubs for graphviz
 from dbt_column_lineage.models.schema import Column, ColumnLineage
 from dbt_column_lineage.artifacts.registry import ModelRegistry
-from dbt_column_lineage.lineage.display.base import LineageDisplay
+from dbt_column_lineage.lineage.display.base import LineageStaticDisplay
 
-class DotDisplay(LineageDisplay):
+class DotDisplay(LineageStaticDisplay):
     def __init__(self, output_file: str = "lineage.dot", registry: Optional[ModelRegistry] = None):
         self.dot = Digraph(comment='Column Lineage')
         self.dot.attr(rankdir='LR')
