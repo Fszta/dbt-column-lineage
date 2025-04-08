@@ -125,6 +125,35 @@ def real_manifest(tmp_path):
     
     return manifest_path
 
+@pytest.fixture
+def sample_manifest_with_sources_identifier(tmp_path):
+    """Create a sample manifest file that includes sources with identifier."""
+    manifest_data = {
+        "nodes": {
+            "model.jaffle_shop.customers": {
+                "name": "customers",
+                "resource_type": "model",
+                "depends_on": {
+                    "nodes": ["source.jaffle_shop.raw_customers"]
+                }
+            }
+        },
+        "sources": {
+            "source.jaffle_shop.raw_customers": {
+                "name": "raw_customers",
+                "source_name": "raw",
+                "resource_type": "source",
+                "identifier": "raw_customers_table"
+            }
+        }
+    }
+    
+    manifest_path = tmp_path / "manifest.json"
+    with open(manifest_path, "w") as f:
+        json.dump(manifest_data, f)
+    
+    return manifest_path
+
 def test_manifest_reader_basics():
     """Test ManifestReader initialization and error handling."""
     reader = ManifestReader("some/path")
@@ -174,3 +203,50 @@ def test_complex_dependencies(real_manifest):
     
     for model, expected_deps in dependency_tests.items():
         assert dependencies[model] == expected_deps 
+
+def test_source_dependencies(sample_manifest_with_sources_identifier):
+    """Test handling of source dependencies in manifest."""
+    reader = ManifestReader(sample_manifest_with_sources_identifier)
+    reader.load()
+    
+    upstream = reader.get_model_upstream()    
+    assert "customers" in upstream
+    assert "raw_customers_table" in upstream["customers"]
+    
+    downstream = reader.get_model_downstream()
+    assert "raw_customers_table" in downstream
+    assert "customers" in downstream["raw_customers_table"]
+
+def test_source_dependencies_without_identifier(tmp_path):
+    """Test handling of source dependencies when source has no identifier."""
+    manifest_data = {
+        "nodes": {
+            "model.jaffle_shop.customers": {
+                "name": "customers",
+                "resource_type": "model",
+                "depends_on": {
+                    "nodes": ["source.jaffle_shop.raw_customers"]
+                }
+            }
+        },
+        "sources": {
+            "source.jaffle_shop.raw_customers": {
+                "name": "raw_customers",
+                "source_name": "raw",
+                "resource_type": "source"
+            }
+        }
+    }
+    
+    manifest_path = tmp_path / "manifest.json"
+    with open(manifest_path, "w") as f:
+        json.dump(manifest_data, f)
+    
+    reader = ManifestReader(manifest_path)
+    reader.load()
+    
+    upstream = reader.get_model_upstream()
+    
+    # Should fall back to source name when identifier is not present
+    assert "customers" in upstream
+    assert "raw_customers" in upstream["customers"] 

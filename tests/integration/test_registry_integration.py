@@ -49,9 +49,9 @@ def test_model_dependencies(registry):
     models = registry.get_models()
     
     upstream_tests = [
-        ("stg_transactions", ["transactions"]),
-        ("stg_accounts", ["accounts"]),
-        ("stg_countries", ["countries"]),
+        ("stg_transactions", ["raw_transactions"]),
+        ("stg_accounts", ["raw_accounts"]),
+        ("stg_countries", ["raw_countries"]),
 
         
         ("int_monthly_account_metrics", ["int_transactions_enriched"]),
@@ -133,4 +133,81 @@ def test_compiled_sql_from_test_project(registry):
     sql = registry.get_compiled_sql("transactions")
     assert "select" in sql.lower()
     assert "from" in sql.lower()
-    assert "join" in sql.lower() 
+    assert "join" in sql.lower()
+
+def test_source_lineage_integration(registry):
+    """Test source to model lineage integration."""
+    models = registry.get_models()
+    
+    source_to_staging_tests = [
+        ("stg_accounts", "account_id", "raw_accounts.id"),
+        ("stg_accounts", "account_holder", "raw_accounts.holder"),
+        ("stg_transactions", "transaction_id", "raw_transactions.id"),
+        ("stg_transactions", "amount", "raw_transactions.amount"),
+        ("stg_countries", "country_code", "raw_countries.code"),
+        ("stg_countries", "country_name", "raw_countries.name"),
+    ]
+    
+    for model_name, column_name, expected_source in source_to_staging_tests:
+        model = models[model_name]
+        column = model.columns[column_name]
+        assert column.lineage, f"No lineage found for {model_name}.{column_name}"
+        
+        sources = set()
+        for lineage in column.lineage:
+            sources.update(lineage.source_columns)
+        
+        assert expected_source in sources, \
+            f"{model_name}.{column_name} should trace to {expected_source}, got {sources}"
+
+def test_source_model_types(registry):
+    """Test that models and sources have correct resource types."""
+    models = registry.get_models()
+    
+    # TODO: Add tests for seeds and tests when supported
+    resource_type_tests = [
+        ("raw_accounts", "source"),
+        ("raw_transactions", "source"),
+        ("raw_countries", "source"),
+        ("stg_accounts", "model"),
+        ("int_transactions_enriched", "model"),
+        ("accounts_tiering", "model"),
+    ]
+    
+    for node_name, expected_type in resource_type_tests:
+        node = models[node_name]
+        assert node.resource_type == expected_type, \
+            f"{node_name} should be a {expected_type}, got {node.resource_type}"
+
+def test_source_dependencies(registry):
+    """Test source dependency relationships."""
+    models = registry.get_models()
+    
+    source_dependency_tests = [
+        ("stg_accounts", {"raw_accounts"}),
+        ("stg_transactions", {"raw_transactions"}),
+        ("stg_countries", {"raw_countries"}),
+        ("int_transactions_enriched", {"stg_transactions", "stg_accounts"}),
+    ]
+    
+    for model_name, expected_upstream in source_dependency_tests:
+        model = models[model_name]
+        for source in expected_upstream:
+            assert source in model.upstream, \
+                f"{model_name} should have {source} as upstream dependency"
+
+def test_source_downstream_dependencies(registry):
+    """Test source downstream dependency relationships."""
+    models = registry.get_models()
+    
+    source_downstream_tests = [
+        ("raw_accounts", {"stg_accounts"}),
+        ("raw_transactions", {"stg_transactions"}),
+        ("raw_countries", {"stg_countries"}),
+    ]
+    
+    for source_name, expected_downstream in source_downstream_tests:
+        source = models[source_name]
+        for downstream_model in expected_downstream:
+            assert downstream_model in source.downstream, \
+                f"{source_name} should have {downstream_model} as downstream dependency"
