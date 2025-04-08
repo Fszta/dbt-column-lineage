@@ -20,7 +20,7 @@ The tool offers several ways to view lineage:
 ## Installation
 
 ```bash
-pip install dbt-col-lineage==0.2.0
+pip install dbt-col-lineage==0.2.1
 ```
 
 ## Usage
