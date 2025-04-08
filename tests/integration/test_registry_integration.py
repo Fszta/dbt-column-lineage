@@ -107,7 +107,6 @@ def test_derived_columns_lineage(registry):
         column = model.columns[column_name]
         assert column.lineage, f"No lineage found for {model_name}.{column_name}"
         
-        # TODO Check this assertion
         assert any(l.transformation_type == expected_type for l in column.lineage), \
             f"{model_name}.{column_name} should have {expected_type} transformation"
 
