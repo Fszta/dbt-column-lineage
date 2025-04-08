@@ -79,10 +79,21 @@ class LineageExplorer:
             
             models = []
             for model_name, model in self.lineage_service.registry.get_models().items():
-                columns = [
-                    {"name": col_name, "type": col.data_type}
-                    for col_name, col in model.columns.items()
-                ]
+                columns = []
+                for col_name, col in model.columns.items():
+                    # Get transformation type and sql expression from the first lineage entry, if available
+                    transformation_type = None
+                    sql_expression = None
+                    if col.lineage and len(col.lineage) > 0:
+                        transformation_type = col.lineage[0].transformation_type
+                        sql_expression = col.lineage[0].sql_expression
+                        
+                    columns.append({
+                        "name": col_name, 
+                        "type": col.data_type,
+                        "transformation_type": transformation_type, 
+                        "sql_expression": sql_expression
+                    })
                 
                 models.append({
                     "name": model_name,
