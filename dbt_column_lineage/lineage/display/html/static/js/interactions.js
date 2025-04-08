@@ -175,7 +175,6 @@ function createDragBehavior(state, config) {
         .on('start', function(event, d) {
             d3.select(this).raise();
             d3.select(this).classed('active', true);
-            // Cache connected edges for efficient update during drag
             d._connectedEdges = state.modelEdges.get(d.name) || []; 
         })
         .on('drag', function(event, d) {
@@ -185,25 +184,22 @@ function createDragBehavior(state, config) {
             const modelElement = d3.select(this);
             modelElement.attr('transform', `translate(${d.x},${d.y - d.height/2})`);
             
-            // Update column positions as the model moves
             d.columns.forEach((col, i) => {
+                 let columnYOffset = config.box.titleHeight + 28 + 
+                                    (i * config.box.columnHeight) + 
+                                    (config.box.columnHeight - config.box.columnPadding) / 2;
+
                  const columnCenter = {
                     x: d.x,
-                    y: d.y - d.height/2 + config.box.titleHeight + 28 + 
-                       (i * config.box.columnHeight) + 
-                       (config.box.columnHeight - config.box.columnPadding) / 2
+                    y: d.y - d.height/2 + columnYOffset
                 };
                 state.columnPositions.set(col.id, columnCenter);
             });
             
-            if (typeof updateModelEdges === 'function') {
-                updateModelEdges(d, state, config); 
-            } else {
-                console.error("updateModelEdges function not found.");
-            }
+            updateModelEdges(d, state, config); 
         })
         .on('end', function(event, d) {
             d3.select(this).classed('active', false);
-            delete d._connectedEdges; // Clean up cached edges
+            delete d._connectedEdges;
         });
 }
