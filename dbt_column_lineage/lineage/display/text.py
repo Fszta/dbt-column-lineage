@@ -1,9 +1,9 @@
 from typing import Dict, Set, Union
 import click
 from dbt_column_lineage.models.schema import Column, ColumnLineage
-from .base import LineageDisplay
+from .base import LineageStaticDisplay
 
-class TextDisplay(LineageDisplay):
+class TextDisplay(LineageStaticDisplay):
     def display_column_info(self, column: Column) -> None:
         click.echo(f"\nColumn: {column.name}")
         click.echo(f"Type: {column.data_type}")

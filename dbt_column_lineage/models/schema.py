@@ -41,6 +41,8 @@ class Model(BaseModel):
     downstream: Set[str] = Field(default_factory=set)
     compiled_sql: Optional[str] = None
     language: Optional[str] = None
+    resource_type: Literal["model", "source", "seed", "test"]
+    source_identifier: Optional[str] = None
 
 class SQLParseResult(BaseModel):
     column_lineage: Dict[str, List[ColumnLineage]]

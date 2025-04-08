@@ -43,7 +43,7 @@ class ManifestReader:
         upstream: Dict[str, Set[str]] = {}
         
         for _, node in self.manifest.get("nodes", {}).items():
-            if node.get("resource_type") == "model":
+            if node.get("resource_type") in ["model", "seed", "test"]:
                 model_name = node.get("name")
                 if not model_name:
                     continue
@@ -52,12 +52,19 @@ class ManifestReader:
                 
                 depends_on = node.get("depends_on", {})
                 for dep_id in depends_on.get("nodes", []):
-                    if dep_id.startswith("model."):
-                        dep_name = dep_id.split(".")[-1]
+                    parts = dep_id.split(".")
+                    if parts[0] == "model":
+                        dep_name = parts[-1]
                         upstream[model_name].add(dep_name)
-                    elif dep_id.startswith("source."):
-                        source_name = dep_id.split(".")[-1]
-                        upstream[model_name].add(source_name)
+                    elif parts[0] == "source":
+                        source_node = self.manifest.get("sources", {}).get(dep_id, {})
+                        source_identifier = source_node.get("identifier")
+                        if source_identifier:
+                            upstream[model_name].add(source_identifier)
+                        else:
+                            # Fallback to source name if identifier not found
+                            source_name = parts[-1]
+                            upstream[model_name].add(source_name)
         
         return upstream
     

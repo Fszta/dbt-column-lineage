@@ -2,19 +2,24 @@ import sys
 from pathlib import Path
 import click
 
-from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay, HTMLDisplay
+from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay
+from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
 from dbt_column_lineage.lineage.service import LineageService, LineageSelector
-from dbt_column_lineage.lineage.display.base import LineageDisplay
+from dbt_column_lineage.lineage.display.base import LineageStaticDisplay
 
 @click.command()
 @click.option(
     '--select',
-    required=True,
     help="Select models/columns to generate lineage for. Format: [+]model_name[.column_name][+]\n"
          "Examples:\n"
          "  stg_accounts.account_id+  (downstream lineage)\n"
          "  +stg_accounts.account_id  (upstream lineage)\n"
          "  stg_accounts.account_id   (both directions)"
+)
+@click.option(
+    '--explore',
+    is_flag=True,
+    help="Start an interactive HTML server for exploring model and column lineage"
 )
 @click.option(
     '--catalog',
@@ -29,32 +34,44 @@ from dbt_column_lineage.lineage.display.base import LineageDisplay
     help="Path to the dbt manifest file"
 )
 @click.option('--format', '-f', 
-              type=click.Choice(['text', 'dot', 'html']), 
+              type=click.Choice(['text', 'dot']), 
               default='text',
-              help='Output format (text, dot graph, or interactive html)')
+              help='Output format (text or dot graph)')
 @click.option('--output', '-o', default='lineage',
               help='Output file name for dot format (without extension)')
 @click.option('--port', '-p', 
               default=8000,
-              help='Port to run the HTML server (only used with html format)')
-def cli(select: str, catalog: str, manifest: str, format: str, output: str, port: int) -> None:
+              help='Port to run the HTML server (only used with --explore)')
+def cli(select: str, explore: bool, catalog: str, manifest: str, format: str, output: str, port: int) -> None:
     """DBT Column Lineage - Generate column-level lineage for DBT models."""
+    if not select and not explore:
+        click.echo("Error: Either --select or --explore must be specified", err=True)
+        sys.exit(1)
+    
+    if select and explore:
+        click.echo("Error: Cannot use both --select and --explore at the same time", err=True)
+        sys.exit(1)
+
     try:
-        selector = LineageSelector.from_string(select)
         service = LineageService(Path(catalog), Path(manifest))
+        
+        if explore:
+            click.echo(f"Starting explore mode server on port {port}...")
+            lineage_explorer = LineageExplorer(port=port)
+            lineage_explorer.set_lineage_service(service)
+            lineage_explorer.start()
+            return
+            
+        selector = LineageSelector.from_string(select)
         model = service.registry.get_model(selector.model)
     
         if selector.column:
             if selector.column in model.columns:
                 column = model.columns[selector.column]
                 
-                display: LineageDisplay
+                display: LineageStaticDisplay
                 if format == 'dot':
                     display = DotDisplay(output, registry=service.registry)
-                    display.main_model = selector.model
-                    display.main_column = selector.column
-                elif format == 'html':
-                    display = HTMLDisplay(port=port)
                     display.main_model = selector.model
                     display.main_column = selector.column
                 else:
@@ -70,7 +87,7 @@ def cli(select: str, catalog: str, manifest: str, format: str, output: str, port
                     downstream_refs = service._get_downstream_lineage(selector.model, selector.column)
                     display.display_downstream(downstream_refs)
 
-                if format in ('dot', 'html'):
+                if format == 'dot':
                     display.save()
             else:
                 available_columns = ", ".join(model.columns.keys())
