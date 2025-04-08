@@ -7,6 +7,7 @@
     <script src="https://dagrejs.github.io/project/dagre/latest/dagre.min.js"></script>
     <script src="{{ url_for('static', path='/js/config.js') }}"></script>
     <script src="{{ url_for('static', path='/js/dataProcessor.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/utils.js') }}"></script>
     <script src="{{ url_for('static', path='/js/renderer.js') }}"></script>
     <script src="{{ url_for('static', path='/js/interactions.js') }}"></script>
     <script src="{{ url_for('static', path='/js/graph.js') }}"></script>
@@ -14,6 +15,24 @@
 <body>
     <div class="container">
         <div class="sidebar">
+            {% if explore_mode %}
+            <div class="explore-panel">
+                <h3>Explore Lineage</h3>
+                <div class="model-selector">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect">
+                        <option value="">Select a model</option>
+                    </select>
+                </div>
+                <div class="column-selector">
+                    <label for="columnSelect">Column:</label>
+                    <select id="columnSelect" disabled>
+                        <option value="">Select a column</option>
+                    </select>
+                </div>
+                <button id="loadLineage" disabled>Load Lineage</button>
+            </div>
+            {% endif %}
             <div class="controls">
                 <h3>Controls</h3>
                 <button id="zoomIn">Zoom In</button>
@@ -21,35 +40,74 @@
                 <button id="resetView">Reset View</button>
                 <button id="relayout">Re-layout</button>
             </div>
-            <div class="info-panel">
-                <h3>Column Details</h3>
-                <div id="nodeInfo" class="node-info">
-                    <div class="node-info-placeholder">
-                        Select a column to see details
-                    </div>
-                    <div class="node-info-content" style="display: none;">
-                        <div class="node-header">
-                            <span id="nodeLabel" class="node-label"></span>
-                            <span id="nodeType" class="node-badge"></span>
-                        </div>
-                        <div class="node-detail">
-                            <span class="detail-label">Model:</span>
-                            <span id="nodeModel"></span>
-                        </div>
-                        <div class="node-detail">
-                            <span class="detail-label">Data Type:</span>
-                            <span id="nodeDataType"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
         <div id="graph"></div>
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Data:', {{ data | tojson }});
-            initGraph({{ data | tojson }});
+            let graphInstance = initGraph({{ data | tojson }});
+            
+            {% if explore_mode %}
+            const modelSelect = document.getElementById('modelSelect');
+            const columnSelect = document.getElementById('columnSelect');
+            const loadLineageBtn = document.getElementById('loadLineage');
+            const graphContainer = document.getElementById('graph');
+            
+            let allModelsData = [];
+            
+            fetch('/api/models')
+                .then(response => response.json())
+                .then(models => {
+                    allModelsData = models;
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.name;
+                        option.textContent = model.name;
+                        modelSelect.appendChild(option);
+                    });
+                });
+                
+            modelSelect.addEventListener('change', function() {
+                columnSelect.innerHTML = '<option value="">Select a column</option>';
+                columnSelect.disabled = !this.value;
+                loadLineageBtn.disabled = true;
+                
+                if (this.value) {
+                    const model = allModelsData.find(m => m.name === this.value);
+                    if (model && model.columns) {
+                        model.columns.forEach(column => {
+                            const option = document.createElement('option');
+                            option.value = column.name;
+                            option.textContent = `${column.name} (${column.type || 'unknown'})`;
+                            columnSelect.appendChild(option);
+                        });
+                    }
+                }
+            });
+            
+            columnSelect.addEventListener('change', function() {
+                loadLineageBtn.disabled = !this.value;
+            });
+            
+            loadLineageBtn.addEventListener('click', function() {
+                const model = modelSelect.value;
+                const column = columnSelect.value;
+                if (model && column) {
+                    fetch(`/api/lineage/${model}/${column}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                console.error(data.error);
+                                return;
+                            }
+                            graphContainer.innerHTML = '';
+                            
+                            graphInstance = initGraph(data);
+                        });
+                }
+            });
+            {% endif %}
         });
     </script>
 </body>

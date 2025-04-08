@@ -25,21 +25,38 @@ function processData(data, state) {
         state.nodeIndex.set(node.id, node);
     });
 
-    // Group nodes by model
     const modelGroups = {};
+    const modelTypes = {};
+    
+    // First pass: gather all resource_types by model to handle cases
+    // where only some columns in a model have the type defined.
+    data.nodes.forEach(node => {
+        if (node.type === 'column' && node.resource_type) {
+            if (!modelTypes[node.model]) {
+                modelTypes[node.model] = node.resource_type;
+            }
+        }
+    });
+    
+    // Second pass: create model groups using the determined type.
     data.nodes.forEach(node => {
         if (node.type === 'column') {
+            const resourceType = modelTypes[node.model] || node.resource_type || 'model';
+            
             if (!modelGroups[node.model]) {
                 modelGroups[node.model] = {
                     name: node.model,
                     columns: [],
-                    isMain: node.is_main || false
+                    isMain: node.is_main || false,
+                    type: resourceType
                 };
             }
+            
             modelGroups[node.model].columns.push({
                 name: node.label,
                 id: node.id,
-                dataType: node.data_type
+                dataType: node.data_type,
+                isKey: node.is_key || false
             });
         }
     });
@@ -59,22 +76,20 @@ function buildLineageMaps(data, state) {
         const sourceId = edge.source;
         const targetId = edge.target;
         
-        // Upstream: what feeds into this column
         if (!upstreamMap.has(targetId)) {
             upstreamMap.set(targetId, new Set());
         }
         upstreamMap.get(targetId).add(sourceId);
-        upstreamMap.get(targetId).add(targetId);  // Include self
+        upstreamMap.get(targetId).add(targetId); // Include self
         
-        // Downstream: where this column's data goes
         if (!downstreamMap.has(sourceId)) {
             downstreamMap.set(sourceId, new Set());
         }
         downstreamMap.get(sourceId).add(targetId);
-        downstreamMap.get(sourceId).add(sourceId);  // Include self
+        downstreamMap.get(sourceId).add(sourceId); // Include self
     });
     
-    // Recursively find all connected columns
+    // Recursively find all connected columns (full upstream/downstream)
     function getAllConnected(columnId, map, visited = new Set()) {
         if (visited.has(columnId)) return visited;
         
@@ -101,7 +116,6 @@ function buildLineageMaps(data, state) {
 
 // Calculate model positions based on their dependencies
 function layoutModels(data, state) {
-    // Create dependency graph for models
     const dependencies = new Map();
     state.models.forEach(model => {
         dependencies.set(model.name, { model, inDegree: 0, outDegree: 0, level: 0 });
@@ -123,14 +137,13 @@ function layoutModels(data, state) {
         }
     });
     
-    // Assign levels based on topological sort
+    // Assign levels based on topological sort approach
     let currentLevel = 0;
     let modelsInCurrentLevel = [...dependencies.values()]
         .filter(info => info.inDegree === 0)
         .map(info => info.model.name);
     
     while (modelsInCurrentLevel.length > 0) {
-        // Set level for current models
         modelsInCurrentLevel.forEach(modelName => {
             const info = dependencies.get(modelName);
             if (info) info.level = currentLevel;
@@ -141,6 +154,7 @@ function layoutModels(data, state) {
             const sourceNode = state.nodeIndex.get(edge.source);
             const targetNode = state.nodeIndex.get(edge.target);
             
+            // Find edges originating from the current level to other levels
             if (sourceNode && targetNode && 
                 modelsInCurrentLevel.includes(sourceNode.model) && 
                 !modelsInCurrentLevel.includes(targetNode.model)) {
@@ -148,14 +162,15 @@ function layoutModels(data, state) {
             }
         });
         
-        modelsInCurrentLevel = [...new Set(nextLevelModels)]; // Deduplicate
+        modelsInCurrentLevel = [...new Set(nextLevelModels)]; // Deduplicate for next iteration
         currentLevel++;
     }
     
-    // Handle cycles or disconnected models
+    // Handle potential cycles or disconnected models by assigning them a level
     dependencies.forEach((info, modelName) => {
         if (info.level === 0 && info.inDegree > 0) {
-            info.level = Math.max(1, currentLevel);
+            // Assign to a level after the main flow, avoids level 0 if it has inputs
+            info.level = Math.max(1, currentLevel); 
         }
     });
     
@@ -175,6 +190,7 @@ function layoutModels(data, state) {
 function positionModels(state, config) {
     let xOffset = 50;
     state.levelGroups.forEach((modelsInLevel, level) => {
+        // Distribute models vertically within the allocated space for the level
         const levelHeight = config.height * config.layout.verticalUsage;
         const verticalSpacing = levelHeight / (modelsInLevel.length + 1);
         
@@ -183,9 +199,10 @@ function positionModels(state, config) {
             model.y = verticalSpacing * (idx + 1);
             model.height = config.box.titleHeight + 
                           (model.columns.length * config.box.columnHeight) + 
-                          (config.box.padding * 2);
+                          (config.box.padding * 2); 
         });
         
+        // Increase offset for the next level if this level had models
         if (modelsInLevel.length > 0) {
             xOffset += 50;
         }

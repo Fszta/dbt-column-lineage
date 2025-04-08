@@ -1,4 +1,3 @@
-/* Add CSS Variables for consistent colors */
 :root {
   --primary: #4a6fa5;
   --primary-light: #6989b9;
@@ -14,7 +13,6 @@
   --edge-highlight: #ff9100;
 }
 
-/* Base styles */
 html, body {
     margin: 0;
     padding: 0;
@@ -25,7 +23,6 @@ html, body {
     color: var(--text-dark);
 }
 
-/* Layout */
 .container {
     display: flex;
     width: 100%;
@@ -46,34 +43,83 @@ html, body {
 #graph {
     flex: 1;
     overflow: hidden;
+    position: relative;
+    background-color: #f9fafc;
+    background-image: 
+      radial-gradient(circle, rgba(130, 150, 175, 0.5) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: -1px -1px;
 }
 
-/* Controls section */
 .controls {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 50px;
+  padding: 10px;
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 100;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  width: auto;
+}
+
+.controls h3 {
+  display: none;
 }
 
 .controls button {
-    padding: 8px 16px;
-    background: var(--secondary);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    color: var(--primary);
-    font-weight: 500;
-    transition: all 0.2s;
+  padding: 10px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  width: 40px;
+  height: 40px;
+  position: relative;
+  text-indent: -9999px;
+  overflow: hidden;
+}
+
+/* Ensure the icons remain visible and centered */
+.controls button::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-indent: 0;
 }
 
 .controls button:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
 }
 
-/* Info panel */
+.controls button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .controls {
+    bottom: 15px;
+    right: 15px;
+    padding: 8px;
+  }
+}
+
 .info-panel {
     margin-top: 20px;
 }
@@ -82,69 +128,110 @@ html, body {
     margin-bottom: 10px;
 }
 
-/* Graph Models */
 .model {
     transition: filter 0.1s;
     cursor: move;
 }
 
-.model:hover {
-    filter: brightness(0.95);
-}
-
 .model.active {
-    filter: brightness(0.9);
-}
-
-.model.active .model-container {
-    stroke: #2196f3;
+    stroke: var(--primary); /* Highlight border when active/dragging */
     stroke-width: 2px;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,0.15));
 }
 
 .model-container {
-    fill: var(--model-bg);
-    stroke: var(--border);
+    fill: white;
+    stroke: #e2e8f0;
     stroke-width: 1px;
     rx: 8px;
     ry: 8px;
 }
 
+.model-header,
+.columns-header rect,
+.column-bg {
+  stroke: none;
+  fill-opacity: 1;
+}
+
+.model:hover .model-container {
+  stroke: #cbd5e1;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.05));
+}
+
 .model-header {
+    stroke: none;
+    fill-opacity: 1;
+    rx: 7px;
+    ry: 7px;
+}
+
+/* Columns header styling - no top border */
+.columns-header rect {
+    transition: fill 0.2s, rx 0.2s, ry 0.2s;
     stroke: none;
 }
 
-.title-divider {
-    stroke: var(--border);
-    stroke-width: 1px;
-    stroke-opacity: 0.5;
+.columns-header:hover rect {
+    fill: #e5e9f0;
 }
 
-.model-title {
-    fill: var(--primary);
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0.2px;
+.columns-label {
+    font-weight: 500;
+    user-select: none;
 }
 
-/* Graph Columns */
-.column-group {
-    pointer-events: all;
-    cursor: pointer;
+.toggle-icon {
+    position: relative;
+    pointer-events: none;
+}
+
+.toggle-icon path {
+    transform-origin: center;
+    transition: transform 0.3s ease;
+}
+
+.model.collapsed-model .columns-header rect {
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    rx: 0;
+    ry: 7px;
+    transition: rx 0.2s, ry 0.2s;
 }
 
 .column-bg {
-    fill: var(--column-bg);
-    stroke: var(--border);
-    stroke-width: 1px;
-    rx: 4px;
-    ry: 4px;
-    transition: all 0.2s ease;
+  display: none; 
 }
 
-.column-group:hover .column-bg {
-    fill: #f0f4f8;
-    stroke: var(--primary-light);
-    filter: brightness(1.02);
+.column-group {
+  transition: all 0.2s ease;
+}
+
+.column-group:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.column-indicator {
+  transition: opacity 0.2s;
+}
+
+.column-group:hover .column-indicator {
+  opacity: 1;
+}
+
+.column-group rect.column-background {
+  stroke: none;
+  fill: transparent;
+}
+
+.column-group:hover rect.column-background {
+  fill: rgba(0, 0, 0, 0.03);
+  stroke: none;
+}
+
+.column-group:hover .column-name {
+  fill: #1e293b;
+  font-weight: 500;
 }
 
 .column-name {
@@ -163,13 +250,13 @@ html, body {
     pointer-events: none;
 }
 
-/* Graph Edges */
 .edge {
     stroke: var(--edge-color);
     stroke-width: 1.5px;
-    stroke-opacity: 0.9;
+    stroke-opacity: 0.85;
     fill: none;
     pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.05));
 }
 
 .edge:hover {
@@ -223,7 +310,6 @@ html, body {
     font-size: 14px;
 }
 
-/* For text tooltips on hover (optional enhancement) */
 .model-title:hover::after,
 .column-name:hover::after {
     content: attr(data-original-text);
@@ -238,7 +324,6 @@ html, body {
     pointer-events: none;
 }
 
-/* Add styles for the sidebar toggle */
 .sidebar-toggle {
   text-align: right;
   margin-bottom: 15px;
@@ -273,7 +358,6 @@ html, body {
   transform: rotate(180deg);
 }
 
-/* Add these styles for the improved node info panel */
 .node-info {
   background: white;
   border-radius: 6px;
@@ -346,4 +430,395 @@ html, body {
 
 .focus-button:hover {
   background: var(--primary-light);
+}
+
+.explore-panel {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 6px var(--shadow);
+  margin-bottom: 20px;
+}
+
+.explore-panel h3 {
+  color: var(--primary);
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.model-selector,
+.column-selector {
+  margin-bottom: 14px;
+}
+
+.model-selector label,
+.column-selector label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-dark);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.model-selector select,
+.column-selector select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background-color: #fff;
+  font-size: 14px;
+  color: var(--text-dark);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+  transition: border-color 0.2s;
+}
+
+.model-selector select:focus,
+.column-selector select:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.2);
+}
+
+.model-selector select:disabled,
+.column-selector select:disabled {
+  background-color: #f2f2f2;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+#loadLineage {
+  width: 100%;
+  padding: 10px;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 8px;
+}
+
+#loadLineage:hover {
+  background-color: var(--primary-light);
+}
+
+#loadLineage:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+#loadLineage.loading {
+  position: relative;
+  text-indent: -9999px;
+}
+
+#loadLineage.loading:after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 8px);
+  top: calc(50% - 8px);
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-left-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Clone controls to graph area */
+#graph::after {
+  content: "";
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 150px;
+  height: 200px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.sidebar .controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 10px var(--shadow);
+  z-index: 100;
+  width: auto;
+}
+
+/* Make sure buttons get pointer events */
+.sidebar .controls button {
+  pointer-events: auto;
+}
+
+#resetView[title]::after {
+  content: "Reset Layout & View";
+}
+
+.sidebar .controls #relayout {
+  display: none;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.controls button:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.controls button:active {
+  transform: translateY(0px);
+}
+
+#zoomIn::before, #zoomOut::before, #resetView::before {
+  content: "";
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-indent: 0;
+}
+
+#zoomIn::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3Cline x1='11' y1='8' x2='11' y2='14'%3E%3C/line%3E%3Cline x1='8' y1='11' x2='14' y2='11'%3E%3C/line%3E%3C/svg%3E");
+}
+
+#zoomOut::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3Cline x1='8' y1='11' x2='14' y2='11'%3E%3C/line%3E%3C/svg%3E");
+}
+
+#resetView::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3Cpath d='M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16'/%3E%3Cpath d='M16 16h5v5'/%3E%3C/svg%3E");
+}
+
+.controls button:hover::before {
+  filter: brightness(0) invert(1);
+}
+
+svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Improve active state for better visibility against grid */
+.model.active .model-container {
+  stroke: #2196f3;
+  stroke-width: 2px;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Updated Model Icon styling for Lucide */
+.model-icon {
+  pointer-events: none;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.model-icon path {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model:hover .model-icon {
+  opacity: 1;
+}
+
+.model-title {
+  fill: var(--primary);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  dominant-baseline: middle;
+}
+
+.columns-section-header {
+  transition: background-color 0.2s;
+}
+
+.columns-section-header:hover {
+  background-color: #eff1f5;
+}
+
+.columns-section-header rect {
+  transition: fill 0.2s;
+}
+
+.columns-section-header:hover rect {
+  fill: #eff1f5;
+}
+
+.columns-title {
+  font-weight: 500;
+  user-select: none;
+}
+
+.columns-count {
+  user-select: none;
+}
+
+.toggle-icon {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.toggle-icon path {
+  transform-origin: center;
+  transition: transform 0.3s ease;
+  stroke: #64748b;
+}
+
+/* Add specific styling for the toggle icon in collapsed state */
+.columns-header[data-collapsed="true"] .toggle-icon path {
+  transform: rotate(-90deg);
+}
+
+.toggle-icon {
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.columns-header:hover .toggle-icon {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.column-group {
+  transition: all 0.2s ease;
+}
+
+.column-group:hover .column-bg {
+  fill: #edf2f7;
+  stroke: #e2e8f0;
+  stroke-width: 1px;
+}
+
+.column-indicator {
+  transition: opacity 0.2s;
+}
+
+.column-group:hover .column-indicator {
+  opacity: 1;
+}
+
+.columns-container {
+  transition: display 0.3s;
+}
+
+.columns-header {
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.columns-header:hover rect {
+  fill: #f1f5f9;
+}
+
+.columns-label {
+  font-weight: 500;
+}
+
+.toggle-icon {
+  transition: transform 0.3s ease;
+}
+
+.toggle-icon path {
+  transition: transform 0.3s ease;
+}
+
+/* Add style for edges connected to collapsed models */
+.model.collapsed-model .edge {
+  stroke-dasharray: 4, 2;
+  stroke-width: 1.5px;
+}
+
+.columns-header rect {
+  transition: fill 0.2s;
+}
+
+.model .columns-header[data-collapsed="true"] rect {
+  fill: #eff1f5;
+}
+
+.toggle-icon path {
+  transform-origin: center;
+  transition: transform 0.3s ease;
+}
+
+.model.collapsed-model .model-container {
+  fill: #f8f9fa;
+}
+
+.model.collapsed-model .columns-header rect {
+  fill: #eff1f5;
+}
+
+/* Make sure edges don't show through models */
+.model-container, .model-header, .columns-header rect {
+  fill-opacity: 1;
+}
+
+.edge {
+  transition: stroke-dasharray 0.3s ease;
+}
+
+.model.collapsed-model .edge {
+  stroke-dasharray: 5, 3;
+}
+
+.columns-header rect {
+  fill: #f8fafc;
+  stroke: none;
+}
+
+.columns-header:hover rect {
+  fill: #f1f5f9;
+}
+
+.model.collapsed-model .columns-header rect {
+  fill: #eff1f5;
+  border-radius: 0 0 8px 8px;
+}
+
+.column-type-icon {
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.column-group:hover .column-type-icon {
+    opacity: 1;
+}
+
+.column-type-tag {
+    pointer-events: none;
+}
+
+.column-type-tag text {
+    fill: white;
+    font-size: 11px;
 } 
