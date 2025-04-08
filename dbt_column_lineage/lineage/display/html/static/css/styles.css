@@ -134,8 +134,7 @@ html, body {
 }
 
 .model.active {
-    stroke: var(--primary); /* Highlight border when active/dragging */
-    stroke-width: 2px;
+
     filter: drop-shadow(0 3px 8px rgba(0,0,0,0.15));
 }
 
@@ -242,6 +241,7 @@ html, body {
     overflow: hidden;
     white-space: nowrap;
     max-width: 160px;
+    stroke: none; /* Prevent inheriting stroke */
 }
 
 .column-type {
@@ -656,6 +656,7 @@ svg {
   font-size: 14px;
   letter-spacing: 0.2px;
   dominant-baseline: middle;
+  stroke: none; /* Prevent inheriting stroke */
 }
 
 .columns-section-header {
@@ -821,4 +822,5 @@ svg {
 .column-type-tag text {
     fill: white;
     font-size: 11px;
+    stroke: none; /* Prevent inheriting stroke */
 } 

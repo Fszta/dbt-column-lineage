@@ -92,11 +92,25 @@ function handleModelCollapse(model, isCollapsed, state, config) {
 function updateModelEdges(model, state, config) {
     if (state.modelEdges.has(model.name)) {
         state.modelEdges.get(model.name).forEach(edgeInfo => {
-            edgeInfo.element.attr('d', createEdgePath({
-                source: edgeInfo.source,
-                target: edgeInfo.target
-            }, state, config));
+            if (edgeInfo.element && edgeInfo.element.parentNode) { 
+                const edgeElement = d3.select(edgeInfo.element);
+                
+                const newPath = createEdgePath({ 
+                    source: edgeInfo.source, 
+                    target: edgeInfo.target 
+                }, state, config);
+                
+                edgeElement.attr('d', newPath);
+            } else {
+                console.warn("Edge element reference broken or detached for edge:", edgeInfo);
+            }
         });
+        
+        // Ensure edges remain visually behind models after update
+        const edgesGroup = d3.select('.edges-group');
+        if (!edgesGroup.empty()) {
+            edgesGroup.lower();
+        }
     }
 }
 
@@ -428,14 +442,15 @@ function drawColumns(nodes, state, config, onColumnClick) {
     });
 }
 
-// Updated drawEdges function to maintain proper stacking
 function drawEdges(g, data, state, config) {
     state.models.forEach(model => {
         state.modelEdges.set(model.name, []);
     });
     
-    // Create a group specifically for edges
-    const edgesGroup = g.append('g').attr('class', 'edges-group');
+    let edgesGroup = g.select('.edges-group');
+    if (edgesGroup.empty()) {
+        edgesGroup = g.append('g').attr('class', 'edges-group');
+    }
     
     const edges = edgesGroup.selectAll('.edge')
         .data(data.edges.filter(e => e.type === 'lineage'))
@@ -447,15 +462,14 @@ function drawEdges(g, data, state, config) {
         .style('stroke', config.colors.edge)
         .style('stroke-width', 1.5)
         .style('fill', 'none')
-        .attr('d', d => createEdgePath(d, state, config))
+        .attr('d', d => createEdgePath(d, state, config)) // Initial path calculation
         .each(function(d) {
-            indexEdgeForDragging(d, this, state);
+            indexEdgeForDragging(d, this, state); 
         });
     
-    // Make sure edges are behind models by default
     edgesGroup.lower();
         
-    return edges;
+    return edges; 
 }
 
 // Store references to edges for efficient dragging
