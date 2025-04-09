@@ -13,6 +13,9 @@ class ManifestReader:
             raise FileNotFoundError(f"Manifest file not found: {self.manifest_path}")
         with open(self.manifest_path, "r") as f:
             self.manifest = json.load(f)
+            
+    def get_adapter(self) -> str:
+        return self.manifest.get("metadata", {}).get("adapter_type")
 
     def _find_node(self, model_name: str) -> Optional[Dict[str, Any]]:
         """Find a node in the manifest by model name."""

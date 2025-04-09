@@ -12,6 +12,9 @@ from dbt_column_lineage.artifacts.exceptions import (
 )
 from dbt_column_lineage.artifacts.sql_parser import SQLColumnParser
 
+logger = logging.getLogger(__name__) 
+
+
 @dataclass
 class RegistryState:
     """Immutable state of the registry."""
@@ -22,8 +25,9 @@ class ModelRegistry:
     def __init__(self, catalog_path: str, manifest_path: str):
         self._catalog_reader = CatalogReader(catalog_path)
         self._manifest_reader = ManifestReader(manifest_path)
-        self._sql_parser = SQLColumnParser()
         self._state = RegistryState(models={}, is_loaded=False)
+        self._sql_parser : Optional[SQLColumnParser] = None
+        self._dialect : Optional[str] = None
 
     @property
     def is_loaded(self) -> bool:
@@ -129,7 +133,17 @@ class ModelRegistry:
         try:
             self._catalog_reader.load()
             self._manifest_reader.load()
-
+            
+            # Ensure the dialect is set before initializing the parser
+            self._dialect = self._manifest_reader.get_adapter()
+            
+            if self._dialect:
+                logger.info(f"Detected dialect: {self._dialect}")
+            else:
+                logger.warning("No dialect detected, the sql parser will be less accurate")
+            
+            self._sql_parser = SQLColumnParser(dialect=self._dialect)
+            
             models = self._initialize_models()
             self._apply_dependencies(models)
             self._process_lineage(models)
