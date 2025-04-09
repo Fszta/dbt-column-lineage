@@ -1,11 +1,18 @@
 import sys
 from pathlib import Path
 import click
+import logging
 
 from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay
 from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
 from dbt_column_lineage.lineage.service import LineageService, LineageSelector
 from dbt_column_lineage.lineage.display.base import LineageStaticDisplay
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s - %(message)s'
+)
 
 @click.command()
 @click.option(
