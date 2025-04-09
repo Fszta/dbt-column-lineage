@@ -188,26 +188,25 @@ function layoutModels(data, state) {
 
 // Position models in the grid layout
 function positionModels(state, config) {
-    let currentXOffset = config.box.padding; // Start positioning from the left edge + padding
-    const levelWidths = new Map(); // To track the max width used by each level
+    let currentXOffset = config.box.padding;
+    const levelWidths = new Map();
 
     // First pass to calculate all model heights
     state.models.forEach(model => {
-        model.height = config.box.titleHeight + 28 + // Header + Columns Header
+        model.height = config.box.titleHeight + 28 +
                       (model.columns.length * config.box.columnHeight) +
-                      config.box.padding; // Bottom padding within the box
-        model.columnsCollapsed = model.columnsCollapsed || false; // Initialize collapsed state if needed
+                      config.box.padding; 
+        model.columnsCollapsed = model.columnsCollapsed || false;
         if (model.columnsCollapsed) {
-            model.height = config.box.titleHeight + 28; // Only header heights
+            model.height = config.box.titleHeight + 28;
         }
     });
 
     state.levelGroups.forEach((modelsInLevel, level) => {
-        let currentYOffset = config.box.padding; // Start positioning from the top edge + padding for each level
+        let currentYOffset = config.box.padding;
         let maxModelWidthInLevel = 0;
 
         modelsInLevel.forEach((model, idx) => {
-            // Calculate height again in case it was collapsed/expanded
             model.height = config.box.titleHeight + 28 +
                           (model.columns.length * config.box.columnHeight) +
                           config.box.padding;
@@ -216,33 +215,26 @@ function positionModels(state, config) {
             }
 
             model.x = currentXOffset;
-            // Position model center vertically
             model.y = currentYOffset + model.height / 2;
-
-            // Update the Y offset for the next model in this level
             currentYOffset += model.height + config.layout.ySpacing;
 
-            // Track the maximum width needed for this level (all models have same box width)
             maxModelWidthInLevel = Math.max(maxModelWidthInLevel, config.box.width);
         });
 
-        // Store the width used by this level
         if (modelsInLevel.length > 0) {
             levelWidths.set(level, maxModelWidthInLevel);
-            // Update the X offset for the next level
             currentXOffset += maxModelWidthInLevel + config.layout.xSpacing;
         } else {
             levelWidths.set(level, 0);
         }
     });
 
-    // Center potentially shorter levels vertically relative to the tallest level
     let maxYOffset = 0;
     state.levelGroups.forEach((modelsInLevel, level) => {
         let levelHeight = 0;
         if (modelsInLevel.length > 0) {
             const lastModel = modelsInLevel[modelsInLevel.length - 1];
-            levelHeight = (lastModel.y + lastModel.height / 2); // Bottom edge of last model
+            levelHeight = (lastModel.y + lastModel.height / 2);
         }
         maxYOffset = Math.max(maxYOffset, levelHeight);
     });
