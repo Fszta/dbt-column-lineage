@@ -188,23 +188,77 @@ function layoutModels(data, state) {
 
 // Position models in the grid layout
 function positionModels(state, config) {
-    let xOffset = 50;
-    state.levelGroups.forEach((modelsInLevel, level) => {
-        // Distribute models vertically within the allocated space for the level
-        const levelHeight = config.height * config.layout.verticalUsage;
-        const verticalSpacing = levelHeight / (modelsInLevel.length + 1);
-        
-        modelsInLevel.forEach((model, idx) => {
-            model.x = xOffset + level * config.layout.xSpacing;
-            model.y = verticalSpacing * (idx + 1);
-            model.height = config.box.titleHeight + 
-                          (model.columns.length * config.box.columnHeight) + 
-                          (config.box.padding * 2); 
-        });
-        
-        // Increase offset for the next level if this level had models
-        if (modelsInLevel.length > 0) {
-            xOffset += 50;
+    let currentXOffset = config.box.padding; // Start positioning from the left edge + padding
+    const levelWidths = new Map(); // To track the max width used by each level
+
+    // First pass to calculate all model heights
+    state.models.forEach(model => {
+        model.height = config.box.titleHeight + 28 + // Header + Columns Header
+                      (model.columns.length * config.box.columnHeight) +
+                      config.box.padding; // Bottom padding within the box
+        model.columnsCollapsed = model.columnsCollapsed || false; // Initialize collapsed state if needed
+        if (model.columnsCollapsed) {
+            model.height = config.box.titleHeight + 28; // Only header heights
         }
+    });
+
+    state.levelGroups.forEach((modelsInLevel, level) => {
+        let currentYOffset = config.box.padding; // Start positioning from the top edge + padding for each level
+        let maxModelWidthInLevel = 0;
+
+        modelsInLevel.forEach((model, idx) => {
+            // Calculate height again in case it was collapsed/expanded
+            model.height = config.box.titleHeight + 28 +
+                          (model.columns.length * config.box.columnHeight) +
+                          config.box.padding;
+            if (model.columnsCollapsed) {
+                 model.height = config.box.titleHeight + 28;
+            }
+
+            model.x = currentXOffset;
+            // Position model center vertically
+            model.y = currentYOffset + model.height / 2;
+
+            // Update the Y offset for the next model in this level
+            currentYOffset += model.height + config.layout.ySpacing;
+
+            // Track the maximum width needed for this level (all models have same box width)
+            maxModelWidthInLevel = Math.max(maxModelWidthInLevel, config.box.width);
+        });
+
+        // Store the width used by this level
+        if (modelsInLevel.length > 0) {
+            levelWidths.set(level, maxModelWidthInLevel);
+            // Update the X offset for the next level
+            currentXOffset += maxModelWidthInLevel + config.layout.xSpacing;
+        } else {
+            levelWidths.set(level, 0);
+        }
+    });
+
+    // Center potentially shorter levels vertically relative to the tallest level
+    let maxYOffset = 0;
+    state.levelGroups.forEach((modelsInLevel, level) => {
+        let levelHeight = 0;
+        if (modelsInLevel.length > 0) {
+            const lastModel = modelsInLevel[modelsInLevel.length - 1];
+            levelHeight = (lastModel.y + lastModel.height / 2); // Bottom edge of last model
+        }
+        maxYOffset = Math.max(maxYOffset, levelHeight);
+    });
+
+    state.levelGroups.forEach((modelsInLevel, level) => {
+         let currentLevelHeight = 0;
+         if (modelsInLevel.length > 0) {
+             const lastModel = modelsInLevel[modelsInLevel.length - 1];
+             currentLevelHeight = (lastModel.y + lastModel.height / 2);
+         }
+         const verticalShift = (maxYOffset - currentLevelHeight) / 2;
+
+         if (verticalShift > 0) {
+             modelsInLevel.forEach(model => {
+                 model.y += verticalShift;
+             });
+         }
     });
 }
