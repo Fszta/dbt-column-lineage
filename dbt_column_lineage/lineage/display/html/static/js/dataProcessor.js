@@ -188,23 +188,69 @@ function layoutModels(data, state) {
 
 // Position models in the grid layout
 function positionModels(state, config) {
-    let xOffset = 50;
-    state.levelGroups.forEach((modelsInLevel, level) => {
-        // Distribute models vertically within the allocated space for the level
-        const levelHeight = config.height * config.layout.verticalUsage;
-        const verticalSpacing = levelHeight / (modelsInLevel.length + 1);
-        
-        modelsInLevel.forEach((model, idx) => {
-            model.x = xOffset + level * config.layout.xSpacing;
-            model.y = verticalSpacing * (idx + 1);
-            model.height = config.box.titleHeight + 
-                          (model.columns.length * config.box.columnHeight) + 
-                          (config.box.padding * 2); 
-        });
-        
-        // Increase offset for the next level if this level had models
-        if (modelsInLevel.length > 0) {
-            xOffset += 50;
+    let currentXOffset = config.box.padding;
+    const levelWidths = new Map();
+
+    // First pass to calculate all model heights
+    state.models.forEach(model => {
+        model.height = config.box.titleHeight + 28 +
+                      (model.columns.length * config.box.columnHeight) +
+                      config.box.padding; 
+        model.columnsCollapsed = model.columnsCollapsed || false;
+        if (model.columnsCollapsed) {
+            model.height = config.box.titleHeight + 28;
         }
+    });
+
+    state.levelGroups.forEach((modelsInLevel, level) => {
+        let currentYOffset = config.box.padding;
+        let maxModelWidthInLevel = 0;
+
+        modelsInLevel.forEach((model, idx) => {
+            model.height = config.box.titleHeight + 28 +
+                          (model.columns.length * config.box.columnHeight) +
+                          config.box.padding;
+            if (model.columnsCollapsed) {
+                 model.height = config.box.titleHeight + 28;
+            }
+
+            model.x = currentXOffset;
+            model.y = currentYOffset + model.height / 2;
+            currentYOffset += model.height + config.layout.ySpacing;
+
+            maxModelWidthInLevel = Math.max(maxModelWidthInLevel, config.box.width);
+        });
+
+        if (modelsInLevel.length > 0) {
+            levelWidths.set(level, maxModelWidthInLevel);
+            currentXOffset += maxModelWidthInLevel + config.layout.xSpacing;
+        } else {
+            levelWidths.set(level, 0);
+        }
+    });
+
+    let maxYOffset = 0;
+    state.levelGroups.forEach((modelsInLevel, level) => {
+        let levelHeight = 0;
+        if (modelsInLevel.length > 0) {
+            const lastModel = modelsInLevel[modelsInLevel.length - 1];
+            levelHeight = (lastModel.y + lastModel.height / 2);
+        }
+        maxYOffset = Math.max(maxYOffset, levelHeight);
+    });
+
+    state.levelGroups.forEach((modelsInLevel, level) => {
+         let currentLevelHeight = 0;
+         if (modelsInLevel.length > 0) {
+             const lastModel = modelsInLevel[modelsInLevel.length - 1];
+             currentLevelHeight = (lastModel.y + lastModel.height / 2);
+         }
+         const verticalShift = (maxYOffset - currentLevelHeight) / 2;
+
+         if (verticalShift > 0) {
+             modelsInLevel.forEach(model => {
+                 model.y += verticalShift;
+             });
+         }
     });
 }
