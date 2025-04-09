@@ -8,10 +8,19 @@ logging.getLogger('sqlglot').setLevel(logging.ERROR)
 
 
 class SQLColumnParser:
+    def __init__(self, dialect: Optional[str] = None):
+        """
+        Initialize the parser with an optional SQL dialect.
+
+        Args:
+            dialect: The SQL dialect to use (e.g., 'snowflake', 'bigquery', 'postgres'). 
+        """
+        self.dialect = dialect
+
     def parse_column_lineage(self, sql: str) -> SQLParseResult:
         """Parse SQL to extract column-level lineage using sqlglot."""
         cte_to_model = self._extract_cte_model_mappings(sql)
-        parsed = parse_one(sql)
+        parsed = parse_one(sql, dialect=self.dialect)
         
         aliases = self._get_table_aliases(parsed)
         cte_sources = self._build_cte_sources(parsed)
