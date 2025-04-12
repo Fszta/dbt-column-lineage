@@ -1,3 +1,12 @@
+## [0.3.1](https://github.com/Fszta/dbt-column-lineage/compare/v0.3.0...v0.3.1) (2025-04-12)
+
+
+### Bug Fixes
+
+* **lineage:** overlapping model boxes ([#6](https://github.com/Fszta/dbt-column-lineage/issues/6)) ([b582bea](https://github.com/Fszta/dbt-column-lineage/commit/b582bea14077e0122e6d9e090cf1d16d0711b202))
+
+
+
 # [0.3.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.2.1...v0.3.0) (2025-04-09)
 
 
