@@ -46,7 +46,7 @@ class ManifestReader:
         upstream: Dict[str, Set[str]] = {}
         
         for _, node in self.manifest.get("nodes", {}).items():
-            if node.get("resource_type") in ["model", "seed", "test"]:
+            if node.get("resource_type") == "model":
                 model_name = node.get("name")
                 if not model_name:
                     continue
