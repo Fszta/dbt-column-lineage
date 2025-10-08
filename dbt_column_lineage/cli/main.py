@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import click
 import logging
+from typing import Optional
 
 from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay
 from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
@@ -49,7 +50,9 @@ logging.basicConfig(
 @click.option('--port', '-p', 
               default=8000,
               help='Port to run the HTML server (only used with --explore)')
-def cli(select: str, explore: bool, catalog: str, manifest: str, format: str, output: str, port: int) -> None:
+@click.option('--adapter',
+              help='Override sqlglot dialect (e.g., tsql, snowflake, bigquery). If set, ignores adapter from manifest.')
+def cli(select: str, explore: bool, catalog: str, manifest: str, format: str, output: str, port: int, adapter: Optional[str]) -> None:
     """DBT Column Lineage - Generate column-level lineage for DBT models."""
     if not select and not explore:
         click.echo("Error: Either --select or --explore must be specified", err=True)
@@ -60,7 +63,7 @@ def cli(select: str, explore: bool, catalog: str, manifest: str, format: str, ou
         sys.exit(1)
 
     try:
-        service = LineageService(Path(catalog), Path(manifest))
+        service = LineageService(Path(catalog), Path(manifest), adapter=adapter)
         
         if explore:
             click.echo(f"Starting explore mode server on port {port}...")

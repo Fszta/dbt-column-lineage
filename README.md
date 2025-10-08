@@ -83,6 +83,7 @@ dbt-col-lineage --select stg_orders --format text
 - `--format`, `-f`: Output format for static analysis (`text` or `dot`). Not used with `--explore`. (default: `text`)
 - `--output`, `-o`: Output filename for `dot` format (without extension, default: `lineage`). Not used with `--explore`.
 - `--port`, `-p`: Port for the interactive web server when using `--explore` (default: `8000`).
+- `--adapter`: Override the SQL dialect used by the parser (sqlglot dialect name, e.g., `tsql`, `snowflake`, `bigquery`). When provided, this overrides the adapter detected from the dbt manifest.
 
 ## Limitations
 - Doesn't support python models
@@ -94,6 +95,7 @@ The tool has been tested with the following dbt adapters:
 - Snowflake
 - SQLite
 - DuckDB
+- MS SQLServer / TSQL
 
 
 ## License
