@@ -34,8 +34,8 @@ class LineageSelector:
 class LineageService:
     """Service for handling lineage operations."""
     
-    def __init__(self, catalog_path: Path, manifest_path: Path):
-        self.registry = ModelRegistry(str(catalog_path), str(manifest_path))
+    def __init__(self, catalog_path: Path, manifest_path: Path, adapter: Optional[str] = None):
+        self.registry = ModelRegistry(str(catalog_path), str(manifest_path), adapter_override=adapter)
         self.registry.load()
 
     def get_model_info(self, selector: LineageSelector) -> Dict[str, Any]:

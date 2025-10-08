@@ -22,12 +22,13 @@ class RegistryState:
     is_loaded: bool = False
 
 class ModelRegistry:
-    def __init__(self, catalog_path: str, manifest_path: str):
+    def __init__(self, catalog_path: str, manifest_path: str, adapter_override: Optional[str] = None):
         self._catalog_reader = CatalogReader(catalog_path)
         self._manifest_reader = ManifestReader(manifest_path)
         self._state = RegistryState(models={}, is_loaded=False)
         self._sql_parser : Optional[SQLColumnParser] = None
         self._dialect : Optional[str] = None
+        self._adapter_override: Optional[str] = adapter_override
 
     @property
     def is_loaded(self) -> bool:
@@ -135,13 +136,15 @@ class ModelRegistry:
             self._manifest_reader.load()
             
             # Ensure the dialect is set before initializing the parser
-            self._dialect = self._manifest_reader.get_adapter()
+            self._dialect = self._adapter_override or self._manifest_reader.get_adapter()
             
-            if self._dialect:
+            if self._adapter_override:
+                logger.info(f"Using adapter override from CLI: {self._adapter_override}")
+            elif self._dialect:
                 logger.info(f"Detected dialect: {self._dialect}")
             else:
                 logger.warning("No dialect detected, the sql parser will be less accurate")
-            
+
             self._sql_parser = SQLColumnParser(dialect=self._dialect)
             
             models = self._initialize_models()
