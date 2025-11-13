@@ -53,6 +53,7 @@ class ModelRegistry:
                 model.upstream = upstream_deps.get(model_name, set())
                 model.downstream = downstream_deps.get(model_name, set())
                 model.language = self._manifest_reader.get_model_language(model_name)
+                model.resource_path = self._manifest_reader.get_model_resource_path(model_name)
         except Exception as e:
             raise RegistryError(f"Failed to apply dependencies: {e}")
 

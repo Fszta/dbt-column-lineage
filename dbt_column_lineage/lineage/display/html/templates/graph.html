@@ -18,16 +18,16 @@
             {% if explore_mode %}
             <div class="explore-panel">
                 <h3>Explore Lineage</h3>
-                <div class="model-selector">
-                    <label for="modelSelect">Model:</label>
-                    <select id="modelSelect">
-                        <option value="">Select a model</option>
-                    </select>
+                <div class="search-bar-container">
+                    <input type="text" id="modelSearchInput" placeholder="Search models...">
+                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <div id="model-tree-container">
                 </div>
                 <div class="column-selector">
                     <label for="columnSelect">Column:</label>
                     <select id="columnSelect" disabled>
-                        <option value="">Select a column</option>
+                        <option value="">Select a model first</option>
                     </select>
                 </div>
                 <button id="loadLineage" disabled>Load Lineage</button>
@@ -49,63 +49,212 @@
             let graphInstance = initGraph({{ data | tojson }});
             
             {% if explore_mode %}
-            const modelSelect = document.getElementById('modelSelect');
             const columnSelect = document.getElementById('columnSelect');
             const loadLineageBtn = document.getElementById('loadLineage');
             const graphContainer = document.getElementById('graph');
+            const modelTreeContainer = document.getElementById('model-tree-container');
+            const searchInput = document.getElementById('modelSearchInput');
             
-            let allModelsData = [];
+            let selectedModelData = null;
+            let allTreeData = [];
             
-            fetch('/api/models')
-                .then(response => response.json())
-                .then(models => {
-                    allModelsData = models;
-                    models.forEach(model => {
-                        const option = document.createElement('option');
-                        option.value = model.name;
-                        option.textContent = model.name;
-                        modelSelect.appendChild(option);
-                    });
-                });
-                
-            modelSelect.addEventListener('change', function() {
-                columnSelect.innerHTML = '<option value="">Select a column</option>';
-                columnSelect.disabled = !this.value;
-                loadLineageBtn.disabled = true;
-                
-                if (this.value) {
-                    const model = allModelsData.find(m => m.name === this.value);
-                    if (model && model.columns) {
-                        model.columns.forEach(column => {
-                            const option = document.createElement('option');
-                            option.value = column.name;
-                            option.textContent = `${column.name} (${column.type || 'unknown'})`;
-                            columnSelect.appendChild(option);
+            const iconFolderClosed = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon folder-icon closed"><path d="M3 7C3 5.89543 3.89543 5 5 5H9.58579C9.851 5 10.1054 5.10536 10.2929 5.29289L12 7H19C20.1046 7 21 7.89543 21 9V18C21 19.1046 20.1046 20 19 20H5C3.89543 20 3 19.1046 3 18V7Z" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            const iconFolderOpen = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon folder-icon open"><path d="M3 7C3 5.89543 3.89543 5 5 5H9.58579C9.851 5 10.1054 5.10536 10.2929 5.29289L12 7H19C20.1046 7 21 7.89543 21 9V10M3 11L4.5 17.5C4.77614 18.6 5.77614 19.5 6.9 19.5H17.1C18.2239 19.5 19.2239 18.6 19.5 17.5L21 11H3Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            const iconModel = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon model-icon"><path d="M12 3L3 7.5V16.5L12 21L21 16.5V7.5L12 3Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12L21 7.5M12 12L3 7.5M12 12V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            const iconSource = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon source-icon"><path d="M12 5C7 5 4 6.5 4 8.5C4 10.5 7 12 12 12C17 12 20 10.5 20 8.5C20 6.5 17 5 12 5Z" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/><path d="M4 8.5V15.5C4 17.5 7 19 12 19C17 19 20 17.5 20 15.5V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 12C4 14 7 15.5 12 15.5C17 15.5 20 14 20 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+            const iconSeed = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon seed-icon"><path d="M3 6C3 4.34315 4.34315 3 6 3H14L18 7V18C18 19.6569 16.6569 21 15 21H6C4.34315 21 3 19.6569 3 18V6Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3V7H18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 12H14M7 16H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+            const iconDefault = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon default-icon"><rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+            function renderTree(nodes, container, level = 0) {
+                const ul = document.createElement('ul');
+                ul.classList.add('model-tree');
+                if (level > 0) ul.classList.add('nested');
+
+                nodes.forEach(node => {
+                    const li = document.createElement('li');
+                    li.classList.add('tree-node', `tree-node-${node.type}`);
+                    
+                    const nodeContent = document.createElement('div');
+                    nodeContent.classList.add('node-content');
+                    
+                    const iconContainer = document.createElement('span');
+                    iconContainer.classList.add('icon-container');
+
+                    const span = document.createElement('span');
+                    span.textContent = node.type === 'model' ? node.display_name : node.name; 
+                    span.classList.add('node-label');
+
+                    if (node.type === 'folder') {
+                        nodeContent.classList.add('folder');
+                        iconContainer.innerHTML = iconFolderClosed;
+                        nodeContent.appendChild(iconContainer);
+                        nodeContent.appendChild(span);
+                        
+                        li.appendChild(nodeContent);
+
+                        nodeContent.addEventListener('click', () => {
+                            li.classList.toggle('expanded');
+                            const nestedUl = li.querySelector('ul');
+                            const icon = iconContainer.querySelector('.folder-icon');
+                            if (nestedUl) {
+                                nestedUl.classList.toggle('active');
+                                if (li.classList.contains('expanded')) {
+                                    iconContainer.innerHTML = iconFolderOpen;
+                                } else {
+                                    iconContainer.innerHTML = iconFolderClosed;
+                                }
+                            }
+                        });
+                        if (node.children && node.children.length > 0) {
+                             renderTree(node.children, li, level + 1);
+                             const childUl = li.querySelector('ul');
+                             if(childUl) childUl.classList.remove('active');
+                        } else {
+                            li.classList.add('empty-folder'); // Style empty folders if needed
+                        }
+                    } else { // It's a model node
+                        nodeContent.classList.add('model');
+                        let modelIcon = iconDefault;
+                        if (node.resource_type === 'model') modelIcon = iconModel;
+                        else if (node.resource_type === 'source') modelIcon = iconSource;
+                        else if (node.resource_type === 'seed') modelIcon = iconSeed;
+                        
+                        iconContainer.innerHTML = modelIcon;
+                        nodeContent.appendChild(iconContainer);
+                        nodeContent.appendChild(span);
+
+                        li.appendChild(nodeContent);
+
+                        span.dataset.modelName = node.model_name;
+                        
+                        nodeContent.addEventListener('click', () => {
+                            document.querySelectorAll('.model-tree .node-content.selected').forEach(el => el.classList.remove('selected'));
+                            nodeContent.classList.add('selected');
+                            
+                            selectedModelData = node;
+                            populateColumnSelector(node.columns);
+                            columnSelect.disabled = false;
+                            loadLineageBtn.disabled = true;
                         });
                     }
-                }
-            });
+                    ul.appendChild(li);
+                });
+                container.appendChild(ul);
+            }
             
+            function filterTree(searchTerm) {
+                const term = searchTerm.toLowerCase().trim();
+                const allNodes = modelTreeContainer.querySelectorAll('.tree-node');
+
+                // Reset visibility and expansion
+                allNodes.forEach(node => {
+                    node.style.display = '';
+                    // Collapse all folders initially unless search is empty
+                    if (node.classList.contains('tree-node-folder') && term !== '') {
+                        node.classList.remove('expanded');
+                        const nestedUl = node.querySelector('ul.nested');
+                        if (nestedUl) nestedUl.classList.remove('active');
+                        const iconContainer = node.querySelector('.icon-container');
+                        if(iconContainer) iconContainer.innerHTML = iconFolderClosed;
+                    }
+                });
+
+                if (term === '') return;
+
+                const modelNodes = modelTreeContainer.querySelectorAll('.tree-node-model');
+                const foldersToShow = new Set();
+
+                modelNodes.forEach(modelLi => {
+                    const label = modelLi.querySelector('.node-label');
+                    const modelName = label ? label.textContent.toLowerCase() : '';
+                    const matches = modelName.includes(term);
+
+                    if (matches) {
+                        modelLi.style.display = 'block';
+                        let current = modelLi.parentElement;
+                        while (current && current !== modelTreeContainer) {
+                            if (current.tagName === 'LI' && current.classList.contains('tree-node-folder')) {
+                                foldersToShow.add(current);
+                            }
+                            current = current.parentElement;
+                        }
+                    } else {
+                        modelLi.style.display = 'none';
+                    }
+                });
+
+                // Show necessary folders and hide others
+                const folderNodes = modelTreeContainer.querySelectorAll('.tree-node-folder');
+                folderNodes.forEach(folderLi => {
+                    if (foldersToShow.has(folderLi)) {
+                        folderLi.style.display = 'block';
+                        if (!folderLi.classList.contains('expanded')) {
+                           folderLi.classList.add('expanded');
+                           const nestedUl = folderLi.querySelector('ul.nested');
+                           if (nestedUl) nestedUl.classList.add('active');
+                           const iconContainer = folderLi.querySelector('.icon-container');
+                           if (iconContainer) iconContainer.innerHTML = iconFolderOpen;
+                        }
+                    } else {
+                        folderLi.style.display = 'none';
+                    }
+                });
+            }
+
+            function populateColumnSelector(columns) {
+                columnSelect.innerHTML = '<option value="">Select a column</option>';
+                columns.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column.name;
+                    option.textContent = `${column.name} (${column.type || 'unknown'})`;
+                    columnSelect.appendChild(option);
+                });
+            }
+
+            fetch('/api/models')
+                .then(response => response.json())
+                .then(treeData => {
+                    modelTreeContainer.innerHTML = '';
+                    allTreeData = treeData;
+                    if (treeData && treeData.length > 0) {
+                        renderTree(treeData, modelTreeContainer);
+                    } else {
+                        modelTreeContainer.innerHTML = '<p>No models found.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching model tree:", error);
+                    modelTreeContainer.innerHTML = '<p>Error loading models.</p>';
+                });
+                
             columnSelect.addEventListener('change', function() {
-                loadLineageBtn.disabled = !this.value;
+                loadLineageBtn.disabled = !this.value || !selectedModelData;
             });
             
             loadLineageBtn.addEventListener('click', function() {
-                const model = modelSelect.value;
                 const column = columnSelect.value;
-                if (model && column) {
-                    fetch(`/api/lineage/${model}/${column}`)
+                if (selectedModelData && selectedModelData.model_name && column) { 
+                    fetch(`/api/lineage/${selectedModelData.model_name}/${column}`)
                         .then(response => response.json())
                         .then(data => {
                             if (data.error) {
                                 console.error(data.error);
+                                graphContainer.innerHTML = `<p class="error-message">Error loading lineage: ${data.error}</p>`;
                                 return;
                             }
                             graphContainer.innerHTML = '';
-                            
                             graphInstance = initGraph(data);
-                        });
+                        })
+                        .catch(error => { 
+                            console.error("Fetch error:", error);
+                            graphContainer.innerHTML = `<p class="error-message">Failed to fetch lineage data.</p>`;
+                         });
                 }
+            });
+
+            // Add event listener for the search input
+            searchInput.addEventListener('input', (e) => {
+                filterTree(e.target.value);
             });
             {% endif %}
         });

@@ -76,20 +76,77 @@ class LineageExplorer:
         async def get_models() -> List[Dict[str, Any]]:
             if not self.lineage_service:
                 return []
-            
-            models = []
-            for model_name, model in self.lineage_service.registry.get_models().items():
+
+            model_tree_root = []
+            all_models = self.lineage_service.registry.get_models()
+
+            def insert_into_tree(tree, path_parts, model_data):
+                current_level = tree
+                for i, part in enumerate(path_parts):
+                    is_last_part = (i == len(path_parts) - 1)
+                    node_type = 'model' if is_last_part else 'folder'
+
+                    node = next((item for item in current_level if item['name'] == part and item['type'] == node_type), None)
+
+                    if node is None:
+                        node = {'name': part, 'type': node_type}
+                        if node_type == 'folder':
+                             node['children'] = []
+                        else:
+                            node['model_name'] = model_data['registry_key']
+                            node['display_name'] = part 
+                            node['columns'] = model_data['columns']
+                            node['resource_type'] = model_data['resource_type']
+                            # node['full_path'] = model_data['full_path'] 
+                        
+                        current_level.append(node)
+                        # Sort folders first, then models, alphabetically within each type
+                        current_level.sort(key=lambda x: (x['type'] != 'folder', x['name']))
+
+                    if node_type == 'folder':
+                         if 'children' not in node: 
+                             node['children'] = []
+                         current_level = node['children']
+
+
+            for model_registry_key, model in all_models.items():
+                resource_path_str = getattr(model, 'resource_path', None)
+                resource_type = getattr(model, 'resource_type', None)
+                model_name_for_path = model_registry_key 
+
+                # Group sources under a dedicated "source" folder
+                if resource_type == 'source':
+                    # For sources, use: source / source_name / table_name
+                    # The registry key format is typically "source_name.table_name"
+                    if '.' in model_registry_key:
+                        source_name, table_name = model_registry_key.rsplit('.', 1)
+                        path_parts = ['source', source_name, table_name]
+                    else:
+                        path_parts = ['source', model_name_for_path]
+                elif resource_path_str:
+                     p = Path(resource_path_str)
+                     path_parts = list(p.parent.parts) + [model_name_for_path]
+                else:
+                    path_parts = [model_name_for_path]
+
+                path_parts = [part for part in path_parts if part]
+                if not path_parts:
+                     path_parts = [model_name_for_path]
+
                 columns = [
                     {"name": col_name, "type": col.data_type}
                     for col_name, col in model.columns.items()
                 ]
                 
-                models.append({
-                    "name": model_name,
+                model_data_payload = {
+                    "registry_key": model_registry_key,
                     "columns": columns,
-                    "resource_type": model.resource_type
-                })
-            return models
+                    "resource_type": resource_type,
+                }
+                
+                insert_into_tree(model_tree_root, path_parts, model_data_payload)
+
+            return model_tree_root
             
         @self.app.get("/api/lineage/{model}/{column}")
         async def get_lineage(model: str, column: str) -> Dict[str, Any]:

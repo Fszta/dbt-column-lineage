@@ -108,6 +108,13 @@ class ManifestReader:
             return None
         return node.get("language")
 
+    def get_model_resource_path(self, model_name: str) -> Optional[str]:
+        """Get the original file path of a model from the manifest."""
+        node = self._find_node(model_name)
+        if not node:
+            return None
+        return node.get("original_file_path")
+
     def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
         node = self.manifest.get('nodes', {}).get(node_id)
         if node is None:

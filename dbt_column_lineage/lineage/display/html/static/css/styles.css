@@ -21,19 +21,23 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: #f8f9fa;
     color: var(--text-dark);
+    display: flex;
+    height: 100vh;
+    overflow: hidden; /* Prevent body scroll */
 }
 
 .container {
     display: flex;
     width: 100%;
-    height: 100vh;
+    height: 100%;
 }
 
 .sidebar {
-    width: 250px;
-    padding: 20px;
-    background: white;
-    border-right: 1px solid var(--border);
+    width: 300px;
+    padding: 15px;
+    border-right: 1px solid #ccc;
+    background-color: #f9f9f9;
+    overflow-y: auto; /* Allow sidebar scroll */
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -41,9 +45,9 @@ html, body {
 }
 
 #graph {
-    flex: 1;
-    overflow: hidden;
+    flex-grow: 1;
     position: relative;
+    overflow: hidden; /* Ensure SVG/graph controls overflow */
     background-color: #f9fafc;
     background-image: 
       radial-gradient(circle, rgba(130, 150, 175, 0.5) 1px, transparent 1px);
@@ -823,4 +827,381 @@ svg {
     fill: white;
     font-size: 11px;
     stroke: none; /* Prevent inheriting stroke */
-} 
+}
+
+/* --- Tree View Styles --- */
+
+#model-tree-container {
+    height: 40vh; /* Set a fixed height */
+    overflow-y: auto;
+    border: 1px solid #eee;
+    padding: 5px;
+    margin-bottom: 10px;
+    background-color: #fff;
+}
+
+.model-tree {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    position: relative; /* Needed for absolute positioning of lines */
+}
+
+/* Styling for the lines */
+.model-tree li::before, .model-tree li::after {
+    content: '';
+    position: absolute;
+    left: 8px; /* Align lines with the center of the icon area */
+    border-color: var(--border); /* Use theme border color */
+}
+
+/* Vertical line connecting siblings */
+.model-tree li::before {
+    border-left: 1px solid var(--border);
+    bottom: 50%;
+    height: 100%;
+    top: 0;
+    width: 1px;
+}
+
+/* Horizontal line connecting to parent */
+.model-tree li::after {
+    border-top: 1px solid var(--border);
+    height: 20px;
+    top: 14px; /* Adjust vertical position to align with icon center */
+    width: 10px; /* Length of the horizontal line */
+}
+
+/* Remove lines for the root level items */
+.model-tree > li::before, .model-tree > li::after {
+    display: none;
+}
+
+/* Adjust line for the last child in a list */
+.model-tree li:last-child::before {
+    height: 28px; /* Extend line only halfway down the last item */
+    bottom: auto; /* Override bottom: 50% */
+}
+
+.model-tree ul.nested {
+    padding-left: 15px; /* Indentation for nested levels */
+    display: none; /* Start collapsed */
+    margin-left: 10px; /* Add margin to align children under parent */
+}
+
+.model-tree ul.nested.active {
+    display: block; /* Show when expanded */
+}
+
+.tree-node {
+    /* No specific margin needed here, handled by node-content */
+    position: relative; /* Needed for line pseudo-elements */
+}
+
+/* New container for icon + label */
+.node-content {
+    display: flex;
+    align-items: center;
+    padding: 4px 6px; /* Adjust padding */
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+
+.node-content:hover {
+    background-color: #e9edf1; /* Lighter hover */
+}
+
+.icon-container {
+    display: inline-flex; /* Use flex to center icon */
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px; /* Space between icon and label */
+    flex-shrink: 0; /* Prevent icon shrinking */
+    width: 16px; /* Match icon size */
+    height: 16px;
+}
+
+.tree-icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.5;
+    color: var(--text-light);
+    transition: all 0.2s ease;
+}
+
+.folder-icon {
+    color: #f59e0b; /* Warm amber/orange for folders */
+    transition: color 0.2s ease;
+}
+
+.folder-icon.closed {
+    color: #f59e0b;
+}
+
+.folder-icon.open {
+    color: #fb923c; /* Lighter orange when open */
+}
+
+.model-icon {
+    color: #8b5cf6; /* Purple for models */
+}
+
+.source-icon {
+    color: #06b6d4; /* Cyan for sources/databases */
+}
+
+.seed-icon {
+    color: #10b981; /* Emerald green for seed files */
+}
+
+.default-icon {
+    color: #6b7280; /* Neutral gray */
+}
+
+.node-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9em; /* Slightly smaller font */
+    flex-grow: 1; /* Allow label to take remaining space */
+}
+
+/* Update selected state styling */
+.node-content.model.selected {
+    background-color: var(--primary-light); /* Use theme color */
+    color: white; /* Text color for selected */
+    font-weight: 500;
+}
+
+.node-content.model.selected .tree-icon {
+    color: white; /* Icon color for selected */
+}
+
+.node-content.model.selected .node-label {
+    color: white;
+}
+
+.tree-node.empty-folder > .node-content {
+    /* Optional: Style empty folders differently, e.g., slightly faded */
+    opacity: 0.7;
+}
+
+.tree-node.empty-folder > .node-content .icon-container {
+    /* Keep icon space or hide */
+     visibility: hidden; /* Hide icon placeholder */
+}
+
+.error-message {
+    color: #d9534f; /* Bootstrap's danger color */
+    padding: 15px;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* Add other styles as needed */
+
+/* --- Search Bar Styles --- */
+
+.search-bar-container {
+    position: relative; /* For positioning the icon */
+    margin-bottom: 10px;
+}
+
+#modelSearchInput {
+    width: 100%;
+    padding: 8px 30px 8px 10px; /* Right padding for icon */
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+#modelSearchInput:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.search-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--text-light);
+    pointer-events: none; /* Make icon non-interactive */
+}
+
+/* --- Tree View Styles --- */
+
+#model-tree-container {
+    height: 40vh; /* Set a fixed height */
+    overflow-y: auto;
+    border: 1px solid #eee;
+    padding: 5px;
+    margin-bottom: 10px;
+    background-color: #fff;
+}
+
+.model-tree {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    position: relative; /* Needed for absolute positioning of lines */
+}
+
+/* Styling for the lines */
+.model-tree li::before, .model-tree li::after {
+    content: '';
+    position: absolute;
+    left: 8px; /* Align lines with the center of the icon area */
+    border-color: var(--border); /* Use theme border color */
+}
+
+/* Vertical line connecting siblings */
+.model-tree li::before {
+    border-left: 1px solid var(--border);
+    bottom: 50%;
+    height: 100%;
+    top: 0;
+    width: 1px;
+}
+
+/* Horizontal line connecting to parent */
+.model-tree li::after {
+    border-top: 1px solid var(--border);
+    height: 20px;
+    top: 14px; /* Adjust vertical position to align with icon center */
+    width: 10px; /* Length of the horizontal line */
+}
+
+/* Remove lines for the root level items */
+.model-tree > li::before, .model-tree > li::after {
+    display: none;
+}
+
+/* Adjust line for the last child in a list */
+.model-tree li:last-child::before {
+    height: 28px; /* Extend line only halfway down the last item */
+    bottom: auto; /* Override bottom: 50% */
+}
+
+.model-tree ul.nested {
+    padding-left: 15px; /* Indentation for nested levels */
+    display: none; /* Start collapsed */
+    margin-left: 10px; /* Add margin to align children under parent */
+}
+
+.model-tree ul.nested.active {
+    display: block; /* Show when expanded */
+}
+
+.tree-node {
+    /* No specific margin needed here, handled by node-content */
+    position: relative; /* Needed for line pseudo-elements */
+}
+
+/* New container for icon + label */
+.node-content {
+    display: flex;
+    align-items: center;
+    padding: 4px 6px; /* Adjust padding */
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+
+.node-content:hover {
+    background-color: #e9edf1; /* Lighter hover */
+}
+
+.icon-container {
+    display: inline-flex; /* Use flex to center icon */
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px; /* Space between icon and label */
+    flex-shrink: 0; /* Prevent icon shrinking */
+    width: 16px; /* Match icon size */
+    height: 16px;
+}
+
+.tree-icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.5;
+    color: var(--text-light);
+    transition: all 0.2s ease;
+}
+
+.folder-icon {
+    color: #f59e0b; /* Warm amber/orange for folders */
+    transition: color 0.2s ease;
+}
+
+.folder-icon.closed {
+    color: #f59e0b;
+}
+
+.folder-icon.open {
+    color: #fb923c; /* Lighter orange when open */
+}
+
+.model-icon {
+    color: #8b5cf6; /* Purple for models */
+}
+
+.source-icon {
+    color: #06b6d4; /* Cyan for sources/databases */
+}
+
+.seed-icon {
+    color: #10b981; /* Emerald green for seed files */
+}
+
+.default-icon {
+    color: #6b7280; /* Neutral gray */
+}
+
+.node-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9em; /* Slightly smaller font */
+    flex-grow: 1; /* Allow label to take remaining space */
+}
+
+/* Update selected state styling */
+.node-content.model.selected {
+    background-color: var(--primary-light); /* Use theme color */
+    color: white; /* Text color for selected */
+    font-weight: 500;
+}
+
+.node-content.model.selected .tree-icon {
+    color: white; /* Icon color for selected */
+}
+
+.node-content.model.selected .node-label {
+    color: white;
+}
+
+.tree-node.empty-folder > .node-content {
+    /* Optional: Style empty folders differently, e.g., slightly faded */
+    opacity: 0.7;
+}
+
+.tree-node.empty-folder > .node-content .icon-container {
+    /* Keep icon space or hide */
+     visibility: hidden; /* Hide icon placeholder */
+}
+
+.error-message {
+    color: #d9534f; /* Bootstrap's danger color */
+    padding: 15px;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* Add other styles as needed */ 
