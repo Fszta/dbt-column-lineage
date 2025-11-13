@@ -2,6 +2,8 @@ import json
 from typing import Dict, Optional, Set, Any
 from pathlib import Path
 
+from dbt_column_lineage.artifacts.adapter_mapping import normalize_adapter
+
 
 class ManifestReader:
     def __init__(self, manifest_path: Optional[str] = None):
@@ -14,8 +16,11 @@ class ManifestReader:
         with open(self.manifest_path, "r") as f:
             self.manifest = json.load(f)
             
-    def get_adapter(self) -> str:
-        return self.manifest.get("metadata", {}).get("adapter_type")
+    def get_adapter(self) -> Optional[str]:
+        adapter_name = self.manifest.get("metadata", {}).get("adapter_type")
+        return normalize_adapter(adapter_name)
+
+
 
     def _find_node(self, model_name: str) -> Optional[Dict[str, Any]]:
         """Find a node in the manifest by model name."""
