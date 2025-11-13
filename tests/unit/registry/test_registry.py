@@ -131,3 +131,49 @@ def test_model_dependencies(sample_catalog, sample_manifest):
         model = models[model_name]
         assert model.upstream == expected["upstream"], f"Expected {model_name}.upstream to be {expected['upstream']}, got {model.upstream}"
         assert model.downstream == expected["downstream"], f"Expected {model_name}.downstream to be {expected['downstream']}, got {model.downstream}"
+
+def test_adapter_override(tmp_path):
+    """Test that adapter override takes precedence over manifest adapter."""
+    # Create minimal catalog and manifest
+    catalog_data = {
+        "nodes": {
+            "model.test.test_model": {
+                "unique_id": "model.test.test_model",
+                "name": "test_model",
+                "schema": "test",
+                "database": "test_db",
+                "columns": {}
+            }
+        }
+    }
+    
+    manifest_data = {
+        "metadata": {
+            "adapter_type": "sqlserver"  # Should be normalized to "tsql"
+        },
+        "nodes": {
+            "model.test.test_model": {
+                "name": "test_model",
+                "resource_type": "model",
+                "depends_on": {"nodes": []}
+            }
+        }
+    }
+    
+    catalog_path = tmp_path / "catalog.json"
+    manifest_path = tmp_path / "manifest.json"
+    
+    with open(catalog_path, "w") as f:
+        json.dump(catalog_data, f)
+    with open(manifest_path, "w") as f:
+        json.dump(manifest_data, f)
+    
+    # Test without override - should normalize sqlserver to tsql
+    registry_no_override = ModelRegistry(str(catalog_path), str(manifest_path))
+    registry_no_override.load()
+    assert registry_no_override._dialect == "tsql", "Expected sqlserver to be normalized to tsql"
+    
+    # Test with override - should use the override
+    registry_with_override = ModelRegistry(str(catalog_path), str(manifest_path), adapter_override="bigquery")
+    registry_with_override.load()
+    assert registry_with_override._dialect == "bigquery", "Expected adapter override to take precedence"
