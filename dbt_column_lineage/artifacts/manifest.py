@@ -46,7 +46,7 @@ class ManifestReader:
         upstream: Dict[str, Set[str]] = {}
         
         for _, node in self.manifest.get("nodes", {}).items():
-            if node.get("resource_type") in ["model", "seed", "test"]:
+            if node.get("resource_type") == "model":
                 model_name = node.get("name")
                 if not model_name:
                     continue
@@ -107,6 +107,13 @@ class ManifestReader:
         if not node:
             return None
         return node.get("language")
+
+    def get_model_resource_path(self, model_name: str) -> Optional[str]:
+        """Get the original file path of a model from the manifest."""
+        node = self._find_node(model_name)
+        if not node:
+            return None
+        return node.get("original_file_path")
 
     def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
         node = self.manifest.get('nodes', {}).get(node_id)

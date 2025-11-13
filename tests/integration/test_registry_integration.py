@@ -210,3 +210,18 @@ def test_source_downstream_dependencies(registry):
         for downstream_model in expected_downstream:
             assert downstream_model in source.downstream, \
                 f"{source_name} should have {downstream_model} as downstream dependency"
+
+def test_model_resource_paths(registry):
+    """Test that models have the correct resource path."""
+    models = registry.get_models()
+    
+    path_tests = [
+        ("stg_accounts", "models/staging/stg_accounts.sql"),
+        ("int_transactions_enriched", "models/intermediate/int_transactions_enriched.sql"),
+        ("accounts_tiering", "models/marts/accounts_tiering.sql"),
+    ]
+    
+    for model_name, expected_path in path_tests:
+        model = models[model_name]
+        assert model.resource_path == expected_path, \
+            f"{model_name} should have resource path {expected_path}, got {model.resource_path}"
