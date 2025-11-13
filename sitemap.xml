@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/</loc>
+         <lastmod>2025-11-13</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/changelog/</loc>
+         <lastmod>2025-11-13</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/getting-started/installation/</loc>
+         <lastmod>2025-11-13</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/getting-started/quickstart/</loc>
+         <lastmod>2025-11-13</lastmod>
+    </url>
+</urlset>
