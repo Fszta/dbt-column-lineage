@@ -49,6 +49,18 @@ jobs:
           draft: false
           prerelease: false
 
+      - name: Setup Python
+        if: steps.changelog.outputs.skipped != 'true'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Build and verify documentation
+        if: steps.changelog.outputs.skipped != 'true'
+        run: |
+          pip install mkdocs-material mkdocs-click
+          mkdocs build
+
       - name: Trigger publish workflow
         if: steps.changelog.outputs.skipped != 'true'
         uses: peter-evans/repository-dispatch@v2

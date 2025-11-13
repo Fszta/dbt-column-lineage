@@ -2,6 +2,7 @@
 
 [![Tests](https://github.com/Fszta/dbt-column-lineage/actions/workflows/test.yml/badge.svg)](https://github.com/Fszta/dbt-column-lineage/actions/workflows/test.yml)
 
+📖 **[Documentation](https://fszta.github.io/dbt-column-lineage/)** | 🐛 [Report Bug](https://github.com/Fszta/dbt-column-lineage/issues) | 💡 [Request Feature](https://github.com/Fszta/dbt-column-lineage/issues)
 
 ## Overview
 
