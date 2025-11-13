@@ -1,29 +1,27 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'dbt_column_lineage/**'
-      - 'pyproject.toml'
-
-      - '!.github/**'
-      - '!tests/**'
-      - '!*.md'
-      - '!.gitignore'
-      - '!LICENSE'
-      - '!poetry.lock'
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Skip if commit message contains "chore(release)" to avoid loops
-    if: "!contains(github.event.head_commit.message, 'chore(release)')"
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Conventional Changelog Action
         id: changelog
@@ -38,6 +36,8 @@ jobs:
           git-message: 'chore(release): {version}'
           git-user-name: 'Fszta'
           fallback-version: '0.1.1'
+          preset: 'conventionalcommits'
+          release-count: '0'
 
       - name: Create Release
         if: steps.changelog.outputs.skipped != 'true'
@@ -54,4 +54,4 @@ jobs:
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: trigger-publish 
+          event-type: trigger-publish
