@@ -117,18 +117,32 @@ function buildLineageMaps(data, state) {
 // Calculate model positions based on their dependencies
 function layoutModels(data, state) {
     const dependencies = new Map();
+    const modelIncomingEdges = new Map();
+    const modelOutgoingEdges = new Map();
+    
+    // Initialize dependency tracking
     state.models.forEach(model => {
-        dependencies.set(model.name, { model, inDegree: 0, outDegree: 0, level: 0 });
+        dependencies.set(model.name, { model, inDegree: 0, outDegree: 0, level: -1 });
+        modelIncomingEdges.set(model.name, new Set());
+        modelOutgoingEdges.set(model.name, new Set());
     });
     
-    // Count dependencies between models
+    // Build dependency graph: track which models depend on which
+    // Edge direction: source -> target means source feeds into target
     data.edges.forEach(edge => {
         const sourceNode = state.nodeIndex.get(edge.source);
         const targetNode = state.nodeIndex.get(edge.target);
         
         if (sourceNode && targetNode && sourceNode.model !== targetNode.model) {
-            const sourceInfo = dependencies.get(sourceNode.model);
-            const targetInfo = dependencies.get(targetNode.model);
+            const sourceModel = sourceNode.model;
+            const targetModel = targetNode.model;
+            
+            // Source model feeds into target model
+            modelOutgoingEdges.get(sourceModel).add(targetModel);
+            modelIncomingEdges.get(targetModel).add(sourceModel);
+            
+            const sourceInfo = dependencies.get(sourceModel);
+            const targetInfo = dependencies.get(targetModel);
             
             if (sourceInfo && targetInfo) {
                 sourceInfo.outDegree++;
@@ -137,40 +151,69 @@ function layoutModels(data, state) {
         }
     });
     
-    // Assign levels based on topological sort approach
+    // Topological sort: assign levels based on data flow
+    // Level 0 = sources (no incoming edges)
+    // Level N = models that depend on level N-1 models
+    const visited = new Set();
     let currentLevel = 0;
+    
+    // Start with models that have no incoming edges (true sources)
     let modelsInCurrentLevel = [...dependencies.values()]
         .filter(info => info.inDegree === 0)
         .map(info => info.model.name);
     
-    while (modelsInCurrentLevel.length > 0) {
-        modelsInCurrentLevel.forEach(modelName => {
-            const info = dependencies.get(modelName);
-            if (info) info.level = currentLevel;
-        });
-        
-        const nextLevelModels = [];
-        data.edges.forEach(edge => {
-            const sourceNode = state.nodeIndex.get(edge.source);
-            const targetNode = state.nodeIndex.get(edge.target);
-            
-            // Find edges originating from the current level to other levels
-            if (sourceNode && targetNode && 
-                modelsInCurrentLevel.includes(sourceNode.model) && 
-                !modelsInCurrentLevel.includes(targetNode.model)) {
-                nextLevelModels.push(targetNode.model);
+    // If no true sources exist (all models have dependencies), start with the first model
+    if (modelsInCurrentLevel.length === 0 && state.models.length > 0) {
+        // Find models with minimum in-degree
+        let minInDegree = Infinity;
+        state.models.forEach(model => {
+            const info = dependencies.get(model.name);
+            if (info && info.inDegree < minInDegree) {
+                minInDegree = info.inDegree;
             }
         });
+        modelsInCurrentLevel = [...dependencies.values()]
+            .filter(info => info.inDegree === minInDegree)
+            .map(info => info.model.name);
+    }
+    
+    // Assign levels using BFS from sources
+    while (modelsInCurrentLevel.length > 0) {
+        const nextLevelModels = new Set();
         
-        modelsInCurrentLevel = [...new Set(nextLevelModels)]; // Deduplicate for next iteration
+        modelsInCurrentLevel.forEach(modelName => {
+            if (visited.has(modelName)) return;
+            
+            const info = dependencies.get(modelName);
+            if (info) {
+                info.level = currentLevel;
+                visited.add(modelName);
+            }
+            
+            // Find all models that this model feeds into
+            modelOutgoingEdges.get(modelName).forEach(targetModel => {
+                if (!visited.has(targetModel)) {
+                    // Check if all dependencies of targetModel have been processed
+                    const allDepsProcessed = [...modelIncomingEdges.get(targetModel)]
+                        .every(depModel => visited.has(depModel));
+                    
+                    if (allDepsProcessed) {
+                        nextLevelModels.add(targetModel);
+                    }
+                }
+            });
+        });
+        
+        modelsInCurrentLevel = [...nextLevelModels];
         currentLevel++;
     }
     
-    // Handle potential cycles or disconnected models by assigning them a level
+    // Handle any remaining unvisited models (cycles or disconnected components)
     dependencies.forEach((info, modelName) => {
-        if (info.level === 0 && info.inDegree > 0) {
-            // Assign to a level after the main flow, avoids level 0 if it has inputs
-            info.level = Math.max(1, currentLevel); 
+        if (info.level === -1) {
+            // Assign to a level after all processed models
+            info.level = currentLevel;
+            currentLevel++;
         }
     });
     
@@ -202,7 +245,11 @@ function positionModels(state, config) {
         }
     });
 
-    state.levelGroups.forEach((modelsInLevel, level) => {
+    // Sort levels to ensure correct left-to-right ordering
+    const sortedLevels = Array.from(state.levelGroups.keys()).sort((a, b) => a - b);
+    
+    sortedLevels.forEach(level => {
+        const modelsInLevel = state.levelGroups.get(level);
         let currentYOffset = config.box.padding;
         let maxModelWidthInLevel = 0;
 
@@ -230,7 +277,8 @@ function positionModels(state, config) {
     });
 
     let maxYOffset = 0;
-    state.levelGroups.forEach((modelsInLevel, level) => {
+    sortedLevels.forEach(level => {
+        const modelsInLevel = state.levelGroups.get(level);
         let levelHeight = 0;
         if (modelsInLevel.length > 0) {
             const lastModel = modelsInLevel[modelsInLevel.length - 1];
@@ -239,7 +287,8 @@ function positionModels(state, config) {
         maxYOffset = Math.max(maxYOffset, levelHeight);
     });
 
-    state.levelGroups.forEach((modelsInLevel, level) => {
+    sortedLevels.forEach(level => {
+        const modelsInLevel = state.levelGroups.get(level);
          let currentLevelHeight = 0;
          if (modelsInLevel.length > 0) {
              const lastModel = modelsInLevel[modelsInLevel.length - 1];
