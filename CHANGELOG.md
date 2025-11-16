@@ -1,3 +1,17 @@
+## [0.5.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.4.0...v0.5.0) (2025-11-16)
+
+
+### Features
+
+* add exposures to lineage ([#18](https://github.com/Fszta/dbt-column-lineage/issues/18)) ([a03f26c](https://github.com/Fszta/dbt-column-lineage/commit/a03f26ccb5e3f41f60d303413ba09f699c9bbe49))
+* add impact analysis to understand downstream effects of col changes ([#21](https://github.com/Fszta/dbt-column-lineage/issues/21)) ([1352fb4](https://github.com/Fszta/dbt-column-lineage/commit/1352fb4e7317d5322a779a9955bfd1b6100de11e))
+* enhance explore panel ui ([#19](https://github.com/Fszta/dbt-column-lineage/issues/19)) ([0a0e5d6](https://github.com/Fszta/dbt-column-lineage/commit/0a0e5d6a82a8f90e0688021494429565272131c1))
+
+
+### Bug Fixes
+
+* position nodes based on data flow, not selected node ([#15](https://github.com/Fszta/dbt-column-lineage/issues/15)) ([66805ec](https://github.com/Fszta/dbt-column-lineage/commit/66805ecdacc2d7280d70341e3be7e127129ff1e5))
+
 ## [0.4.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.3.1...v0.4.0) (2025-11-13)
 
 
