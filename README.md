@@ -13,12 +13,12 @@ DBT Column Lineage is a simple tool that helps you visualize and understand colu
 
 The tool offers several ways to view lineage:
 - **Interactive Explorer**: A local web server providing an interactive UI to explore model and column lineage visually. **(Recommended)**
+- **Impact Analysis**: Understand downstream effects of column changes, including affected models, transformations, and dashboards.
 - **DOT**: Generates GraphViz dot files that can be rendered as static images.
 - **Text**: Simple console output showing upstream and downstream dependencies for a specific model or column.
 
 
 ![DBT Column Lineage Demo - Concept](assets/demo_lineage.gif)
-*(Note: The demo shows the lineage concept; the interactive explorer provides an enhanced UI.)*
 
 
 ## Installation
@@ -48,6 +48,8 @@ dbt-col-lineage --explore \
 ```
 
 This will start a server (defaulting to port 8000). Open your web browser to the specified address (e.g., `http://127.0.0.1:8080`). You can then select models and columns from the sidebar to visualize their lineage directly in the UI.
+
+**Impact Analysis**: After loading lineage for a column, click "Analyze Impact" to see which models, transformations, and dashboards will be affected if you change that column.
 
 ### 2. Static Output (Text or DOT)
 

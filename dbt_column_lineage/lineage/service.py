@@ -137,7 +137,8 @@ class LineageService:
         if visited is None:
             visited = set()
         
-        current_ref = f"{model_name}.{column_name}"
+        # Normalize to match source_columns format (column names are lowercase in source_columns)
+        current_ref = f"{model_name}.{column_name.lower()}"
         if current_ref in visited:
             return {}
         
@@ -163,7 +164,9 @@ class LineageService:
                             continue
                             
                         for lineage in col.lineage:
-                            if any(src == current_ref for src in lineage.source_columns):
+                            # Check if current_ref (normalized) is in source_columns
+                            # source_columns are normalized to lowercase for column names
+                            if any(src.lower() == current_ref.lower() for src in lineage.source_columns):
                                 column_used_downstream = True
                                 if other_name not in downstream_models_using_column:
                                     downstream_models_using_column.append(other_name)
@@ -174,6 +177,7 @@ class LineageService:
                                 if isinstance(model_refs, dict):
                                     model_refs[col_name] = lineage
                                 
+                                # Recursively get downstream lineage (col_name is already the actual column name)
                                 next_refs = self._get_downstream_lineage(other_name, col_name, visited)
                                 for model, cols in next_refs.items():
                                     if model == 'exposures':
@@ -215,3 +219,100 @@ class LineageService:
             logger.warning(f"Failed to process downstream lineage for {current_ref}: {str(e)}")
             
         return downstream_refs 
+
+    def get_column_impact(self, model_name: str, column_name: str) -> Dict[str, Any]:
+        """Get impact analysis for a column - what would break if this column is modified.
+        
+        Returns:
+            Dict with:
+            - summary: metrics (affected_models, affected_columns, affected_exposures, critical_count, potential_count)
+            - affected_models: list of affected models with resource_type
+            - affected_columns: list of affected columns with details
+            - affected_exposures: list of affected exposures
+        """
+        try:
+            model = self.registry.get_model(model_name)
+            if column_name not in model.columns:
+                raise ValueError(f"Column '{column_name}' not found in model '{model_name}'")
+            
+            downstream_refs = self._get_downstream_lineage(model_name, column_name)
+            
+            affected_models = {}
+            affected_columns = []
+            affected_exposures = []
+            critical_count = 0
+            potential_count = 0
+            
+            for downstream_model_name, columns in downstream_refs.items():
+                # Skip non-model entries (exposures, sources, direct_refs)
+                if downstream_model_name in ('exposures', 'sources', 'direct_refs') or not isinstance(columns, dict):
+                    continue
+                
+                try:
+                    downstream_model = self.registry.get_model(downstream_model_name)
+                    
+                    if downstream_model_name not in affected_models:
+                        affected_models[downstream_model_name] = {
+                            'name': downstream_model_name,
+                            'resource_type': getattr(downstream_model, 'resource_type', 'model'),
+                            'schema': downstream_model.schema_name,
+                            'database': downstream_model.database
+                        }
+                    
+                    for col_name, lineage in columns.items():
+                        if not isinstance(lineage, ColumnLineage):
+                            logger.warning(f"Expected ColumnLineage for {downstream_model_name}.{col_name}, got {type(lineage)}")
+                            continue
+                            
+                        # Determine severity based on transformation type
+                        # Critical = derived/transformed columns (transformation logic might break)
+                        # Low impact = direct/renamed (just pass-through, change propagates)
+                        is_critical = lineage.transformation_type == 'derived'
+                        if is_critical:
+                            critical_count += 1
+                        else:
+                            potential_count += 1
+                        
+                        col_obj = downstream_model.columns.get(col_name)
+                        affected_columns.append({
+                            'model': downstream_model_name,
+                            'column': col_name,
+                            'transformation_type': lineage.transformation_type,
+                            'sql_expression': lineage.sql_expression,
+                            'severity': 'critical' if is_critical else 'low_impact',
+                            'data_type': col_obj.data_type if col_obj else None
+                        })
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to process model {downstream_model_name} in impact analysis: {e}", exc_info=True)
+            
+            if 'exposures' in downstream_refs and isinstance(downstream_refs['exposures'], set):
+                for exposure_name in downstream_refs['exposures']:
+                    try:
+                        exposure = self.registry.get_exposure(exposure_name)
+                        affected_exposures.append({
+                            'name': exposure.name,
+                            'type': exposure.type,
+                            'url': exposure.url,
+                            'description': exposure.description,
+                            'depends_on_models': list(exposure.depends_on_models)
+                        })
+                    except Exception as e:
+                        logger.warning(f"Failed to process exposure {exposure_name} in impact analysis: {e}")
+            
+            return {
+                'summary': {
+                    'affected_models': len(affected_models),
+                    'affected_columns': len(affected_columns),
+                    'affected_exposures': len(affected_exposures),
+                    'critical_count': critical_count,
+                    'low_impact_count': potential_count
+                },
+                'affected_models': list(affected_models.values()),
+                'affected_columns': affected_columns,
+                'affected_exposures': affected_exposures
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in impact analysis for {model_name}.{column_name}: {e}")
+            raise 
