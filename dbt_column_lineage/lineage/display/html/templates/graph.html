@@ -24,13 +24,26 @@
                 </div>
                 <div id="model-tree-container">
                 </div>
-                <div class="column-selector">
-                    <label for="columnSelect">Column:</label>
-                    <select id="columnSelect" disabled>
-                        <option value="">Select a model first</option>
-                    </select>
+                <div class="explore-panel-actions">
+                    <div class="column-selector">
+                        <label for="columnSelect">Column:</label>
+                        <div class="custom-select disabled" id="columnSelectWrapper">
+                            <div class="custom-select-trigger" id="columnSelectTrigger">
+                                <span class="custom-select-value"><span class="option-text">Select a model first</span></span>
+                                <svg class="custom-select-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </div>
+                            <div class="custom-select-options" id="columnSelectOptions">
+                                <div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>
+                            </div>
+                        </div>
+                        <select id="columnSelect" disabled style="display: none;">
+                            <option value="">Select a model first</option>
+                        </select>
+                    </div>
+                    <button id="loadLineage" disabled>Load Lineage</button>
                 </div>
-                <button id="loadLineage" disabled>Load Lineage</button>
             </div>
             {% endif %}
             <div class="controls">
@@ -127,7 +140,20 @@
                                 document.querySelectorAll('.model-tree .node-content.selected').forEach(el => el.classList.remove('selected'));
                                 nodeContent.classList.add('selected');
                                 // Don't populate column selector for exposures
+                                const columnSelectWrapper = document.getElementById('columnSelectWrapper');
+                                const columnSelectValue = document.querySelector('.custom-select-value');
+                                const columnSelectOptions = document.getElementById('columnSelectOptions');
                                 columnSelect.innerHTML = '<option value="">Exposures don\'t have columns</option>';
+                                columnSelectOptions.innerHTML = '<div class="custom-select-option" data-value=""><span class="option-text">Exposures don\'t have columns</span></div>';
+                                const resetContent = document.createElement('div');
+                                resetContent.className = 'option-content';
+                                const resetText = document.createElement('span');
+                                resetText.className = 'option-text';
+                                resetText.textContent = 'Exposures don\'t have columns';
+                                resetContent.appendChild(resetText);
+                                columnSelectValue.innerHTML = '';
+                                columnSelectValue.appendChild(resetContent);
+                                columnSelectWrapper.classList.add('disabled');
                                 columnSelect.disabled = true;
                                 loadLineageBtn.disabled = true;
                             });
@@ -152,7 +178,6 @@
                                 
                                 selectedModelData = node;
                                 populateColumnSelector(node.columns);
-                                columnSelect.disabled = false;
                                 loadLineageBtn.disabled = true;
                             });
                         }
@@ -221,14 +246,100 @@
                 });
             }
 
+            function getTagColor(type) {
+                if (!type) return '#cbd5e1';
+                const typeStr = type.toLowerCase();
+                const defaultColor = '#cbd5e1';
+                
+                if (typeStr.includes('int') || typeStr.includes('decimal') || 
+                    typeStr.includes('numeric') || typeStr.includes('double') || 
+                    typeStr.includes('float')) {
+                    return '#7cb7fc';
+                }
+                
+                if (typeStr.includes('varchar') || typeStr.includes('char') || 
+                    typeStr.includes('text') || typeStr.includes('string')) {
+                    return '#4ddba4';
+                }
+                
+                if (typeStr.includes('date') || typeStr.includes('time')) {
+                    return '#b29dfc';
+                }
+                
+                if (typeStr.includes('bool')) {
+                    return '#f98b8b';
+                }
+                
+                if (typeStr.includes('variant')) {
+                    return '#fca154';
+                }
+                
+                return defaultColor;
+            }
+
+            function getShortType(type) {
+                if (!type) return 'unknown';
+                return type.toLowerCase()
+                    .replace('character varying', 'varchar')
+                    .replace('double precision', 'double')
+                    .replace('timestamp without time zone', 'timestamp')
+                    .replace('timestamp with time zone', 'timestamptz');
+            }
+
             function populateColumnSelector(columns) {
+                const columnSelectWrapper = document.getElementById('columnSelectWrapper');
+                const columnSelectTrigger = document.getElementById('columnSelectTrigger');
+                const columnSelectOptions = document.getElementById('columnSelectOptions');
+                const columnSelectValue = columnSelectTrigger.querySelector('.custom-select-value');
+                
+                // Update hidden select for form compatibility
                 columnSelect.innerHTML = '<option value="">Select a column</option>';
+                
+                // Update custom dropdown
+                columnSelectOptions.innerHTML = '<div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>';
+                
                 columns.forEach(column => {
+                    // Add to hidden select
                     const option = document.createElement('option');
                     option.value = column.name;
                     option.textContent = `${column.name} (${column.type || 'unknown'})`;
                     columnSelect.appendChild(option);
+                    
+                    // Add to custom dropdown with styled type tag
+                    const customOption = document.createElement('div');
+                    customOption.className = 'custom-select-option';
+                    customOption.dataset.value = column.name;
+                    
+                    const optionContent = document.createElement('div');
+                    optionContent.className = 'option-content';
+                    
+                    const optionText = document.createElement('span');
+                    optionText.className = 'option-text';
+                    optionText.textContent = column.name;
+                    
+                    const typeTag = document.createElement('span');
+                    typeTag.className = 'option-type-tag';
+                    const shortType = getShortType(column.type);
+                    typeTag.textContent = shortType;
+                    typeTag.style.backgroundColor = getTagColor(column.type);
+                    
+                    optionContent.appendChild(optionText);
+                    optionContent.appendChild(typeTag);
+                    customOption.appendChild(optionContent);
+                    columnSelectOptions.appendChild(customOption);
                 });
+                
+                // Reset display
+                const resetContent = document.createElement('div');
+                resetContent.className = 'option-content';
+                const resetText = document.createElement('span');
+                resetText.className = 'option-text';
+                resetText.textContent = 'Select a column';
+                resetContent.appendChild(resetText);
+                columnSelectValue.innerHTML = '';
+                columnSelectValue.appendChild(resetContent);
+                columnSelectWrapper.classList.remove('disabled');
+                columnSelect.disabled = false;
             }
 
             fetch('/api/models')
@@ -247,6 +358,54 @@
                     modelTreeContainer.innerHTML = '<p>Error loading models.</p>';
                 });
                 
+            // Custom dropdown functionality
+            const columnSelectWrapper = document.getElementById('columnSelectWrapper');
+            const columnSelectTrigger = document.getElementById('columnSelectTrigger');
+            const columnSelectOptions = document.getElementById('columnSelectOptions');
+            const columnSelectValue = columnSelectTrigger.querySelector('.custom-select-value');
+            
+            // Toggle dropdown
+            columnSelectTrigger.addEventListener('click', function(e) {
+                if (columnSelectWrapper.classList.contains('disabled')) return;
+                e.stopPropagation();
+                columnSelectWrapper.classList.toggle('open');
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!columnSelectWrapper.contains(e.target)) {
+                    columnSelectWrapper.classList.remove('open');
+                }
+            });
+            
+            // Handle option selection
+            columnSelectOptions.addEventListener('click', function(e) {
+                const option = e.target.closest('.custom-select-option');
+                if (!option) return;
+                
+                const value = option.dataset.value;
+                const optionContent = option.querySelector('.option-content');
+                
+                // Update custom dropdown - clone the option content
+                columnSelectValue.innerHTML = '';
+                if (optionContent) {
+                    columnSelectValue.appendChild(optionContent.cloneNode(true));
+                } else {
+                    const text = option.textContent;
+                    columnSelectValue.textContent = text;
+                }
+                columnSelectOptions.querySelectorAll('.custom-select-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                option.classList.add('selected');
+                columnSelectWrapper.classList.remove('open');
+                
+                // Update hidden select
+                columnSelect.value = value;
+                columnSelect.dispatchEvent(new Event('change'));
+            });
+            
+            // Sync with hidden select for compatibility
             columnSelect.addEventListener('change', function() {
                 loadLineageBtn.disabled = !this.value || !selectedModelData;
             });
