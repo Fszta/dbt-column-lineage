@@ -225,3 +225,48 @@ def test_model_resource_paths(registry):
         model = models[model_name]
         assert model.resource_path == expected_path, \
             f"{model_name} should have resource path {expected_path}, got {model.resource_path}"
+
+def test_exposures_loaded(registry):
+    """Test that exposures are loaded correctly in the registry."""
+    exposures = registry.get_exposures()
+    
+    assert len(exposures) == 3, f"Expected 3 exposures, got {len(exposures)}"
+    
+    expected_exposures = {
+        "transactions_dashboard",
+        "account_tiering_report",
+        "api_transactions_endpoint"
+    }
+    
+    actual_exposures = set(exposures.keys())
+    assert actual_exposures == expected_exposures, \
+        f"Expected exposures {expected_exposures}, got {actual_exposures}"
+    
+    dashboard = exposures["transactions_dashboard"]
+    assert dashboard.type == "dashboard"
+    assert dashboard.url == "https://example.com/dashboards/transactions"
+    assert "transactions" in dashboard.depends_on_models
+    
+    api = exposures["api_transactions_endpoint"]
+    assert api.type == "application"
+    assert api.url == "https://api.example.com/v1/transactions"
+    assert "transactions" in api.depends_on_models
+    
+    report = exposures["account_tiering_report"]
+    assert report.type == "dashboard"
+    assert "accounts_tiering" in report.depends_on_models
+
+def test_exposures_as_downstream_dependencies(registry):
+    """Test that exposures are added as downstream dependencies of models."""
+    models = registry.get_models()
+    
+    transactions_model = models.get("transactions")
+    if transactions_model:
+        assert "transactions_dashboard" in transactions_model.downstream, \
+            "transactions model should have transactions_dashboard as downstream"
+        assert "api_transactions_endpoint" in transactions_model.downstream, \
+            "transactions model should have api_transactions_endpoint as downstream"
+    
+    accounts_tiering_model = models["accounts_tiering"]
+    assert "account_tiering_report" in accounts_tiering_model.downstream, \
+        "accounts_tiering model should have account_tiering_report as downstream"

@@ -1,0 +1,39 @@
+version: 2
+
+exposures:
+  - name: transactions_dashboard
+    type: dashboard
+    description: "Main dashboard showing transaction data and metrics"
+    url: "https://example.com/dashboards/transactions"
+    owner:
+      name: "Analytics Team"
+      email: "analytics@example.com"
+    depends_on:
+      - ref('transactions')
+    meta:
+      tool: "Metabase"
+      domain: "Finance"
+
+  - name: account_tiering_report
+    type: dashboard
+    description: "Monthly report on account tiering"
+    url: "https://example.com/reports/account-tiering"
+    owner:
+      name: "Analytics Team"
+      email: "analytics@example.com"
+    depends_on:
+      - ref('accounts_tiering')
+    meta:
+      tool: "Metabase"
+      domain: "gtm"
+
+  - name: api_transactions_endpoint
+    type: application
+    description: "REST API endpoint serving transaction data"
+    url: "https://api.example.com/v1/transactions"
+    owner:
+      name: "Platform Team"
+      email: "platform@example.com"
+    depends_on:
+      - ref('transactions')
+

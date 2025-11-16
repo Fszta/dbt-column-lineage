@@ -20,6 +20,17 @@ class Column(BaseModel):
     def full_name(self) -> str:
         return f"{self.model_name}.{self.name}"
 
+class Exposure(BaseModel):
+    name: str
+    type: str
+    url: Optional[str] = None
+    description: Optional[str] = None
+    owner: Optional[Dict[str, Any]] = None
+    unique_id: str
+    depends_on_models: Set[str] = Field(default_factory=set)
+    resource_path: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
 class ModelDependency(BaseModel):
     model_name: str
     depends_on: Set[str]
@@ -41,7 +52,7 @@ class Model(BaseModel):
     downstream: Set[str] = Field(default_factory=set)
     compiled_sql: Optional[str] = None
     language: Optional[str] = None
-    resource_type: Literal["model", "source", "seed", "test"]
+    resource_type: Literal["model", "source", "seed", "test", "exposure"]
     resource_path: Optional[str] = None
     source_identifier: Optional[str] = None
 

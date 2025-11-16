@@ -125,3 +125,61 @@ class ManifestReader:
         if node is None:
             return None
         return dict(node)
+
+    def get_exposures(self) -> Dict[str, Dict[str, Any]]:
+        """Get all exposures from the manifest.
+        
+        Returns:
+            Dict[str, Dict[str, Any]]: Key is exposure unique_id, value is exposure data
+        """
+        return self.manifest.get("exposures", {})
+
+    def get_exposure_dependencies(self) -> Dict[str, Set[str]]:
+        """Get model dependencies for each exposure.
+        
+        Returns:
+            Dict[str, Set[str]]: Key is exposure name, value is set of model names it depends on
+        """
+        exposure_deps: Dict[str, Set[str]] = {}
+        
+        for exposure_id, exposure_data in self.manifest.get("exposures", {}).items():
+            exposure_name = exposure_data.get("name")
+            if not exposure_name:
+                continue
+            
+            exposure_deps[exposure_name] = set()
+            
+            depends_on = exposure_data.get("depends_on", {})
+            for dep_id in depends_on.get("nodes", []):
+                parts = dep_id.split(".")
+                if parts[0] == "model":
+                    dep_name = parts[-1]
+                    exposure_deps[exposure_name].add(dep_name)
+                elif parts[0] == "source":
+                    source_node = self.manifest.get("sources", {}).get(dep_id, {})
+                    source_identifier = source_node.get("identifier")
+                    if source_identifier:
+                        exposure_deps[exposure_name].add(source_identifier)
+                    else:
+                        source_name = parts[-1]
+                        exposure_deps[exposure_name].add(source_name)
+        
+        return exposure_deps
+
+    def get_model_exposures(self) -> Dict[str, Set[str]]:
+        """Get exposures that depend on each model.
+        
+        Returns:
+            Dict[str, Set[str]]: Key is model name, value is set of exposure names that depend on it
+        """
+        model_exposures: Dict[str, Set[str]] = {}
+        
+        exposure_deps = self.get_exposure_dependencies()
+        
+        for exposure_name, model_names in exposure_deps.items():
+            for model_name in model_names:
+                if model_name not in model_exposures:
+                    model_exposures[model_name] = set()
+                model_exposures[model_name].add(exposure_name)
+        
+        return model_exposures

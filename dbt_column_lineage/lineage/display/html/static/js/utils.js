@@ -13,6 +13,7 @@ function getModelIcon(modelType) {
         seed: "M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z M14 2v6h6",
         model: "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M12 22.5v-9 M3.3 7l8.7 5 8.7-5",
         test: "M9 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z M13 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M20 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4z M4 20a2 2 0 1 0 0-4 2 2 0 0 0 0-4z",
+        exposure: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
         default: "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z M12 22.5v-9 M3.3 7l8.7 5 8.7-5"
     };
     
@@ -99,6 +100,47 @@ function createEdgePath(d, state, config) {
     const dx = Math.abs(targetX - sourceX);
     const controlX1 = sourceX + (leftToRight ? dx * 0.4 : -dx * 0.4);
     const controlX2 = targetX + (leftToRight ? -dx * 0.4 : dx * 0.4);
+    
+    return `M${sourceX},${sourceY} 
+            C${controlX1},${sourceY} 
+             ${controlX2},${targetY} 
+             ${targetX},${targetY}`;
+}
+
+// Create edge path for exposure connections
+function createExposureEdgePath(d, state, config) {
+    const sourceNode = state.nodeIndex.get(d.source);
+    const targetNode = state.nodeIndex.get(d.target);
+    
+    if (!sourceNode || !targetNode) return '';
+    
+    let sourceX, sourceY, targetX, targetY;
+    
+    // Source is a column
+    if (sourceNode.type === 'column') {
+        const sourcePos = state.columnPositions.get(d.source);
+        if (!sourcePos) return '';
+        sourceX = sourcePos.x;
+        sourceY = sourcePos.y;
+    } else {
+        return '';
+    }
+    
+    // Target is an exposure
+    if (targetNode.type === 'exposure') {
+        const exposure = state.exposures.find(e => e.name === targetNode.model);
+        if (!exposure || typeof exposure.x !== 'number' || isNaN(exposure.x) || 
+            typeof exposure.y !== 'number' || isNaN(exposure.y)) return '';
+        targetX = exposure.x + config.box.width / 2;
+        targetY = exposure.y - exposure.height / 2;
+    } else {
+        return '';
+    }
+    
+    // Create bezier curve path
+    const dx = Math.abs(targetX - sourceX);
+    const controlX1 = sourceX + dx * 0.4;
+    const controlX2 = targetX - dx * 0.4;
     
     return `M${sourceX},${sourceY} 
             C${controlX1},${sourceY} 

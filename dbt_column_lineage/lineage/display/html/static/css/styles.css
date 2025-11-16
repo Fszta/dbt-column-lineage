@@ -169,6 +169,36 @@ html, body {
     ry: 7px;
 }
 
+.exposure-header {
+    stroke: none;
+    fill-opacity: 1;
+    rx: 7px;
+    ry: 7px;
+    fill: #f3e8ff;
+}
+
+.exposure-container {
+    fill: white;
+    stroke: #a78bfa;
+    stroke-width: 2px;
+    rx: 8px;
+    ry: 8px;
+}
+
+.exposure-title {
+    fill: #9333ea;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.2px;
+    dominant-baseline: middle;
+    stroke: none;
+}
+
+.model-exposure:hover .exposure-container {
+    stroke: #9333ea;
+    filter: drop-shadow(0 4px 6px rgba(147, 51, 234, 0.15));
+}
+
 /* Columns header styling - no top border */
 .columns-header rect {
     transition: fill 0.2s, rx 0.2s, ry 0.2s;
@@ -266,6 +296,19 @@ html, body {
 .edge:hover {
     stroke: var(--edge-highlight);
     stroke-width: 2px;
+    stroke-opacity: 1;
+}
+
+.edge.exposure {
+    stroke: #9333ea;
+    stroke-width: 2px;
+    stroke-dasharray: 5,3;
+    stroke-opacity: 0.8;
+}
+
+.edge.exposure:hover {
+    stroke: #7c3aed;
+    stroke-width: 2.5px;
     stroke-opacity: 1;
 }
 
@@ -955,6 +998,48 @@ svg {
     color: #10b981; /* Emerald green for seed files */
 }
 
+.exposure-icon {
+    color: #9333ea; /* Purple for exposures */
+}
+
+.exposure-detail-row {
+    pointer-events: none;
+}
+
+.exposure-detail-label {
+    fill: #334155;
+    font-size: 12px;
+}
+
+.exposure-detail-value {
+    fill: #9333ea;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.exposure-type-tag {
+    pointer-events: none;
+}
+
+.exposure-type-tag text {
+    fill: white;
+    font-size: 11px;
+    stroke: none;
+}
+
+.exposure-url {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.exposure-url-clickable {
+    pointer-events: all;
+}
+
+.exposure-url-clickable:hover + .exposure-url {
+    fill: #7c3aed;
+}
+
 .default-icon {
     color: #6b7280; /* Neutral gray */
 }
@@ -979,6 +1064,24 @@ svg {
 }
 
 .node-content.model.selected .node-label {
+    color: white;
+}
+
+.node-content.exposure {
+    cursor: pointer;
+}
+
+.node-content.exposure.selected {
+    background-color: #9333ea; /* Purple for selected exposure */
+    color: white;
+    font-weight: 500;
+}
+
+.node-content.exposure.selected .tree-icon {
+    color: white;
+}
+
+.node-content.exposure.selected .node-label {
     color: white;
 }
 
@@ -1160,6 +1263,48 @@ svg {
     color: #10b981; /* Emerald green for seed files */
 }
 
+.exposure-icon {
+    color: #9333ea; /* Purple for exposures */
+}
+
+.exposure-detail-row {
+    pointer-events: none;
+}
+
+.exposure-detail-label {
+    fill: #334155;
+    font-size: 12px;
+}
+
+.exposure-detail-value {
+    fill: #9333ea;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.exposure-type-tag {
+    pointer-events: none;
+}
+
+.exposure-type-tag text {
+    fill: white;
+    font-size: 11px;
+    stroke: none;
+}
+
+.exposure-url {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.exposure-url-clickable {
+    pointer-events: all;
+}
+
+.exposure-url-clickable:hover + .exposure-url {
+    fill: #7c3aed;
+}
+
 .default-icon {
     color: #6b7280; /* Neutral gray */
 }
@@ -1184,6 +1329,24 @@ svg {
 }
 
 .node-content.model.selected .node-label {
+    color: white;
+}
+
+.node-content.exposure {
+    cursor: pointer;
+}
+
+.node-content.exposure.selected {
+    background-color: #9333ea; /* Purple for selected exposure */
+    color: white;
+    font-weight: 500;
+}
+
+.node-content.exposure.selected .tree-icon {
+    color: white;
+}
+
+.node-content.exposure.selected .node-label {
     color: white;
 }
 

@@ -6,8 +6,10 @@
 function createState() {
     return {
         models: [],
+        exposures: [],
         nodeIndex: new Map(),
         columnPositions: new Map(),
+        exposurePositions: new Map(),
         columnElements: new Map(),
         modelEdges: new Map(),
         levelGroups: new Map(),
@@ -27,6 +29,7 @@ function processData(data, state) {
 
     const modelGroups = {};
     const modelTypes = {};
+    const exposureGroups = {};
     
     // First pass: gather all resource_types by model to handle cases
     // where only some columns in a model have the type defined.
@@ -58,10 +61,21 @@ function processData(data, state) {
                 dataType: node.data_type,
                 isKey: node.is_key || false
             });
+        } else if (node.type === 'exposure') {
+            if (!exposureGroups[node.model]) {
+                exposureGroups[node.model] = {
+                    name: node.model,
+                    columns: [],
+                    isMain: false,
+                    type: 'exposure',
+                    exposureData: node.exposure_data || {}
+                };
+            }
         }
     });
 
     state.models = Object.values(modelGroups);
+    state.exposures = Object.values(exposureGroups);
     
     buildLineageMaps(data, state);
     layoutModels(data, state);
@@ -120,15 +134,18 @@ function layoutModels(data, state) {
     const modelIncomingEdges = new Map();
     const modelOutgoingEdges = new Map();
     
-    // Initialize dependency tracking
     state.models.forEach(model => {
         dependencies.set(model.name, { model, inDegree: 0, outDegree: 0, level: -1 });
         modelIncomingEdges.set(model.name, new Set());
         modelOutgoingEdges.set(model.name, new Set());
     });
     
-    // Build dependency graph: track which models depend on which
-    // Edge direction: source -> target means source feeds into target
+    state.exposures.forEach(exposure => {
+        dependencies.set(exposure.name, { model: exposure, inDegree: 0, outDegree: 0, level: -1 });
+        modelIncomingEdges.set(exposure.name, new Set());
+        modelOutgoingEdges.set(exposure.name, new Set());
+    });
+    
     data.edges.forEach(edge => {
         const sourceNode = state.nodeIndex.get(edge.source);
         const targetNode = state.nodeIndex.get(edge.target);
@@ -137,34 +154,32 @@ function layoutModels(data, state) {
             const sourceModel = sourceNode.model;
             const targetModel = targetNode.model;
             
-            // Source model feeds into target model
-            modelOutgoingEdges.get(sourceModel).add(targetModel);
-            modelIncomingEdges.get(targetModel).add(sourceModel);
+            const sourceEdges = modelOutgoingEdges.get(sourceModel);
+            const targetEdges = modelIncomingEdges.get(targetModel);
             
-            const sourceInfo = dependencies.get(sourceModel);
-            const targetInfo = dependencies.get(targetModel);
-            
-            if (sourceInfo && targetInfo) {
-                sourceInfo.outDegree++;
-                targetInfo.inDegree++;
+            if (sourceEdges && targetEdges) {
+                sourceEdges.add(targetModel);
+                targetEdges.add(sourceModel);
+                
+                const sourceInfo = dependencies.get(sourceModel);
+                const targetInfo = dependencies.get(targetModel);
+                
+                if (sourceInfo && targetInfo) {
+                    sourceInfo.outDegree++;
+                    targetInfo.inDegree++;
+                }
             }
         }
     });
     
-    // Topological sort: assign levels based on data flow
-    // Level 0 = sources (no incoming edges)
-    // Level N = models that depend on level N-1 models
     const visited = new Set();
     let currentLevel = 0;
     
-    // Start with models that have no incoming edges (true sources)
     let modelsInCurrentLevel = [...dependencies.values()]
         .filter(info => info.inDegree === 0)
         .map(info => info.model.name);
     
-    // If no true sources exist (all models have dependencies), start with the first model
     if (modelsInCurrentLevel.length === 0 && state.models.length > 0) {
-        // Find models with minimum in-degree
         let minInDegree = Infinity;
         state.models.forEach(model => {
             const info = dependencies.get(model.name);
@@ -177,7 +192,6 @@ function layoutModels(data, state) {
             .map(info => info.model.name);
     }
     
-    // Assign levels using BFS from sources
     while (modelsInCurrentLevel.length > 0) {
         const nextLevelModels = new Set();
         
@@ -190,10 +204,8 @@ function layoutModels(data, state) {
                 visited.add(modelName);
             }
             
-            // Find all models that this model feeds into
             modelOutgoingEdges.get(modelName).forEach(targetModel => {
                 if (!visited.has(targetModel)) {
-                    // Check if all dependencies of targetModel have been processed
                     const allDepsProcessed = [...modelIncomingEdges.get(targetModel)]
                         .every(depModel => visited.has(depModel));
                     
@@ -208,16 +220,13 @@ function layoutModels(data, state) {
         currentLevel++;
     }
     
-    // Handle any remaining unvisited models (cycles or disconnected components)
     dependencies.forEach((info, modelName) => {
         if (info.level === -1) {
-            // Assign to a level after all processed models
             info.level = currentLevel;
             currentLevel++;
         }
     });
     
-    // Group models by level
     const levelGroups = new Map();
     dependencies.forEach((info) => {
         if (!levelGroups.has(info.level)) {
@@ -234,18 +243,27 @@ function positionModels(state, config) {
     let currentXOffset = config.box.padding;
     const levelWidths = new Map();
 
-    // First pass to calculate all model heights
     state.models.forEach(model => {
+        model.columnsCollapsed = model.columnsCollapsed || false;
         model.height = config.box.titleHeight + 28 +
                       (model.columns.length * config.box.columnHeight) +
                       config.box.padding; 
-        model.columnsCollapsed = model.columnsCollapsed || false;
         if (model.columnsCollapsed) {
             model.height = config.box.titleHeight + 28;
         }
     });
+    
+    state.exposures.forEach(exposure => {
+               const exposureData = exposure.exposureData || {};
+               let detailRows = 0;
+               if (exposureData.type) detailRows++;
+               if (exposureData.url) detailRows++;
+               
+        exposure.height = config.box.titleHeight + 
+                          (detailRows * config.box.columnHeight) +
+                          config.box.padding;
+    });
 
-    // Sort levels to ensure correct left-to-right ordering
     const sortedLevels = Array.from(state.levelGroups.keys()).sort((a, b) => a - b);
     
     sortedLevels.forEach(level => {
@@ -253,17 +271,32 @@ function positionModels(state, config) {
         let currentYOffset = config.box.padding;
         let maxModelWidthInLevel = 0;
 
-        modelsInLevel.forEach((model, idx) => {
-            model.height = config.box.titleHeight + 28 +
-                          (model.columns.length * config.box.columnHeight) +
-                          config.box.padding;
-            if (model.columnsCollapsed) {
-                 model.height = config.box.titleHeight + 28;
+        modelsInLevel.forEach((item, idx) => {
+            if (item.type === 'exposure') {
+                if (!item.height || isNaN(item.height)) {
+                    const exposureData = item.exposureData || {};
+                    let detailRows = 0;
+                    if (exposureData.type) detailRows++;
+                    if (exposureData.url) detailRows++;
+                    
+                    item.height = config.box.titleHeight + 
+                                  (detailRows * config.box.columnHeight) +
+                                  config.box.padding;
+                }
+            } else {
+                if (!item.height || isNaN(item.height)) {
+                    item.height = config.box.titleHeight + 28 +
+                                  (item.columns.length * config.box.columnHeight) +
+                                  config.box.padding;
+                    if (item.columnsCollapsed) {
+                        item.height = config.box.titleHeight + 28;
+                    }
+                }
             }
 
-            model.x = currentXOffset;
-            model.y = currentYOffset + model.height / 2;
-            currentYOffset += model.height + config.layout.ySpacing;
+            item.x = currentXOffset;
+            item.y = currentYOffset + item.height / 2;
+            currentYOffset += item.height + config.layout.ySpacing;
 
             maxModelWidthInLevel = Math.max(maxModelWidthInLevel, config.box.width);
         });
