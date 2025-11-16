@@ -4,7 +4,7 @@ import logging
 
 from dbt_column_lineage.artifacts.catalog import CatalogReader
 from dbt_column_lineage.artifacts.manifest import ManifestReader
-from dbt_column_lineage.models.schema import Model, SQLParseResult, ColumnLineage
+from dbt_column_lineage.models.schema import Model, SQLParseResult, ColumnLineage, Exposure
 from dbt_column_lineage.artifacts.exceptions import (
     ModelNotFoundError,
     RegistryNotLoadedError,
@@ -19,13 +19,14 @@ logger = logging.getLogger(__name__)
 class RegistryState:
     """Immutable state of the registry."""
     models: Dict[str, Model]
+    exposures: Dict[str, Exposure]
     is_loaded: bool = False
 
 class ModelRegistry:
     def __init__(self, catalog_path: str, manifest_path: str, adapter_override: Optional[str] = None):
         self._catalog_reader = CatalogReader(catalog_path)
         self._manifest_reader = ManifestReader(manifest_path)
-        self._state = RegistryState(models={}, is_loaded=False)
+        self._state = RegistryState(models={}, exposures={}, is_loaded=False)
         self._sql_parser : Optional[SQLColumnParser] = None
         self._dialect : Optional[str] = None
         self._adapter_override: Optional[str] = adapter_override
@@ -49,14 +50,45 @@ class ModelRegistry:
         try:
             upstream_deps = self._manifest_reader.get_model_upstream()
             downstream_deps = self._manifest_reader.get_model_downstream()
+            model_exposures = self._manifest_reader.get_model_exposures()
 
             for model_name, model in models.items():
                 model.upstream = upstream_deps.get(model_name, set())
                 model.downstream = downstream_deps.get(model_name, set())
+                if model_name in model_exposures:
+                    model.downstream.update(model_exposures[model_name])
                 model.language = self._manifest_reader.get_model_language(model_name)
                 model.resource_path = self._manifest_reader.get_model_resource_path(model_name)
         except Exception as e:
             raise RegistryError(f"Failed to apply dependencies: {e}")
+
+    def _load_exposures(self) -> Dict[str, Exposure]:
+        """Load exposures from manifest."""
+        exposures = {}
+        exposure_data = self._manifest_reader.get_exposures()
+        exposure_deps = self._manifest_reader.get_exposure_dependencies()
+        
+        for exposure_id, exp_data in exposure_data.items():
+            exposure_name = exp_data.get("name")
+            if not exposure_name:
+                continue
+            
+            depends_on_models = exposure_deps.get(exposure_name, set())
+            
+            exposure = Exposure(
+                name=exposure_name,
+                type=exp_data.get("type", "dashboard"),
+                url=exp_data.get("url"),
+                description=exp_data.get("description"),
+                owner=exp_data.get("owner"),
+                unique_id=exposure_id,
+                depends_on_models=depends_on_models,
+                resource_path=exp_data.get("original_file_path"),
+                metadata=exp_data.get("meta", {})
+            )
+            exposures[exposure_name] = exposure
+        
+        return exposures
 
     def _process_lineage(self, models: Dict[str, Model]) -> None:
         """Process and apply column lineage to models."""
@@ -151,7 +183,8 @@ class ModelRegistry:
             models = self._initialize_models()
             self._apply_dependencies(models)
             self._process_lineage(models)
-            self._state = RegistryState(models=models, is_loaded=True)
+            exposures = self._load_exposures()
+            self._state = RegistryState(models=models, exposures=exposures, is_loaded=True)
         except Exception as e:
             raise RegistryError(f"Failed to load registry: {e}")
 
@@ -170,6 +203,22 @@ class ModelRegistry:
         if model is None:
             raise ModelNotFoundError(f"Model '{model_name}' not found")
         return model
+
+    def get_exposures(self) -> Dict[str, Exposure]:
+        """Get all exposures in the registry."""
+        if not self.is_loaded:
+            raise RegistryNotLoadedError("Registry must be loaded before accessing exposures")
+        return self._state.exposures
+
+    def get_exposure(self, exposure_name: str) -> Exposure:
+        """Get a specific exposure by name."""
+        if not self.is_loaded:
+            raise RegistryNotLoadedError("Registry must be loaded before accessing exposures")
+        
+        exposure = self._state.exposures.get(exposure_name)
+        if exposure is None:
+            raise ValueError(f"Exposure '{exposure_name}' not found")
+        return exposure
 
     def _check_loaded(self) -> None:
         """Verify registry is loaded before operations"""

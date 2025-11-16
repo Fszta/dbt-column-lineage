@@ -28,6 +28,7 @@ function initGraph(data) {
     const dragBehavior = createDragBehavior(state, config);
     const nodes = drawModels(g, state, config, dragBehavior);
     drawColumns(nodes, state, config, onColumnClick);
+    drawExposures(g, state, config, dragBehavior);
     const edges = drawEdges(g, data, state, config);
     
     setupInteractions(svg, g, data, state, config, edges);

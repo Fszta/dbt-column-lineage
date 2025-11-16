@@ -83,26 +83,45 @@ function resetView(svg, g, zoom, config) {
 function updateLayout(state, config, edges) {
     positionModels(state, config);
     
-    d3.selectAll('.model')
+    d3.selectAll('.model:not(.model-exposure)')
         .transition()
         .duration(500)
         .attr('transform', d => `translate(${d.x},${d.y - d.height/2})`);
 
-    d3.selectAll('.model').each(function(model) {
-        model.columns.forEach((col, i) => {
-            const columnCenter = {
-                x: model.x,
-                y: model.y - model.height/2 + config.box.titleHeight + 28 + 
-                   (i * config.box.columnHeight) + 
-                   (config.box.columnHeight - config.box.columnPadding) / 2
-            };
-            state.columnPositions.set(col.id, columnCenter);
-        });
+    d3.selectAll('.model-exposure')
+        .transition()
+        .duration(500)
+        .attr('transform', d => `translate(${d.x},${d.y - d.height/2})`);
+
+    d3.selectAll('.model:not(.model-exposure)').each(function(model) {
+        if (model.columns && Array.isArray(model.columns)) {
+            model.columns.forEach((col, i) => {
+                const columnCenter = {
+                    x: model.x,
+                    y: model.y - model.height/2 + config.box.titleHeight + 28 + 
+                       (i * config.box.columnHeight) + 
+                       (config.box.columnHeight - config.box.columnPadding) / 2
+                };
+                state.columnPositions.set(col.id, columnCenter);
+            });
+        }
     });
 
-    edges.transition()
+    d3.selectAll('.model-exposure').each(function(exposure) {
+        const exposureCenter = {
+            x: exposure.x,
+            y: exposure.y
+        };
+        state.exposurePositions.set(exposure.name, exposureCenter);
+    });
+
+    d3.selectAll('.edge.lineage').transition()
         .duration(500)
         .attr('d', d => createEdgePath(d, state, config));
+    
+    d3.selectAll('.edge.exposure').transition()
+        .duration(500)
+        .attr('d', d => createExposureEdgePath(d, state, config));
 }
 
 // Highlight lineage of a column
@@ -184,17 +203,27 @@ function createDragBehavior(state, config) {
             const modelElement = d3.select(this);
             modelElement.attr('transform', `translate(${d.x},${d.y - d.height/2})`);
             
-            d.columns.forEach((col, i) => {
-                 let columnYOffset = config.box.titleHeight + 28 + 
-                                    (i * config.box.columnHeight) + 
-                                    (config.box.columnHeight - config.box.columnPadding) / 2;
+            if (d.columns && Array.isArray(d.columns)) {
+                d.columns.forEach((col, i) => {
+                     let columnYOffset = config.box.titleHeight + 28 + 
+                                        (i * config.box.columnHeight) + 
+                                        (config.box.columnHeight - config.box.columnPadding) / 2;
 
-                 const columnCenter = {
+                     const columnCenter = {
+                        x: d.x,
+                        y: d.y - d.height/2 + columnYOffset
+                    };
+                    state.columnPositions.set(col.id, columnCenter);
+                });
+            }
+            
+            if (d.type === 'exposure') {
+                const exposureCenter = {
                     x: d.x,
-                    y: d.y - d.height/2 + columnYOffset
+                    y: d.y
                 };
-                state.columnPositions.set(col.id, columnCenter);
-            });
+                state.exposurePositions.set(d.name, exposureCenter);
+            }
             
             updateModelEdges(d, state, config); 
         })

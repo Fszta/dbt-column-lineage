@@ -79,6 +79,7 @@ class LineageExplorer:
 
             model_tree_root = []
             all_models = self.lineage_service.registry.get_models()
+            all_exposures = self.lineage_service.registry.get_exposures()
 
             def insert_into_tree(tree, path_parts, model_data):
                 current_level = tree
@@ -95,8 +96,10 @@ class LineageExplorer:
                         else:
                             node['model_name'] = model_data['registry_key']
                             node['display_name'] = part 
-                            node['columns'] = model_data['columns']
+                            node['columns'] = model_data.get('columns', [])
                             node['resource_type'] = model_data['resource_type']
+                            if 'exposure_data' in model_data:
+                                node['exposure_data'] = model_data['exposure_data']
                             # node['full_path'] = model_data['full_path'] 
                         
                         current_level.append(node)
@@ -145,6 +148,26 @@ class LineageExplorer:
                 }
                 
                 insert_into_tree(model_tree_root, path_parts, model_data_payload)
+
+            # Add exposures to the tree
+            for exposure_name, exposure in all_exposures.items():
+                exposure_data_payload = {
+                    "registry_key": exposure_name,
+                    "columns": [],
+                    "resource_type": "exposure",
+                    "exposure_data": {
+                        "name": exposure.name,
+                        "type": exposure.type,
+                        "url": exposure.url,
+                        "description": exposure.description,
+                        "owner": exposure.owner,
+                        "depends_on_models": list(exposure.depends_on_models)
+                    }
+                }
+                
+                # Group exposures under an "exposures" folder
+                path_parts = ['exposures', exposure_name]
+                insert_into_tree(model_tree_root, path_parts, exposure_data_payload)
 
             return model_tree_root
             
@@ -199,48 +222,52 @@ class LineageExplorer:
         """Enrich nodes with metadata like data types and resource types."""
         for refs in refs_list:
             for model_name, columns in refs.items():
-                if isinstance(columns, dict):
-                    try:
-                        model_obj = self.lineage_service.registry.get_model(model_name)
-                        if not model_obj:
+                if model_name == 'exposures' or not isinstance(columns, dict):
+                    continue
+                    
+                try:
+                    model_obj = self.lineage_service.registry.get_model(model_name)
+                    if not model_obj:
+                        continue
+                        
+                    resource_type = getattr(model_obj, 'resource_type', None)
+                    
+                    for col_name in columns.keys():
+                        col_obj = model_obj.columns.get(col_name)
+                        if not col_obj:
                             continue
                             
-                        resource_type = getattr(model_obj, 'resource_type', None)
+                        node_id = f"col_{model_name}_{col_name}"
                         
-                        for col_name in columns.keys():
-                            col_obj = model_obj.columns.get(col_name)
-                            if not col_obj:
-                                continue
-                                
-                            node_id = f"col_{model_name}_{col_name}"
-                            
-                            found = False
-                            for node in self.data.nodes:
-                                if node['id'] == node_id:
-                                    node['data_type'] = col_obj.data_type
-                                    node['resource_type'] = resource_type
-                                    found = True
-                                    break
-                            
-                            if not found:
-                                self._add_node(
-                                    id=node_id,
-                                    label=col_name,
-                                    model=model_name,
-                                    data_type=col_obj.data_type,
-                                    resource_type=resource_type
-                                )
-                    except Exception as e:
-                        logger.error(f"Error enriching node metadata for {model_name}: {e}")
+                        found = False
+                        for node in self.data.nodes:
+                            if node['id'] == node_id:
+                                node['data_type'] = col_obj.data_type
+                                node['resource_type'] = resource_type
+                                found = True
+                                break
+                        
+                        if not found:
+                            self._add_node(
+                                id=node_id,
+                                label=col_name,
+                                model=model_name,
+                                data_type=col_obj.data_type,
+                                resource_type=resource_type
+                            )
+                except Exception as e:
+                    logger.error(f"Error enriching node metadata for {model_name}: {e}")
     
     def _queue_additional_nodes(self, upstream_refs, downstream_refs, processed, to_process):
         """Queue additional nodes for processing."""
         for refs in [upstream_refs, downstream_refs]:
             for model_name, columns in refs.items():
-                if isinstance(columns, dict):
-                    for col_name in columns.keys():
-                        if (model_name, col_name) not in processed and (model_name, col_name) not in to_process:
-                            to_process.append((model_name, col_name))
+                if model_name == 'exposures' or not isinstance(columns, dict):
+                    continue
+                    
+                for col_name in columns.keys():
+                    if (model_name, col_name) not in processed and (model_name, col_name) not in to_process:
+                        to_process.append((model_name, col_name))
     
     def _add_processed_data(self, refs, direction):
         """Process refs and add to graph."""
@@ -253,6 +280,56 @@ class LineageExplorer:
         for edge in processed["edges"]:
             if not any(e["source"] == edge["source"] and e["target"] == edge["target"] for e in self.data.edges):
                 self.data.edges.append(edge)
+        
+        if direction == "downstream" and self.lineage_service:
+            try:
+                if 'exposures' not in refs or not isinstance(refs['exposures'], set):
+                    return
+                    
+                exposure_names = refs['exposures']
+                if not exposure_names:
+                    return
+                    
+                for exposure_name in exposure_names:
+                    try:
+                        exposure = self.lineage_service.registry.get_exposure(exposure_name)
+                        if not exposure or not hasattr(exposure, 'depends_on_models'):
+                            continue
+                            
+                        exposure_node_id = f"exposure_{exposure_name}"
+                        
+                        for model_name in exposure.depends_on_models:
+                            if model_name in refs and isinstance(refs[model_name], dict):
+                                try:
+                                    model = self.lineage_service.registry.get_model(model_name)
+                                    if not model or not hasattr(model, 'columns'):
+                                        continue
+                                        
+                                    for col_name in model.columns.keys():
+                                        col_node_id = f"col_{model_name}_{col_name}"
+                                        if any(n["id"] == col_node_id for n in self.data.nodes) and \
+                                           any(n["id"] == exposure_node_id for n in self.data.nodes):
+                                            edge = GraphEdge(
+                                                source=col_node_id,
+                                                target=exposure_node_id,
+                                                type="exposure"
+                                            ).model_dump()
+                                            if not any(e["source"] == edge["source"] and e["target"] == edge["target"] for e in self.data.edges):
+                                                self.data.edges.append(edge)
+                                except (ValueError, KeyError, AttributeError) as e:
+                                    logger.debug(f"Failed to process exposure edge for {model_name} -> {exposure_name}: {e}")
+                                    continue
+                                except Exception as e:
+                                    logger.warning(f"Unexpected error processing exposure edge: {e}")
+                                    continue
+                    except (ValueError, KeyError) as e:
+                        logger.debug(f"Exposure {exposure_name} not found: {e}")
+                        continue
+                    except Exception as e:
+                        logger.warning(f"Failed to process exposure {exposure_name}: {e}")
+                        continue
+            except Exception as e:
+                logger.warning(f"Failed to add exposure edges: {e}", exc_info=True)
 
     def set_lineage_service(self, lineage_service) -> None:
         """Set the lineage service for the explore server."""
@@ -328,8 +405,34 @@ class LineageExplorer:
         edges: List[Dict[str, Any]] = []
         node_ids = set()
 
+        # Handle exposures separately
+        if 'exposures' in refs and isinstance(refs['exposures'], set):
+            exposure_names = refs['exposures']
+            for exposure_name in exposure_names:
+                try:
+                    exposure = self.lineage_service.registry.get_exposure(exposure_name)
+                    exposure_node_id = f"exposure_{exposure_name}"
+                    if exposure_node_id not in node_ids:
+                        exposure_node = GraphNode(
+                            id=exposure_node_id,
+                            label=exposure_name,
+                            type="exposure",
+                            model=exposure_name,
+                            resource_type="exposure"
+                        ).model_dump()
+                        exposure_node['exposure_data'] = {
+                            "name": exposure.name,
+                            "type": exposure.type,
+                            "url": exposure.url,
+                            "description": exposure.description
+                        }
+                        nodes.append(exposure_node)
+                        node_ids.add(exposure_node_id)
+                except Exception as e:
+                    logger.warning(f"Failed to process exposure {exposure_name}: {e}")
+
         for model_name, columns in refs.items():
-            if not isinstance(columns, dict):
+            if model_name == 'exposures' or not isinstance(columns, dict):
                 continue
             
             model_resource_type = self._get_model_resource_type(model_name)
@@ -353,6 +456,22 @@ class LineageExplorer:
                     self._process_source_columns(lineage.source_columns, col_node_id, refs, nodes, edges, node_ids)
                 elif direction == "downstream" and hasattr(lineage, 'source_columns'):
                     self._add_downstream_edges(lineage.source_columns, col_node_id, edges)
+                    
+                    # Add edges from columns to exposures that depend on this model
+                    if 'exposures' in refs and isinstance(refs['exposures'], set):
+                        for exposure_name in refs['exposures']:
+                            try:
+                                exposure = self.lineage_service.registry.get_exposure(exposure_name)
+                                if model_name in exposure.depends_on_models:
+                                    exposure_node_id = f"exposure_{exposure_name}"
+                                    edge = GraphEdge(
+                                        source=col_node_id,
+                                        target=exposure_node_id,
+                                        type="exposure"
+                                    ).model_dump()
+                                    edges.append(edge)
+                            except Exception:
+                                pass
 
         return {"nodes": nodes, "edges": edges}
     

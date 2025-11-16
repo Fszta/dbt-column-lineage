@@ -132,8 +132,8 @@ class LineageService:
         return upstream_refs
 
     def _get_downstream_lineage(self, model_name: str, column_name: str, 
-                              visited: Optional[Set[str]] = None) -> Dict[str, Dict[str, ColumnLineage]]:
-        """Get downstream column references following the model DAG."""
+                              visited: Optional[Set[str]] = None) -> Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]:
+        """Get downstream column references following the model DAG, including exposures."""
         if visited is None:
             visited = set()
         
@@ -142,27 +142,74 @@ class LineageService:
             return {}
         
         visited.add(current_ref)
-        downstream_refs: Dict[str, Dict[str, ColumnLineage]] = {}
+        downstream_refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]] = {}
         current_model = self.registry.get_model(model_name)
         
         try:
-            for other_model_name in current_model.downstream:
-                other_model = self.registry.get_model(other_model_name)
-                for col_name, col in other_model.columns.items():
-                    if not col.lineage:
-                        continue
-                        
-                    for lineage in col.lineage:
-                        if any(src == current_ref for src in lineage.source_columns):
-                            if other_model_name not in downstream_refs:
-                                downstream_refs[other_model_name] = {}
-                            downstream_refs[other_model_name][col_name] = lineage
+            column_used_downstream = False
+            downstream_models_using_column = []
+            
+            for other_name in current_model.downstream:
+                try:
+                    self.registry.get_exposure(other_name)
+                    continue
+                except (ValueError, KeyError):
+                    pass
+                
+                try:
+                    other_model = self.registry.get_model(other_name)
+                    for col_name, col in other_model.columns.items():
+                        if not col.lineage:
+                            continue
                             
-                            next_refs = self._get_downstream_lineage(other_model_name, col_name, visited)
-                            for model, cols in next_refs.items():
-                                if model not in downstream_refs:
-                                    downstream_refs[model] = {}
-                                downstream_refs[model].update(cols)
+                        for lineage in col.lineage:
+                            if any(src == current_ref for src in lineage.source_columns):
+                                column_used_downstream = True
+                                if other_name not in downstream_models_using_column:
+                                    downstream_models_using_column.append(other_name)
+                                
+                                if other_name not in downstream_refs:
+                                    downstream_refs[other_name] = {}
+                                model_refs = downstream_refs[other_name]
+                                if isinstance(model_refs, dict):
+                                    model_refs[col_name] = lineage
+                                
+                                next_refs = self._get_downstream_lineage(other_name, col_name, visited)
+                                for model, cols in next_refs.items():
+                                    if model == 'exposures':
+                                        if isinstance(cols, set):
+                                            if 'exposures' not in downstream_refs:
+                                                downstream_refs['exposures'] = set()
+                                            downstream_refs['exposures'].update(cols)
+                                        continue
+                                        
+                                    if model not in downstream_refs:
+                                        downstream_refs[model] = {}
+                                    model_refs = downstream_refs[model]
+                                    if isinstance(cols, dict) and isinstance(model_refs, dict):
+                                        model_refs.update(cols)
+                                        if model not in downstream_models_using_column:
+                                            downstream_models_using_column.append(model)
+                                    elif isinstance(cols, set) and isinstance(model_refs, set):
+                                        model_refs.update(cols)
+                except Exception as e:
+                    logger.warning(f"Failed to process downstream model {other_name}: {str(e)}")
+            
+            if column_used_downstream and downstream_models_using_column:
+                models_using_column = set(downstream_models_using_column)
+                models_using_column.add(model_name)
+            else:
+                models_using_column = {model_name}
+            
+            for other_name in current_model.downstream:
+                try:
+                    exposure = self.registry.get_exposure(other_name)
+                    if any(model in models_using_column for model in exposure.depends_on_models):
+                        if 'exposures' not in downstream_refs:
+                            downstream_refs['exposures'] = set()
+                        downstream_refs['exposures'].add(other_name)
+                except (ValueError, KeyError):
+                    pass
                             
         except Exception as e:
             logger.warning(f"Failed to process downstream lineage for {current_ref}: {str(e)}")
