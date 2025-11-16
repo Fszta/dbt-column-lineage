@@ -24,7 +24,7 @@ The tool offers several ways to view lineage:
 ## Installation
 
 ```bash
-pip install dbt-col-lineage==0.4.0
+pip install dbt-col-lineage
 ```
 
 ## Usage
