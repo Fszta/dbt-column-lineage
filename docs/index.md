@@ -30,6 +30,12 @@ DBT Column Lineage analyzes your dbt project artifacts (manifest & catalog) and 
 
     Track which source columns contribute to each downstream column
 
+-   :material-chart-line:{ .lg .middle } __Impact Analysis__
+
+    ---
+
+    Understand downstream effects of column changes before making them
+
 </div>
 
 ## Quick Start

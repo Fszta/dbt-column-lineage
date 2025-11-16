@@ -74,4 +74,6 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
+  - Features:
+    - Impact Analysis: features/impact-analysis.md
   - Changelog: changelog.md

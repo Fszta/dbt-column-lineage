@@ -195,6 +195,34 @@ class LineageExplorer:
                 logger.debug(traceback.format_exc())
                 return {"error": str(e)}
         
+        @self.app.get("/api/impact-analysis/{model}/{column}")
+        async def get_impact_analysis(model: str, column: str) -> Dict[str, Any]:
+            if not self.lineage_service:
+                return {"error": "Lineage service not initialized"}
+                
+            try:
+                # Verify model exists
+                try:
+                    model_obj = self.lineage_service.registry.get_model(model)
+                except (ValueError, KeyError) as e:
+                    return {"error": f"Model '{model}' not found: {str(e)}"}
+                
+                # Verify column exists
+                if column not in model_obj.columns:
+                    return {"error": f"Column '{column}' not found in model '{model}'"}
+                
+                impact_data = self.lineage_service.get_column_impact(model, column)
+                return impact_data
+            except ValueError as e:
+                # Handle specific value errors (e.g., model/column not found)
+                logger.warning(f"Impact analysis error for {model}.{column}: {e}")
+                return {"error": str(e)}
+            except Exception as e:
+                import traceback
+                logger.error(f"Error getting impact analysis for {model}.{column}: {e}")
+                logger.debug(traceback.format_exc())
+                return {"error": str(e)}
+        
     def _process_lineage_tree(self, start_model: str, start_column: str) -> None:
         """Process complete lineage tree from starting point."""
         processed = set()

@@ -4,11 +4,25 @@
  */
 function initGraph(data) {
     const graphElement = document.getElementById('graph');
+    
+    // Preserve the impact analysis card before clearing
+    const impactCard = document.getElementById('impactAnalysisCard');
+    const preservedCard = impactCard ? impactCard.cloneNode(true) : null;
+    
     graphElement.innerHTML = '';
+    
+    // Re-append the preserved card if it existed
+    if (preservedCard) {
+        graphElement.appendChild(preservedCard);
+    }
     
     if (!data || !data.nodes || !data.edges) {
         console.warn("No data available to render graph");
         graphElement.innerHTML = '<p class="error-message">No lineage data found to render the graph.</p>'; // User-friendly message
+        // Re-append card after error message
+        if (preservedCard) {
+            graphElement.appendChild(preservedCard);
+        }
         return null;
     }
     

@@ -270,3 +270,77 @@ def test_exposures_as_downstream_dependencies(registry):
     accounts_tiering_model = models["accounts_tiering"]
     assert "account_tiering_report" in accounts_tiering_model.downstream, \
         "accounts_tiering model should have account_tiering_report as downstream"
+
+def test_impact_analysis(registry, dbt_artifacts):
+    """Test impact analysis for a column - what would break if the column is modified."""
+    from dbt_column_lineage.lineage.service import LineageService
+    from pathlib import Path
+    
+    service = LineageService(
+        Path(dbt_artifacts["catalog_path"]),
+        Path(dbt_artifacts["manifest_path"])
+    )
+    
+    # Test impact analysis for stg_transactions.amount
+    # This column is used in multiple downstream models
+    impact = service.get_column_impact("stg_transactions", "amount")
+    
+    assert "summary" in impact
+    assert "affected_models" in impact
+    assert "affected_columns" in impact
+    assert "affected_exposures" in impact
+    
+    summary = impact["summary"]
+    assert "affected_models" in summary
+    assert "affected_columns" in summary
+    assert "affected_exposures" in summary
+    assert "critical_count" in summary
+    assert "low_impact_count" in summary
+    
+    # stg_transactions.amount should affect downstream models
+    # It's used in int_transactions_enriched and potentially in transactions
+    assert summary["affected_models"] > 0, "stg_transactions.amount should affect at least one downstream model"
+    assert summary["affected_columns"] > 0, "stg_transactions.amount should affect at least one downstream column"
+    
+    for model in impact["affected_models"]:
+        assert "name" in model
+        assert "resource_type" in model
+        assert "schema" in model
+        assert "database" in model
+    
+    for col in impact["affected_columns"]:
+        assert "model" in col
+        assert "column" in col
+        assert "transformation_type" in col
+        assert "severity" in col
+        assert col["severity"] in ["critical", "low_impact"]
+        assert col["transformation_type"] in ["direct", "renamed", "derived"]
+    
+    # Test impact analysis for a column with no downstream dependencies
+    # accounts_tiering is a mart model, so its columns might not have downstream dependencies
+    impact_no_deps = service.get_column_impact("accounts_tiering", "account_id")
+    
+    # Should still return valid structure even if no dependencies
+    assert "summary" in impact_no_deps
+    assert "affected_models" in impact_no_deps
+    assert "affected_columns" in impact_no_deps
+    
+    # Test impact analysis for a derived column
+    # int_monthly_account_metrics.total_amount is derived from stg_transactions.amount
+    impact_derived = service.get_column_impact("int_monthly_account_metrics", "total_amount")
+    
+    assert "summary" in impact_derived
+    # total_amount might be used in accounts_tiering
+    assert isinstance(impact_derived["summary"]["affected_models"], int)
+    assert isinstance(impact_derived["summary"]["affected_columns"], int)
+    
+    # Verify that critical vs low_impact classification is correct
+    # Derived/transformed columns should be critical (transformation logic might break)
+    # Direct/renamed columns should be low_impact (just pass-through, change propagates)
+    for col in impact["affected_columns"]:
+        if col["transformation_type"] == "derived":
+            assert col["severity"] == "critical", \
+                f"Column {col['model']}.{col['column']} with transformation_type {col['transformation_type']} should be critical (transformation logic might break)"
+        elif col["transformation_type"] in ["direct", "renamed"]:
+            assert col["severity"] == "low_impact", \
+                f"Column {col['model']}.{col['column']} with transformation_type {col['transformation_type']} should be low_impact (just pass-through)"
