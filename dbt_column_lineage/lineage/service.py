@@ -65,6 +65,17 @@ class LineageService:
             'downstream': self._get_downstream_lineage(selector.model, selector.column) if selector.downstream else {}
         }
 
+    def _split_qualified_name(self, qualified_name: str) -> Optional[tuple[str, str]]:
+        """Split a fully qualified name into model and column parts. Returns None if invalid."""
+        if '.' not in qualified_name:
+            return None
+        parts = qualified_name.split('.')
+        if len(parts) < 2:
+            return None
+        model_part = '.'.join(parts[:-1])
+        column_part = parts[-1]
+        return (model_part, column_part)
+    
     def _process_source_reference(self, source: str, upstream_refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]) -> None:
         """Process a source reference and add it to upstream_refs."""
         if 'sources' not in upstream_refs:
@@ -122,7 +133,10 @@ class LineageService:
                             direct_refs.add(source)
                         continue
                     
-                    src_model, src_column = source.split('.')
+                    split_result = self._split_qualified_name(source)
+                    if split_result is None:
+                        continue
+                    src_model, src_column = split_result
                     if src_model in current_model.upstream:
                         self._process_model_reference(src_model, src_column, lineage, upstream_refs, visited)
                     
@@ -156,6 +170,11 @@ class LineageService:
                     continue
                 except (ValueError, KeyError):
                     pass
+                
+                # Check if model exists in registry before processing
+                # Some models in manifest dependencies may not be in catalog
+                if other_name not in self.registry.get_models():
+                    continue
                 
                 try:
                     other_model = self.registry.get_model(other_name)

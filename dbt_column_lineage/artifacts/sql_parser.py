@@ -92,12 +92,30 @@ class SQLColumnParser:
                 return str(table.name)
         return ""
     
+    def _split_qualified_name(self, qualified_name: str) -> tuple[str, str]:
+        """
+        Split a fully qualified name into table and column parts.
+        
+        Args:
+            qualified_name: A name that may be fully qualified (e.g., 'schema.table.column')
+            
+        Returns:
+            A tuple of (table_part, column_part). If no '.' is present, returns ('', qualified_name).
+        """
+        if '.' not in qualified_name:
+            return ('', qualified_name)
+        parts = qualified_name.split('.')
+        table_part = '.'.join(parts[:-1])
+        column_part = parts[-1]
+        return (table_part, column_part)
+    
     def _normalize_table_ref(self, column: str, aliases: Dict[str, str], table_context: str) -> str:
         """Convert aliased table references to actual table names."""
-        if '.' not in column:
-            return f"{table_context}.{column}" if table_context else column
-        table, col = column.split('.')
-        return f"{aliases.get(table, table)}.{col}"
+        table_part, col = self._split_qualified_name(column)
+        if not table_part:
+            return f"{table_context}.{col}" if table_context else col
+        table = aliases.get(table_part, table_part)
+        return f"{table}.{col}"
     
     def _build_cte_sources(self, parsed: Any) -> Dict[str, Dict[str, str]]:
         """Build mapping of CTE columns to their original sources."""
@@ -127,10 +145,10 @@ class SQLColumnParser:
     def _resolve_column_source(self, column: str, table: str, cte_sources: Dict[str, Dict[str, str]], 
                               cte_to_model: Optional[Dict[str, str]] = None) -> str:
         """Resolve a column reference to its original source through CTEs."""
-        if '.' not in column:
-            col_name = column
-        else:
-            table, col_name = column.split('.')
+        table_part, col_name = self._split_qualified_name(column)
+        if table_part:
+            table = table_part
+        
         if table in cte_sources and col_name in cte_sources[table]:
             return cte_sources[table][col_name]
         elif table and cte_to_model and table in cte_to_model:
@@ -148,13 +166,16 @@ class SQLColumnParser:
             
         if isinstance(expr, exp.Column):
             source_col = self._normalize_table_ref(str(expr), aliases, table_context)
-            table, col = source_col.split('.') if '.' in source_col else (table_context, source_col)
+            table_part, col = self._split_qualified_name(source_col)
+            table = table_part if table_part else table_context
             resolved_source = self._resolve_column_source(source_col, table, cte_sources, cte_to_model)
             
             # Normalize column names to lowercase
-            if '.' in resolved_source:
-                table_part, col_part = resolved_source.split('.')
-                resolved_source = f"{table_part}.{col_part.lower()}"
+            resolved_table, resolved_col = self._split_qualified_name(resolved_source)
+            if resolved_table:
+                resolved_source = f"{resolved_table}.{resolved_col.lower()}"
+            elif resolved_col:
+                resolved_source = resolved_col.lower()
             
             return [ColumnLineage(
                 source_columns={resolved_source},
@@ -163,10 +184,13 @@ class SQLColumnParser:
             
         else:
             source_cols = self._extract_source_columns(expr, aliases, table_context, cte_sources, cte_to_model)
-            normalized_source_cols = {
-                s if '.' not in s else f"{s.split('.')[0]}.{s.split('.')[1].lower()}"
-                for s in source_cols
-            }
+            normalized_source_cols = set()
+            for s in source_cols:
+                table_part, col_part = self._split_qualified_name(s)
+                if table_part:
+                    normalized_source_cols.add(f"{table_part}.{col_part.lower()}")
+                else:
+                    normalized_source_cols.add(s)
             return [ColumnLineage(
                 source_columns=normalized_source_cols,
                 transformation_type="derived",
@@ -179,7 +203,8 @@ class SQLColumnParser:
         columns = set()
         for col in expr.find_all(exp.Column):
             source_col = self._normalize_table_ref(str(col), aliases, table_context)
-            table, _ = source_col.split('.') if '.' in source_col else (table_context, source_col)
+            table_part, _ = self._split_qualified_name(source_col)
+            table = table_part if table_part else table_context
             resolved = self._resolve_column_source(source_col, table, cte_sources, cte_to_model)
             columns.add(resolved)
         return columns 
