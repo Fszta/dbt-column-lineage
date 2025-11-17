@@ -94,6 +94,12 @@ class ModelRegistry:
         """Process and apply column lineage to models."""
         logger = logging.getLogger(__name__)
         
+        successful_parses = 0
+        failed_parses = 0
+        skipped_models = 0
+        failed_model_names = []
+        skipped_model_names = []
+        
         # First pass: Process explicit column references
         for model_name, model in models.items():
             if model.language != "sql":
@@ -101,16 +107,27 @@ class ModelRegistry:
 
             sql = self._manifest_reader.get_compiled_sql(model_name)
             if not sql:
+                skipped_models += 1
+                skipped_model_names.append(model_name)
                 continue
 
             try:
                 parse_result = self._sql_parser.parse_column_lineage(sql)
                 self._apply_column_lineage(model, parse_result)
+                successful_parses += 1
             except Exception as e:
+                failed_parses += 1
+                failed_model_names.append(model_name)
                 logger.warning(
-                    f"Failed to process lineage for model {model_name}, skipping..."
+                    f"Failed to process lineage for model {model_name}: {type(e).__name__}: {str(e)}"
                 )
                 continue
+        
+        logger.info(f"SQL parsing summary: {successful_parses} successful, "
+                  f"{failed_parses} failed, {skipped_models} skipped (no SQL)")
+        
+        if failed_model_names:
+            logger.info(f"Failed models ({len(failed_model_names)}): {', '.join(failed_model_names)}")
 
         # Second pass: Process star references
         try:

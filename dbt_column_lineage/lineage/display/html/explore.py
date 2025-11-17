@@ -503,17 +503,30 @@ class LineageExplorer:
 
         return {"nodes": nodes, "edges": edges}
     
+    def _split_qualified_name(self, qualified_name: str) -> Optional[tuple[str, str]]:
+        """Split a fully qualified name into model and column parts. Returns None if invalid."""
+        if '.' not in qualified_name:
+            return None
+        parts = qualified_name.split('.')
+        if len(parts) < 2:
+            return None
+        model_part = '.'.join(parts[:-1])
+        column_part = parts[-1]
+        return (model_part, column_part)
+    
     def _add_downstream_edges(self, source_columns, target_node_id, edges):
         """Add edges for downstream lineage."""
         for source in source_columns:
-            if '.' in source:
-                src_model, src_col = source.split('.')
-                src_node_id = f"col_{src_model}_{src_col}"
-                edge = GraphEdge(
-                    source=src_node_id,
-                    target=target_node_id
-                ).model_dump()
-                edges.append(edge)
+            split_result = self._split_qualified_name(source)
+            if split_result is None:
+                continue
+            src_model, src_col = split_result
+            src_node_id = f"col_{src_model}_{src_col}"
+            edge = GraphEdge(
+                source=src_node_id,
+                target=target_node_id
+            ).model_dump()
+            edges.append(edge)
     
     def _process_source_columns(self, source_columns: Union[List[str], Set[str]], target_node_id: str, 
                               refs: Mapping[str, Union[Dict[str, ColumnLineage], Set[str]]], 
@@ -521,18 +534,20 @@ class LineageExplorer:
                               node_ids: Set[str]) -> None:
         """Process source columns and create nodes/edges."""
         for source in source_columns:
-            if '.' in source:
-                src_model, src_col = source.split('.')
-                src_node_id = f"col_{src_model}_{src_col}"
-                
-                if src_node_id not in node_ids:
-                    self._add_source_node(src_model, src_col, refs, nodes, node_ids)
-                
-                edge = GraphEdge(
-                    source=src_node_id,
-                    target=target_node_id
-                ).model_dump()
-                edges.append(edge)
+            split_result = self._split_qualified_name(source)
+            if split_result is None:
+                continue
+            src_model, src_col = split_result
+            src_node_id = f"col_{src_model}_{src_col}"
+            
+            if src_node_id not in node_ids:
+                self._add_source_node(src_model, src_col, refs, nodes, node_ids)
+            
+            edge = GraphEdge(
+                source=src_node_id,
+                target=target_node_id
+            ).model_dump()
+            edges.append(edge)
     
     def _add_source_node(self, src_model, src_col, refs, nodes, node_ids):
         """Add a source node to the graph."""
