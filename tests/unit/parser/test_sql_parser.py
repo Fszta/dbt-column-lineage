@@ -164,11 +164,20 @@ def test_window_functions():
     lineage = result.column_lineage
 
     assert lineage["customer_total"][0].transformation_type == "derived"
-    assert lineage["customer_total"][0].source_columns == {"orders.amount", "orders.customer_id"}
+    assert lineage["customer_total"][0].source_columns == {
+        "orders.amount",
+        "orders.customer_id",
+    }
     assert lineage["amount_rank"][0].transformation_type == "derived"
-    assert lineage["amount_rank"][0].source_columns == {"orders.amount", "orders.customer_id"}
+    assert lineage["amount_rank"][0].source_columns == {
+        "orders.amount",
+        "orders.customer_id",
+    }
     assert lineage["amount_pct"][0].transformation_type == "derived"
-    assert lineage["amount_pct"][0].source_columns == {"orders.amount", "orders.customer_id"}
+    assert lineage["amount_pct"][0].source_columns == {
+        "orders.amount",
+        "orders.customer_id",
+    }
 
 
 def test_subqueries():
@@ -264,9 +273,15 @@ def test_union_all_simple():
 
     assert "id" in lineage
     assert "name" in lineage
-    id_sources = {src for l in lineage["id"] for src in l.source_columns}
-    name_sources = {src for l in lineage["name"] for src in l.source_columns}
-    assert any("table1" in src for src in id_sources) or any("table2" in src for src in id_sources)
+    id_sources = {
+        src for lineage_item in lineage["id"] for src in lineage_item.source_columns
+    }
+    name_sources = {
+        src for lineage_item in lineage["name"] for src in lineage_item.source_columns
+    }
+    assert any("table1" in src for src in id_sources) or any(
+        "table2" in src for src in id_sources
+    )
     assert any("table1" in src for src in name_sources) or any(
         "table2" in src for src in name_sources
     )
@@ -296,7 +311,9 @@ def test_union_all_multiple_branches():
 
     assert "col1" in lineage
     assert "col2" in lineage
-    col1_sources = {src for l in lineage["col1"] for src in l.source_columns}
+    col1_sources = {
+        src for lineage_item in lineage["col1"] for src in lineage_item.source_columns
+    }
     assert len(col1_sources) > 0
 
 
@@ -367,7 +384,11 @@ def test_exclude_with_additional_columns():
     assert "name_upper" in lineage
     assert "email" not in lineage
     # name_upper should trace to users.name
-    name_upper_sources = {src for l in lineage["name_upper"] for src in l.source_columns}
+    name_upper_sources = {
+        src
+        for lineage_item in lineage["name_upper"]
+        for src in lineage_item.source_columns
+    }
     assert any("name" in src.lower() for src in name_upper_sources)
 
 
@@ -405,7 +426,9 @@ def test_triple_nested_subquery():
 
     assert "id" in lineage
     assert "name" in lineage
-    id_sources = {src for l in lineage["id"] for src in l.source_columns}
+    id_sources = {
+        src for lineage_item in lineage["id"] for src in lineage_item.source_columns
+    }
     assert any("base_table" in src for src in id_sources)
 
 
@@ -436,11 +459,15 @@ def test_cte_with_multiple_dependencies():
     assert "value" in lineage
 
     # id and name should trace to table1
-    name_sources = {src for l in lineage["name"] for src in l.source_columns}
+    name_sources = {
+        src for lineage_item in lineage["name"] for src in lineage_item.source_columns
+    }
     assert any("table1" in src for src in name_sources)
 
     # value should trace to table2
-    value_sources = {src for l in lineage["value"] for src in l.source_columns}
+    value_sources = {
+        src for lineage_item in lineage["value"] for src in lineage_item.source_columns
+    }
     assert any("table2" in src for src in value_sources)
 
 
@@ -478,11 +505,17 @@ def test_cte_chain_with_transformations():
     assert "tier" in lineage
 
     # total_amount should trace to transactions.amount
-    total_sources = {src for l in lineage["total_amount"] for src in l.source_columns}
+    total_sources = {
+        src
+        for lineage_item in lineage["total_amount"]
+        for src in lineage_item.source_columns
+    }
     assert any("amount" in src.lower() for src in total_sources)
 
     # tier should also trace to transactions.amount (through total_amount)
-    tier_sources = {src for l in lineage["tier"] for src in l.source_columns}
+    tier_sources = {
+        src for lineage_item in lineage["tier"] for src in lineage_item.source_columns
+    }
     assert any("amount" in src.lower() for src in tier_sources)
 
 
@@ -514,7 +547,11 @@ def test_window_function_with_qualify():
     assert "date" in lineage
     assert "balance" in lineage
 
-    account_sources = {src for l in lineage["account_id"] for src in l.source_columns}
+    account_sources = {
+        src
+        for lineage_item in lineage["account_id"]
+        for src in lineage_item.source_columns
+    }
     assert any("account_balances" in src for src in account_sources)
 
 
@@ -544,7 +581,11 @@ def test_window_function_aggregation():
 
     assert "avg_balance" in lineage
     # avg_balance should trace to account_balances.balance
-    avg_sources = {src for l in lineage["avg_balance"] for src in l.source_columns}
+    avg_sources = {
+        src
+        for lineage_item in lineage["avg_balance"]
+        for src in lineage_item.source_columns
+    }
     assert any("balance" in src.lower() for src in avg_sources)
 
 
@@ -574,7 +615,11 @@ def test_case_with_forward_reference():
     assert "sub_item_00015" in lineage
 
     # sub_item_00015 should trace to countries.country_code (through sub_item_00004)
-    sub_item_sources = {src for l in lineage["sub_item_00015"] for src in l.source_columns}
+    sub_item_sources = {
+        src
+        for lineage_item in lineage["sub_item_00015"]
+        for src in lineage_item.source_columns
+    }
     assert any("country_code" in src.lower() for src in sub_item_sources)
 
 
@@ -607,7 +652,11 @@ def test_join_with_date_arithmetic():
 
     assert "last_quarter_day" in lineage
     assert "account_id" in lineage
-    account_sources = {src for l in lineage["account_id"] for src in l.source_columns}
+    account_sources = {
+        src
+        for lineage_item in lineage["account_id"]
+        for src in lineage_item.source_columns
+    }
     assert any("account_holders" in src for src in account_sources)
 
 
@@ -622,7 +671,9 @@ def test_fully_qualified_table_name():
     parser = SQLColumnParser()
     result = parser.parse_column_lineage(sql)
 
-    assert result.star_sources == {"stg_table"} or "stg_table" in str(result.star_sources)
+    assert result.star_sources == {"stg_table"} or "stg_table" in str(
+        result.star_sources
+    )
 
 
 def test_complex_query_structure():
@@ -712,5 +763,9 @@ def test_complex_query_structure():
     assert "event_type" in lineage
 
     # event_id should trace back to source columns (card_id, last_quarter_day, etc.)
-    event_id_sources = {src for l in lineage["event_id"] for src in l.source_columns}
+    event_id_sources = {
+        src
+        for lineage_item in lineage["event_id"]
+        for src in lineage_item.source_columns
+    }
     assert len(event_id_sources) > 0
