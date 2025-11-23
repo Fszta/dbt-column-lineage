@@ -21,7 +21,7 @@ class CatalogReader:
         sources = self.catalog.get("sources", {})
 
         for node_id, model_data in nodes.items():
-            resource_type = node_id.split(".")[0]  # e.g., "model", "seed", "test"
+            resource_type = node_id.split(".")[0]
             model_name = (model_data.get("name") or node_id.split(".")[-1]).lower()
             processed_data = {
                 "name": model_name,
@@ -46,24 +46,32 @@ class CatalogReader:
 
         for source_id, source_data in sources.items():
             metadata = source_data.get("metadata", {})
-            source_identifier = metadata.get("name")  # This should contain the identifier
+            source_identifier = metadata.get("name")
             normalized_source_identifier = source_identifier.lower() if source_identifier else None
 
-            source_name = (source_data.get("name") or source_id.split(".")[-1]).lower()
+            table_name = (source_data.get("name") or source_id.split(".")[-1]).lower()
+            source_name = source_data.get("source_name")
+            if not source_name:
+                source_id_parts = source_id.split(".")
+                if len(source_id_parts) >= 4:
+                    source_name = source_id_parts[2]
+            normalized_source_name = source_name.lower() if source_name else None
+
             processed_data = {
-                "name": source_name,
+                "name": table_name,
                 "schema": source_data.get("schema") or "main",
                 "database": source_data.get("database") or "main",
                 "columns": {},
                 "resource_type": "source",
                 "source_identifier": normalized_source_identifier,
+                "source_name": normalized_source_name,
             }
 
             for col_name, col_data in source_data.get("columns", {}).items():
                 normalized_col_name = col_name.lower()
                 processed_data["columns"][normalized_col_name] = {
                     "name": normalized_col_name,
-                    "model_name": normalized_source_identifier or source_name,
+                    "model_name": normalized_source_identifier or table_name,
                     "description": col_data.get("description"),
                     "data_type": col_data.get("type") or col_data.get("data_type"),
                     "lineage": [],
@@ -72,5 +80,7 @@ class CatalogReader:
             model = Model(**processed_data)
             key = normalized_source_identifier or model.name
             models[key] = model
+            for col in model.columns.values():
+                col.model_name = key
 
         return models
