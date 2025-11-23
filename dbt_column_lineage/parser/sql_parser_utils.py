@@ -1,5 +1,28 @@
+import re
 from sqlglot import exp
 from typing import Dict, List, Optional, Any
+
+
+def strip_sql_comments(text: str) -> str:
+    """Remove SQL comments from a string.
+
+    Removes both /* ... */ and -- style comments.
+    Normalizes whitespace (multiple spaces become single space).
+    """
+    if not text:
+        return text
+
+    # Remove /* ... */ style comments
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+
+    # Remove -- style comments (everything after -- until end of line)
+    text = re.sub(r"--.*?$", "", text, flags=re.MULTILINE)
+
+    # Normalize whitespace (multiple spaces/tabs/newlines become single space)
+    text = re.sub(r"\s+", " ", text)
+
+    # Clean up any extra whitespace that might be left
+    return text.strip()
 
 
 def get_table_aliases(parsed: Any) -> Dict[str, str]:
@@ -59,9 +82,11 @@ def get_final_select(parsed: Any) -> Optional[Any]:
 
 
 def split_qualified_name(qualified_name: str) -> tuple[str, str]:
+    """Split a qualified name into table and column parts, stripping SQL comments."""
     if "." not in qualified_name:
-        return ("", qualified_name)
+        return ("", strip_sql_comments(qualified_name))
+    qualified_name = strip_sql_comments(qualified_name)
     parts = qualified_name.split(".")
     table_part = ".".join(parts[:-1])
-    column_part = parts[-1]
+    column_part = strip_sql_comments(parts[-1])
     return (table_part, column_part)
