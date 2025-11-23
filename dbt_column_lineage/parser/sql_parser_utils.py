@@ -29,7 +29,7 @@ def get_table_aliases(parsed: Any) -> Dict[str, str]:
     aliases = {}
     for table in parsed.find_all((exp.Table, exp.From, exp.Join)):
         if table.alias:
-            aliases[table.alias] = table.name
+            aliases[table.alias] = str(table.name).lower()
     return aliases
 
 
@@ -38,7 +38,7 @@ def get_table_context(select: Any) -> str:
     if from_clause:
         table = from_clause.find(exp.Table)
         if table:
-            return str(table.name)
+            return str(table.name).lower()
 
         subquery = from_clause.find(exp.Subquery)
         if subquery:
@@ -54,15 +54,15 @@ def get_all_tables_from_select(select: Any) -> List[str]:
     if from_clause:
         table = from_clause.find(exp.Table)
         if table:
-            tables.append(str(table.name))
+            tables.append(str(table.name).lower())
 
     for join in select.find_all(exp.Join):
         if hasattr(join, "this"):
             join_table = join.this
             if isinstance(join_table, exp.Table):
-                tables.append(str(join_table.name))
+                tables.append(str(join_table.name).lower())
             elif hasattr(join_table, "name"):
-                tables.append(str(join_table.name))
+                tables.append(str(join_table.name).lower())
 
     return tables
 

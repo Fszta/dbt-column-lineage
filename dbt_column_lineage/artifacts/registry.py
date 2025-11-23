@@ -70,9 +70,7 @@ class ModelRegistry:
                 if model_name in model_exposures:
                     model.downstream.update(model_exposures[model_name])
                 model.language = self._manifest_reader.get_model_language(model_name)
-                model.resource_path = self._manifest_reader.get_model_resource_path(
-                    model_name
-                )
+                model.resource_path = self._manifest_reader.get_model_resource_path(model_name)
         except Exception as e:
             raise RegistryError(f"Failed to apply dependencies: {e}")
 
@@ -175,9 +173,7 @@ class ModelRegistry:
 
                 self._apply_star_columns(model, source_name, models[source_name])
 
-    def _apply_star_columns(
-        self, target: Model, source_name: str, source: Model
-    ) -> None:
+    def _apply_star_columns(self, target: Model, source_name: str, source: Model) -> None:
         """Apply star columns from source to target model."""
         for col_name, source_col in source.columns.items():
             if col_name not in target.columns:
@@ -208,20 +204,14 @@ class ModelRegistry:
             self._manifest_reader.load()
 
             # Ensure the dialect is set before initializing the parser
-            self._dialect = (
-                self._adapter_override or self._manifest_reader.get_adapter()
-            )
+            self._dialect = self._adapter_override or self._manifest_reader.get_adapter()
 
             if self._adapter_override:
-                logger.info(
-                    f"Using adapter override from CLI: {self._adapter_override}"
-                )
+                logger.info(f"Using adapter override from CLI: {self._adapter_override}")
             elif self._dialect:
                 logger.info(f"Detected dialect: {self._dialect}")
             else:
-                logger.warning(
-                    "No dialect detected, the sql parser will be less accurate"
-                )
+                logger.warning("No dialect detected, the sql parser will be less accurate")
 
             self._sql_parser = SQLColumnParser(dialect=self._dialect)
 
@@ -229,28 +219,22 @@ class ModelRegistry:
             self._apply_dependencies(models)
             self._process_lineage(models)
             exposures = self._load_exposures()
-            self._state = RegistryState(
-                models=models, exposures=exposures, is_loaded=True
-            )
+            self._state = RegistryState(models=models, exposures=exposures, is_loaded=True)
         except Exception as e:
             raise RegistryError(f"Failed to load registry: {e}")
 
     def get_models(self) -> Dict[str, Model]:
         """Get all models in the registry."""
         if not self.is_loaded:
-            raise RegistryNotLoadedError(
-                "Registry must be loaded before accessing models"
-            )
+            raise RegistryNotLoadedError("Registry must be loaded before accessing models")
         return self._state.models
 
     def get_model(self, model_name: str) -> Model:
         """Get a specific model by name."""
         if not self.is_loaded:
-            raise RegistryNotLoadedError(
-                "Registry must be loaded before accessing models"
-            )
+            raise RegistryNotLoadedError("Registry must be loaded before accessing models")
 
-        model = self._state.models.get(model_name)
+        model = self._state.models.get(model_name.lower())
         if model is None:
             raise ModelNotFoundError(f"Model '{model_name}' not found")
         return model
@@ -258,17 +242,13 @@ class ModelRegistry:
     def get_exposures(self) -> Dict[str, Exposure]:
         """Get all exposures in the registry."""
         if not self.is_loaded:
-            raise RegistryNotLoadedError(
-                "Registry must be loaded before accessing exposures"
-            )
+            raise RegistryNotLoadedError("Registry must be loaded before accessing exposures")
         return self._state.exposures
 
     def get_exposure(self, exposure_name: str) -> Exposure:
         """Get a specific exposure by name."""
         if not self.is_loaded:
-            raise RegistryNotLoadedError(
-                "Registry must be loaded before accessing exposures"
-            )
+            raise RegistryNotLoadedError("Registry must be loaded before accessing exposures")
 
         exposure = self._state.exposures.get(exposure_name)
         if exposure is None:
@@ -278,14 +258,13 @@ class ModelRegistry:
     def _check_loaded(self) -> None:
         """Verify registry is loaded before operations"""
         if not self._state.models:
-            raise RegistryNotLoadedError(
-                "Registry must be loaded before accessing models"
-            )
+            raise RegistryNotLoadedError("Registry must be loaded before accessing models")
 
     def _find_compiled_sql(self, model_name: str) -> Optional[str]:
         """Find compiled SQL for a model from manifest or target file."""
         self._check_loaded()
-        model = self._state.models.get(model_name)
+        model_name_lower = model_name.lower()
+        model = self._state.models.get(model_name_lower)
         if model is None:
             raise ModelNotFoundError(f"Model '{model_name}' not found in registry")
 
@@ -311,7 +290,8 @@ class ModelRegistry:
     def get_compiled_sql(self, model_name: str) -> str:
         """Get compiled SQL for a model, trying manifest first then target file."""
         self._check_loaded()
-        model = self._state.models.get(model_name)
+        model_name_lower = model_name.lower()
+        model = self._state.models.get(model_name_lower)
         if model is None:
             raise ModelNotFoundError(f"Model '{model_name}' not found in registry")
 

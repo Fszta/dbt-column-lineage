@@ -1,5 +1,4 @@
 from dbt_column_lineage.parser import SQLColumnParser
-from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
 
 
 def test_simple_select_with_join():
@@ -274,15 +273,9 @@ def test_union_all_simple():
 
     assert "id" in lineage
     assert "name" in lineage
-    id_sources = {
-        src for lineage_item in lineage["id"] for src in lineage_item.source_columns
-    }
-    name_sources = {
-        src for lineage_item in lineage["name"] for src in lineage_item.source_columns
-    }
-    assert any("table1" in src for src in id_sources) or any(
-        "table2" in src for src in id_sources
-    )
+    id_sources = {src for lineage_item in lineage["id"] for src in lineage_item.source_columns}
+    name_sources = {src for lineage_item in lineage["name"] for src in lineage_item.source_columns}
+    assert any("table1" in src for src in id_sources) or any("table2" in src for src in id_sources)
     assert any("table1" in src for src in name_sources) or any(
         "table2" in src for src in name_sources
     )
@@ -312,9 +305,7 @@ def test_union_all_multiple_branches():
 
     assert "col1" in lineage
     assert "col2" in lineage
-    col1_sources = {
-        src for lineage_item in lineage["col1"] for src in lineage_item.source_columns
-    }
+    col1_sources = {src for lineage_item in lineage["col1"] for src in lineage_item.source_columns}
     assert len(col1_sources) > 0
 
 
@@ -386,9 +377,7 @@ def test_exclude_with_additional_columns():
     assert "email" not in lineage
     # name_upper should trace to users.name
     name_upper_sources = {
-        src
-        for lineage_item in lineage["name_upper"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["name_upper"] for src in lineage_item.source_columns
     }
     assert any("name" in src.lower() for src in name_upper_sources)
 
@@ -427,9 +416,7 @@ def test_triple_nested_subquery():
 
     assert "id" in lineage
     assert "name" in lineage
-    id_sources = {
-        src for lineage_item in lineage["id"] for src in lineage_item.source_columns
-    }
+    id_sources = {src for lineage_item in lineage["id"] for src in lineage_item.source_columns}
     assert any("base_table" in src for src in id_sources)
 
 
@@ -460,9 +447,7 @@ def test_cte_with_multiple_dependencies():
     assert "value" in lineage
 
     # id and name should trace to table1
-    name_sources = {
-        src for lineage_item in lineage["name"] for src in lineage_item.source_columns
-    }
+    name_sources = {src for lineage_item in lineage["name"] for src in lineage_item.source_columns}
     assert any("table1" in src for src in name_sources)
 
     # value should trace to table2
@@ -507,16 +492,12 @@ def test_cte_chain_with_transformations():
 
     # total_amount should trace to transactions.amount
     total_sources = {
-        src
-        for lineage_item in lineage["total_amount"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["total_amount"] for src in lineage_item.source_columns
     }
     assert any("amount" in src.lower() for src in total_sources)
 
     # tier should also trace to transactions.amount (through total_amount)
-    tier_sources = {
-        src for lineage_item in lineage["tier"] for src in lineage_item.source_columns
-    }
+    tier_sources = {src for lineage_item in lineage["tier"] for src in lineage_item.source_columns}
     assert any("amount" in src.lower() for src in tier_sources)
 
 
@@ -549,9 +530,7 @@ def test_window_function_with_qualify():
     assert "balance" in lineage
 
     account_sources = {
-        src
-        for lineage_item in lineage["account_id"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["account_id"] for src in lineage_item.source_columns
     }
     assert any("account_balances" in src for src in account_sources)
 
@@ -583,9 +562,7 @@ def test_window_function_aggregation():
     assert "avg_balance" in lineage
     # avg_balance should trace to account_balances.balance
     avg_sources = {
-        src
-        for lineage_item in lineage["avg_balance"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["avg_balance"] for src in lineage_item.source_columns
     }
     assert any("balance" in src.lower() for src in avg_sources)
 
@@ -617,9 +594,7 @@ def test_case_with_forward_reference():
 
     # sub_item_00015 should trace to countries.country_code (through sub_item_00004)
     sub_item_sources = {
-        src
-        for lineage_item in lineage["sub_item_00015"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["sub_item_00015"] for src in lineage_item.source_columns
     }
     assert any("country_code" in src.lower() for src in sub_item_sources)
 
@@ -654,9 +629,7 @@ def test_join_with_date_arithmetic():
     assert "last_quarter_day" in lineage
     assert "account_id" in lineage
     account_sources = {
-        src
-        for lineage_item in lineage["account_id"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["account_id"] for src in lineage_item.source_columns
     }
     assert any("account_holders" in src for src in account_sources)
 
@@ -672,9 +645,7 @@ def test_fully_qualified_table_name():
     parser = SQLColumnParser()
     result = parser.parse_column_lineage(sql)
 
-    assert result.star_sources == {"stg_table"} or "stg_table" in str(
-        result.star_sources
-    )
+    assert result.star_sources == {"stg_table"} or "stg_table" in str(result.star_sources)
 
 
 def test_complex_query_structure():
@@ -765,15 +736,54 @@ def test_complex_query_structure():
 
     # event_id should trace back to source columns (card_id, last_quarter_day, etc.)
     event_id_sources = {
-        src
-        for lineage_item in lineage["event_id"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["event_id"] for src in lineage_item.source_columns
     }
     assert len(event_id_sources) > 0
 
 
-def test_strip_sql_comments_utility():
+def test_table_names_normalized_from_sql() -> None:
+    """Test that table names extracted from SQL are normalized to lowercase."""
+    from dbt_column_lineage.parser.sql_parser_utils import (
+        get_table_context,
+        get_all_tables_from_select,
+    )
+    from sqlglot import parse_one, exp
+
+    # Test with uppercase table names (Snowflake style)
+    sql = "SELECT * FROM RAW_ORDERS_TABLE"
+    parsed = parse_one(sql, dialect="snowflake")
+    select = parsed.find(exp.Select)
+
+    table_context = get_table_context(select)
+    assert table_context == "raw_orders_table"
+    assert table_context != "RAW_ORDERS_TABLE"
+
+    # Test with mixed case
+    sql2 = "SELECT * FROM RawOrdersTable"
+    parsed2 = parse_one(sql2, dialect="snowflake")
+    select2 = parsed2.find(exp.Select)
+
+    table_context2 = get_table_context(select2)
+    assert table_context2 == "raworderstable"
+
+    # Test get_all_tables_from_select
+    sql3 = """
+    SELECT * FROM RAW_ORDERS_TABLE o
+    JOIN RAW_CUSTOMERS_TABLE c ON c.id = o.customer_id
+    """
+    parsed3 = parse_one(sql3, dialect="snowflake")
+    select3 = parsed3.find(exp.Select)
+
+    tables = get_all_tables_from_select(select3)
+    assert "raw_orders_table" in tables
+    assert "raw_customers_table" in tables
+    assert "RAW_ORDERS_TABLE" not in tables
+
+
+def test_strip_sql_comments_utility() -> None:
     """Test the strip_sql_comments utility function."""
+    from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
+
     # Test /* ... */ style comments
     assert strip_sql_comments("customer_name /* customer data */") == "customer_name"
     assert strip_sql_comments("col /* comment */ name") == "col name"
@@ -797,7 +807,7 @@ def test_strip_sql_comments_utility():
     assert strip_sql_comments("/* only comment */") == ""
 
 
-def test_column_with_block_comment():
+def test_column_with_block_comment() -> None:
     """Test parsing SQL with /* ... */ comments in column names."""
     sql = """
     select
@@ -825,7 +835,7 @@ def test_column_with_block_comment():
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 
 
-def test_column_with_line_comment():
+def test_column_with_line_comment() -> None:
     """Test parsing SQL with -- comments in column names."""
     sql = """
     select
@@ -843,7 +853,7 @@ def test_column_with_line_comment():
     assert "--" not in str(lineage["customer_name"][0].source_columns)
 
 
-def test_qualified_column_with_comment():
+def test_qualified_column_with_comment() -> None:
     """Test parsing qualified column names with comments."""
     sql = """
     select
@@ -869,7 +879,7 @@ def test_qualified_column_with_comment():
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 
 
-def test_cte_with_comments():
+def test_cte_with_comments() -> None:
     """Test parsing CTEs with comments in column references."""
     sql = """
     with customer_summary as (
@@ -900,7 +910,7 @@ def test_cte_with_comments():
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 
 
-def test_comments_in_join_condition():
+def test_comments_in_join_condition() -> None:
     """Test parsing joins with comments in column references."""
     sql = """
     select
@@ -925,7 +935,7 @@ def test_comments_in_join_condition():
                 assert "--" not in src or src.index("--") == len(src) - 2  # Only at end
 
 
-def test_comments_in_aliased_columns():
+def test_comments_in_aliased_columns() -> None:
     """Test parsing aliased columns with comments."""
     sql = """
     select
@@ -950,7 +960,7 @@ def test_comments_in_aliased_columns():
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 
 
-def test_comments_in_star_exclude():
+def test_comments_in_star_exclude() -> None:
     """Test parsing SELECT * EXCLUDE with comments."""
     sql = """
     select * exclude (
@@ -969,7 +979,7 @@ def test_comments_in_star_exclude():
     assert "order_id" not in lineage
 
 
-def test_comments_in_complex_query():
+def test_comments_in_complex_query() -> None:
     """Test parsing a complex query with comments in multiple places."""
     sql = """
     with customer_data as (
