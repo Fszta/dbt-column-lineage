@@ -35,7 +35,13 @@
                                 </svg>
                             </div>
                             <div class="custom-select-options" id="columnSelectOptions">
-                                <div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>
+                                <div class="column-search-container">
+                                    <input type="text" id="columnSearchInput" class="column-search-input" placeholder="Search columns..." autocomplete="off">
+                                    <svg class="column-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                </div>
+                                <div class="custom-select-options-list" id="columnSelectOptionsList">
+                                    <div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>
+                                </div>
                             </div>
                         </div>
                         <select id="columnSelect" disabled style="display: none;">
@@ -343,25 +349,31 @@
                 const columnSelectWrapper = document.getElementById('columnSelectWrapper');
                 const columnSelectTrigger = document.getElementById('columnSelectTrigger');
                 const columnSelectOptions = document.getElementById('columnSelectOptions');
+                const columnSelectOptionsList = document.getElementById('columnSelectOptionsList');
                 const columnSelectValue = columnSelectTrigger.querySelector('.custom-select-value');
+                const columnSearchInput = document.getElementById('columnSearchInput');
 
-                // Update hidden select for form compatibility
+                window.allColumns = columns;
+
                 columnSelect.innerHTML = '<option value="">Select a column</option>';
 
-                // Update custom dropdown
-                columnSelectOptions.innerHTML = '<div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>';
+                columnSelectOptionsList.innerHTML = '<div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>';
+
+                if (columnSearchInput) {
+                    columnSearchInput.value = '';
+                }
 
                 columns.forEach(column => {
-                    // Add to hidden select
                     const option = document.createElement('option');
                     option.value = column.name;
                     option.textContent = `${column.name} (${column.type || 'unknown'})`;
                     columnSelect.appendChild(option);
 
-                    // Add to custom dropdown with styled type tag
                     const customOption = document.createElement('div');
                     customOption.className = 'custom-select-option';
                     customOption.dataset.value = column.name;
+                    customOption.dataset.columnName = column.name.toLowerCase();
+                    customOption.dataset.columnType = (column.type || '').toLowerCase();
 
                     const optionContent = document.createElement('div');
                     optionContent.className = 'option-content';
@@ -379,10 +391,9 @@
                     optionContent.appendChild(optionText);
                     optionContent.appendChild(typeTag);
                     customOption.appendChild(optionContent);
-                    columnSelectOptions.appendChild(customOption);
+                    columnSelectOptionsList.appendChild(customOption);
                 });
 
-                // Reset display
                 const resetContent = document.createElement('div');
                 resetContent.className = 'option-content';
                 const resetText = document.createElement('span');
@@ -393,6 +404,30 @@
                 columnSelectValue.appendChild(resetContent);
                 columnSelectWrapper.classList.remove('disabled');
                 columnSelect.disabled = false;
+            }
+
+            function filterColumns(searchTerm) {
+                const term = searchTerm.toLowerCase().trim();
+                const optionsList = document.getElementById('columnSelectOptionsList');
+                if (!optionsList) return;
+
+                const allOptions = optionsList.querySelectorAll('.custom-select-option');
+
+                allOptions.forEach(option => {
+                    if (!option.dataset.value) {
+                        option.style.display = '';
+                        return;
+                    }
+
+                    const columnName = option.dataset.columnName || '';
+                    const columnType = option.dataset.columnType || '';
+
+                    if (term === '' || columnName.includes(term) || columnType.includes(term)) {
+                        option.style.display = '';
+                    } else {
+                        option.style.display = 'none';
+                    }
+                });
             }
 
             fetch('/api/models')
@@ -431,15 +466,18 @@
                 }
             });
 
-            // Handle option selection
             columnSelectOptions.addEventListener('click', function(e) {
+                if (e.target.closest('.column-search-container')) {
+                    e.stopPropagation();
+                    return;
+                }
+
                 const option = e.target.closest('.custom-select-option');
                 if (!option) return;
 
                 const value = option.dataset.value;
                 const optionContent = option.querySelector('.option-content');
 
-                // Update custom dropdown - clone the option content
                 columnSelectValue.innerHTML = '';
                 if (optionContent) {
                     columnSelectValue.appendChild(optionContent.cloneNode(true));
@@ -453,10 +491,35 @@
                 option.classList.add('selected');
                 columnSelectWrapper.classList.remove('open');
 
-                // Update hidden select
                 columnSelect.value = value;
                 columnSelect.dispatchEvent(new Event('change'));
             });
+
+            const columnSearchInput = document.getElementById('columnSearchInput');
+            if (columnSearchInput) {
+                const searchContainer = columnSearchInput.closest('.column-search-container');
+
+                columnSearchInput.addEventListener('input', function(e) {
+                    e.stopPropagation();
+                    filterColumns(e.target.value);
+                });
+
+                columnSearchInput.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+
+                columnSearchInput.addEventListener('focus', function() {
+                    if (searchContainer) {
+                        searchContainer.classList.add('search-focused');
+                    }
+                });
+
+                columnSearchInput.addEventListener('blur', function() {
+                    if (searchContainer) {
+                        searchContainer.classList.remove('search-focused');
+                    }
+                });
+            }
 
             // Sync with hidden select for compatibility
             columnSelect.addEventListener('change', function() {
