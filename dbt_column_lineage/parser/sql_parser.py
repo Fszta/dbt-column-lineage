@@ -10,6 +10,7 @@ from dbt_column_lineage.parser.sql_parser_utils import (
     get_all_tables_from_select,
     get_final_select,
     split_qualified_name,
+    strip_sql_comments,
 )
 
 logging.getLogger("sqlglot").setLevel(logging.ERROR)
@@ -100,6 +101,8 @@ class StarExpressionHandler:
                             if hasattr(col_expr, "this")
                             else str(col_expr)
                         )
+                        # Strip SQL comments from excluded column names
+                        col_name = strip_sql_comments(col_name)
                         excluded.append(col_name)
         return excluded
 
@@ -211,6 +214,8 @@ class ExpressionAnalyzer:
             if hasattr(expr, "this") and expr.this
             else str(expr).lower()
         )
+        # Strip SQL comments that might be included in the column name
+        col_name = strip_sql_comments(col_name)
 
         forward_result = self.parser._handle_forward_reference(expr, col_name, context)
         if forward_result is not None:
@@ -277,6 +282,8 @@ class SQLColumnParser:
             column_definitions = {}
             for expr in select.expressions:
                 col_name = expr.alias_or_name.lower()
+                # Strip SQL comments that might be included in the column name
+                col_name = strip_sql_comments(col_name)
                 column_definitions[col_name] = expr
 
             context = ParserContext(
@@ -337,6 +344,8 @@ class SQLColumnParser:
                     continue
 
                 target_col = expr.alias_or_name.lower()
+                # Strip SQL comments that might be included in the column name
+                target_col = strip_sql_comments(target_col)
                 lineage = self._expression_analyzer.analyze(expr, context)
                 columns[target_col] = lineage
 
@@ -362,6 +371,7 @@ class SQLColumnParser:
     def _normalize_table_ref(
         self, column: str, aliases: Dict[str, str], table_context: str
     ) -> str:
+        column = strip_sql_comments(column)
         table_part, col = split_qualified_name(column)
         if not table_part:
             return f"{table_context}.{col}" if table_context else col
@@ -392,6 +402,8 @@ class SQLColumnParser:
                 column_definitions = {}
                 for expr in select.expressions:
                     col_name = expr.alias_or_name
+                    # Strip SQL comments that might be included in the column name
+                    col_name = strip_sql_comments(col_name)
                     column_definitions[col_name.lower()] = expr
 
                 context = ParserContext(
@@ -407,6 +419,8 @@ class SQLColumnParser:
 
                 for expr in select.expressions:
                     col_name = expr.alias_or_name
+                    # Strip SQL comments that might be included in the column name
+                    col_name = strip_sql_comments(col_name)
 
                     if self._star_handler.is_star_expression(expr):
                         from_table = self._resolve_star_from_table_in_cte(
@@ -533,6 +547,7 @@ class SQLColumnParser:
         cte_sources: Dict[str, Dict[str, str]],
         cte_to_model: Optional[Dict[str, str]] = None,
     ) -> str:
+        column = strip_sql_comments(column)
         table_part, col_name = split_qualified_name(column)
         if table_part:
             table = table_part
@@ -581,7 +596,7 @@ class SQLColumnParser:
         is_aliased: bool,
     ) -> List[ColumnLineage]:
         source_col = self._normalize_table_ref(
-            str(expr), context.aliases, context.table_context
+            strip_sql_comments(str(expr)), context.aliases, context.table_context
         )
         table_part, col = split_qualified_name(source_col)
         table = table_part if table_part else context.table_context
@@ -614,13 +629,15 @@ class SQLColumnParser:
         ]
 
     def _normalize_source_columns(self, source_cols: Set[str]) -> Set[str]:
+        """Normalize source columns, ensuring all are cleaned of comments and lowercase."""
         normalized = set()
         for s in source_cols:
+            s = strip_sql_comments(s)
             table_part, col_part = split_qualified_name(s)
             if table_part:
                 normalized.add(f"{table_part}.{col_part.lower()}")
             else:
-                normalized.add(s)
+                normalized.add(col_part.lower() if col_part else s)
         return normalized
 
     def _handle_forward_reference_in_extraction(
@@ -665,6 +682,8 @@ class SQLColumnParser:
                 if hasattr(col, "this") and col.this
                 else str(col).lower()
             )
+            # Strip SQL comments that might be included in the column name
+            col_name = strip_sql_comments(col_name)
 
             forward_cols = self._handle_forward_reference_in_extraction(
                 col,
@@ -676,8 +695,9 @@ class SQLColumnParser:
                 columns.update(forward_cols)
                 continue
 
+            source_col_raw = strip_sql_comments(str(col))
             source_col = self._normalize_table_ref(
-                str(col), context.aliases, context.table_context
+                source_col_raw, context.aliases, context.table_context
             )
             table_part, _ = split_qualified_name(source_col)
             table = table_part if table_part else context.table_context
