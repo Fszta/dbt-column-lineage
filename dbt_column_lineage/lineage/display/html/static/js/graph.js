@@ -5,15 +5,20 @@
 function initGraph(data) {
     const graphElement = document.getElementById('graph');
 
-    // Preserve the impact analysis card before clearing
+    // Preserve the impact analysis card and relationship summary card before clearing
     const impactCard = document.getElementById('impactAnalysisCard');
+    const relationshipSummaryCard = document.getElementById('relationshipSummaryCard');
     const preservedCard = impactCard ? impactCard.cloneNode(true) : null;
+    const preservedSummaryCard = relationshipSummaryCard ? relationshipSummaryCard.cloneNode(true) : null;
 
     graphElement.innerHTML = '';
 
-    // Re-append the preserved card if it existed
+    // Re-append the preserved cards if they existed
     if (preservedCard) {
         graphElement.appendChild(preservedCard);
+    }
+    if (preservedSummaryCard) {
+        graphElement.appendChild(preservedSummaryCard);
     }
 
     // Check if we're in explore mode (where empty data on initial load is expected)
@@ -29,6 +34,9 @@ function initGraph(data) {
         graphElement.innerHTML = '<div class="error-message">No lineage data found to render the graph.</div>';
         if (preservedCard) {
             graphElement.appendChild(preservedCard);
+        }
+        if (preservedSummaryCard) {
+            graphElement.appendChild(preservedSummaryCard);
         }
         return null;
     }

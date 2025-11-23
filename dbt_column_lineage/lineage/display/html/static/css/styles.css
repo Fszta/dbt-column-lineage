@@ -3108,7 +3108,214 @@ svg {
     animation: spin 1s linear infinite;
 }
 
+/* Column Relationship Summary Card */
+.relationship-summary-card {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 320px;
+    max-width: calc(100% - 40px);
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+    z-index: 200;
+    animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.relationship-summary-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 12px 14px 10px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.relationship-summary-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex: 1;
+}
+
+.relationship-summary-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.relationship-summary-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.relationship-summary-title h4 {
+    margin: 0 0 3px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    line-height: 1.3;
+}
+
+.relationship-summary-subtitle {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.4;
+}
+
+.relationship-summary-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.relationship-summary-close:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-dark);
+}
+
+.relationship-summary-content {
+    padding: 14px;
+}
+
+.relationship-summary-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+}
+
+.summary-metric {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s;
+    min-width: 0;
+}
+
+.summary-metric:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.summary-metric-critical {
+    background: #fff4e6;
+    border-color: var(--accent);
+}
+
+.summary-metric-critical:hover {
+    background: #ffe8cc;
+    border-color: var(--accent);
+}
+
+.summary-metric-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.summary-metric-critical .summary-metric-icon {
+    color: var(--accent);
+}
+
+.summary-metric-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.summary-metric-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.summary-metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.summary-metric-critical .summary-metric-value {
+    color: var(--accent);
+}
+
+.summary-metric-label {
+    font-size: 11px;
+    color: var(--text-light);
+    line-height: 1.3;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+.summary-metric-pass-through .summary-metric-icon {
+    color: #10b981;
+}
+
+.summary-metric-models .summary-metric-icon {
+    color: #3b82f6;
+}
+
+.summary-metric-exposures .summary-metric-icon {
+    color: #8b5cf6;
+}
+
 @media (max-width: 768px) {
+    .relationship-summary-card {
+        top: 10px;
+        right: 10px;
+        width: calc(100% - 20px);
+        max-width: none;
+    }
+
+    .relationship-summary-metrics {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .summary-metric {
+        padding: 8px;
+    }
+
+    .summary-metric-value {
+        font-size: 18px;
+    }
+
     .impact-analysis-card {
         bottom: 10px;
         left: 10px;
