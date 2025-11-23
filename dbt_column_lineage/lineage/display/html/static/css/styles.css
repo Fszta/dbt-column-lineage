@@ -49,7 +49,7 @@ html, body {
     position: relative;
     overflow: hidden; /* Ensure SVG/graph controls overflow */
     background-color: #f9fafc;
-    background-image: 
+    background-image:
       radial-gradient(circle, rgba(130, 150, 175, 0.5) 1px, transparent 1px);
     background-size: 20px 20px;
     background-position: -1px -1px;
@@ -233,7 +233,7 @@ html, body {
 }
 
 .column-bg {
-  display: none; 
+  display: none;
 }
 
 .column-group {
@@ -485,7 +485,7 @@ html, body {
   -webkit-backdrop-filter: blur(20px);
   border-radius: 0;
   padding: 24px;
-  box-shadow: 
+  box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.08),
     0 0 0 1px rgba(59, 130, 246, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -508,7 +508,7 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
+  background:
     radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
     radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
   pointer-events: none;
@@ -527,8 +527,8 @@ html, body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
+  background: linear-gradient(90deg,
+    transparent 0%,
     rgba(59, 130, 246, 0.6) 25%,
     rgba(139, 92, 246, 0.6) 50%,
     rgba(59, 130, 246, 0.6) 75%,
@@ -623,7 +623,7 @@ html, body {
   backdrop-filter: blur(10px);
   font-size: 14px;
   color: #1e293b;
-  box-shadow: 
+  box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.05),
     0 1px 0 rgba(255, 255, 255, 0.8);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -653,7 +653,7 @@ html, body {
   backdrop-filter: blur(10px);
   font-size: 14px;
   color: #1e293b;
-  box-shadow: 
+  box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.05),
     0 1px 0 rgba(255, 255, 255, 0.8);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -689,7 +689,7 @@ html, body {
 .custom-select-trigger:hover {
   border-color: rgba(59, 130, 246, 0.4);
   background: #f8fafc;
-  box-shadow: 
+  box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.05),
     0 0 0 1px rgba(59, 130, 246, 0.15),
     0 4px 12px rgba(59, 130, 246, 0.1);
@@ -701,7 +701,7 @@ html, body {
   border-color: #3b82f6;
   outline: none;
   background: #ffffff;
-  box-shadow: 
+  box-shadow:
     0 0 0 3px rgba(59, 130, 246, 0.15),
     0 4px 16px rgba(59, 130, 246, 0.2),
     0 0 20px rgba(59, 130, 246, 0.1),
@@ -726,7 +726,7 @@ html, body {
   background: #ffffff;
   border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 10px;
-  box-shadow: 
+  box-shadow:
     0 -8px 24px rgba(0, 0, 0, 0.12),
     0 -4px 12px rgba(59, 130, 246, 0.1),
     0 0 0 1px rgba(59, 130, 246, 0.1);
@@ -846,7 +846,7 @@ html, body {
 .model-selector select:hover {
   border-color: rgba(59, 130, 246, 0.4);
   background: #f8fafc;
-  box-shadow: 
+  box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.05),
     0 0 0 1px rgba(59, 130, 246, 0.15),
     0 4px 12px rgba(59, 130, 246, 0.1);
@@ -857,7 +857,7 @@ html, body {
   border-color: #3b82f6;
   outline: none;
   background: #ffffff;
-  box-shadow: 
+  box-shadow:
     0 0 0 3px rgba(59, 130, 246, 0.15),
     0 4px 16px rgba(59, 130, 246, 0.2),
     0 0 20px rgba(59, 130, 246, 0.1),
@@ -894,8 +894,8 @@ html, body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
+  background: linear-gradient(90deg,
+    transparent 0%,
     rgba(59, 130, 246, 0.2) 50%,
     transparent 100%);
 }
@@ -941,7 +941,7 @@ html, body {
   margin-top: 0;
   position: relative;
   overflow: hidden;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(59, 130, 246, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
   text-transform: uppercase;
@@ -955,9 +955,9 @@ html, body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, 
-    transparent, 
-    rgba(255, 255, 255, 0.2), 
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
     transparent);
   transition: left 0.5s;
 }
@@ -969,7 +969,7 @@ html, body {
 #loadLineage:hover {
   background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 8px 20px rgba(59, 130, 246, 0.4),
     0 0 30px rgba(59, 130, 246, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.2) inset;
@@ -978,7 +978,7 @@ html, body {
 
 #loadLineage:active {
   transform: translateY(0);
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(59, 130, 246, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
@@ -1323,7 +1323,7 @@ svg {
     backdrop-filter: blur(10px);
     color: #1e293b;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 
+    box-shadow:
         inset 0 1px 3px rgba(0, 0, 0, 0.05),
         0 1px 0 rgba(255, 255, 255, 0.8);
 }
@@ -1336,7 +1336,7 @@ svg {
 #modelSearchInput:hover {
     border-color: rgba(59, 130, 246, 0.4);
     background: #f8fafc;
-    box-shadow: 
+    box-shadow:
         inset 0 1px 3px rgba(0, 0, 0, 0.05),
         0 0 0 1px rgba(59, 130, 246, 0.15),
         0 4px 12px rgba(59, 130, 246, 0.1);
@@ -1347,7 +1347,7 @@ svg {
     outline: none;
     border-color: #3b82f6;
     background: #ffffff;
-    box-shadow: 
+    box-shadow:
         0 0 0 3px rgba(59, 130, 246, 0.15),
         0 4px 16px rgba(59, 130, 246, 0.2),
         0 0 20px rgba(59, 130, 246, 0.1),
@@ -1392,7 +1392,7 @@ svg {
     background: #fafbfc;
     backdrop-filter: blur(10px);
     border-radius: 8px;
-    box-shadow: 
+    box-shadow:
         inset 0 1px 3px rgba(0, 0, 0, 0.03),
         0 1px 0 rgba(255, 255, 255, 0.9),
         inset 0 0 40px rgba(59, 130, 246, 0.015),
@@ -1428,7 +1428,7 @@ svg {
 }
 
 #model-tree-container:hover {
-    box-shadow: 
+    box-shadow:
         inset 0 1px 3px rgba(0, 0, 0, 0.05),
         0 1px 0 rgba(255, 255, 255, 0.8),
         inset 0 0 40px rgba(59, 130, 246, 0.04),
@@ -1563,7 +1563,7 @@ svg {
     background: rgba(59, 130, 246, 0.08);
     border-color: rgba(59, 130, 246, 0.25);
     transform: translateX(4px) scale(1.01);
-    box-shadow: 
+    box-shadow:
         0 2px 8px rgba(59, 130, 246, 0.12),
         0 0 12px rgba(59, 130, 246, 0.08),
         inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -1696,7 +1696,7 @@ svg {
     border-color: rgba(59, 130, 246, 0.4);
     color: #1e293b;
     font-weight: 600;
-    box-shadow: 
+    box-shadow:
         0 4px 12px rgba(59, 130, 246, 0.2),
         0 0 16px rgba(59, 130, 246, 0.15),
         inset 0 1px 0 rgba(255, 255, 255, 0.8),
@@ -1729,7 +1729,7 @@ svg {
     border-color: rgba(167, 139, 250, 0.4);
     color: #1e293b;
     font-weight: 600;
-    box-shadow: 
+    box-shadow:
         0 4px 12px rgba(167, 139, 250, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.8),
         0 0 0 1px rgba(167, 139, 250, 0.3);
@@ -1763,10 +1763,22 @@ svg {
 }
 
 .error-message {
-    color: #d9534f; /* Bootstrap's danger color */
-    padding: 15px;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-left: 4px solid #dc2626;
+    border-radius: 8px;
+    color: #dc2626;
+    padding: 20px 24px;
     text-align: center;
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 14px;
+    margin: 20px auto;
+    max-width: 600px;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
 }
 
 /* Impact Analysis Panel Styles */
@@ -3036,11 +3048,11 @@ svg {
         width: calc(100% - 20px);
         max-width: none;
     }
-    
+
     .impact-card-header {
         padding: 16px;
     }
-    
+
     .impact-card-content {
         padding: 16px;
     }

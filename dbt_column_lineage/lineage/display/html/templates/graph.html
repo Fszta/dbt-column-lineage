@@ -113,17 +113,17 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Data:', {{ data | tojson }});
             let graphInstance = initGraph({{ data | tojson }});
-            
+
             {% if explore_mode %}
             const columnSelect = document.getElementById('columnSelect');
             const loadLineageBtn = document.getElementById('loadLineage');
             const graphContainer = document.getElementById('graph');
             const modelTreeContainer = document.getElementById('model-tree-container');
             const searchInput = document.getElementById('modelSearchInput');
-            
+
             let selectedModelData = null;
             let allTreeData = [];
-            
+
             const iconFolderClosed = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon folder-icon closed"><path d="M3 7C3 5.89543 3.89543 5 5 5H9.58579C9.851 5 10.1054 5.10536 10.2929 5.29289L12 7H19C20.1046 7 21 7.89543 21 9V18C21 19.1046 20.1046 20 19 20H5C3.89543 20 3 19.1046 3 18V7Z" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
             const iconFolderOpen = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon folder-icon open"><path d="M3 7C3 5.89543 3.89543 5 5 5H9.58579C9.851 5 10.1054 5.10536 10.2929 5.29289L12 7H19C20.1046 7 21 7.89543 21 9V10M3 11L4.5 17.5C4.77614 18.6 5.77614 19.5 6.9 19.5H17.1C18.2239 19.5 19.2239 18.6 19.5 17.5L21 11H3Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
             const iconModel = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="tree-icon model-icon"><path d="M12 3L3 7.5V16.5L12 21L21 16.5V7.5L12 3Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12L21 7.5M12 12L3 7.5M12 12V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -141,15 +141,15 @@
                     const li = document.createElement('li');
                     const nodeType = node.resource_type === 'exposure' ? 'exposure' : node.type;
                     li.classList.add('tree-node', `tree-node-${nodeType}`);
-                    
+
                     const nodeContent = document.createElement('div');
                     nodeContent.classList.add('node-content');
-                    
+
                     const iconContainer = document.createElement('span');
                     iconContainer.classList.add('icon-container');
 
                     const span = document.createElement('span');
-                    span.textContent = node.type === 'model' ? node.display_name : node.name; 
+                    span.textContent = node.type === 'model' ? node.display_name : node.name;
                     span.classList.add('node-label');
 
                     if (node.type === 'folder') {
@@ -157,7 +157,7 @@
                         iconContainer.innerHTML = iconFolderClosed;
                         nodeContent.appendChild(iconContainer);
                         nodeContent.appendChild(span);
-                        
+
                         li.appendChild(nodeContent);
 
                         nodeContent.addEventListener('click', () => {
@@ -187,7 +187,7 @@
                             nodeContent.appendChild(iconContainer);
                             nodeContent.appendChild(span);
                             li.appendChild(nodeContent);
-                            
+
                             // Exposures don't have columns, so clicking them doesn't populate column selector
                             nodeContent.addEventListener('click', () => {
                                 document.querySelectorAll('.model-tree .node-content.selected').forEach(el => el.classList.remove('selected'));
@@ -216,7 +216,7 @@
                             if (node.resource_type === 'model') modelIcon = iconModel;
                             else if (node.resource_type === 'source') modelIcon = iconSource;
                             else if (node.resource_type === 'seed') modelIcon = iconSeed;
-                            
+
                             iconContainer.innerHTML = modelIcon;
                             nodeContent.appendChild(iconContainer);
                             nodeContent.appendChild(span);
@@ -224,11 +224,11 @@
                             li.appendChild(nodeContent);
 
                             span.dataset.modelName = node.model_name;
-                            
+
                             nodeContent.addEventListener('click', () => {
                                 document.querySelectorAll('.model-tree .node-content.selected').forEach(el => el.classList.remove('selected'));
                                 nodeContent.classList.add('selected');
-                                
+
                                 selectedModelData = node;
                                 populateColumnSelector(node.columns);
                                 loadLineageBtn.disabled = true;
@@ -239,7 +239,7 @@
                 });
                 container.appendChild(ul);
             }
-            
+
             function filterTree(searchTerm) {
                 const term = searchTerm.toLowerCase().trim();
                 const allNodes = modelTreeContainer.querySelectorAll('.tree-node');
@@ -303,30 +303,30 @@
                 if (!type) return '#cbd5e1';
                 const typeStr = type.toLowerCase();
                 const defaultColor = '#cbd5e1';
-                
-                if (typeStr.includes('int') || typeStr.includes('decimal') || 
-                    typeStr.includes('numeric') || typeStr.includes('double') || 
+
+                if (typeStr.includes('int') || typeStr.includes('decimal') ||
+                    typeStr.includes('numeric') || typeStr.includes('double') ||
                     typeStr.includes('float')) {
                     return '#7cb7fc';
                 }
-                
-                if (typeStr.includes('varchar') || typeStr.includes('char') || 
+
+                if (typeStr.includes('varchar') || typeStr.includes('char') ||
                     typeStr.includes('text') || typeStr.includes('string')) {
                     return '#4ddba4';
                 }
-                
+
                 if (typeStr.includes('date') || typeStr.includes('time')) {
                     return '#b29dfc';
                 }
-                
+
                 if (typeStr.includes('bool')) {
                     return '#f98b8b';
                 }
-                
+
                 if (typeStr.includes('variant')) {
                     return '#fca154';
                 }
-                
+
                 return defaultColor;
             }
 
@@ -344,44 +344,44 @@
                 const columnSelectTrigger = document.getElementById('columnSelectTrigger');
                 const columnSelectOptions = document.getElementById('columnSelectOptions');
                 const columnSelectValue = columnSelectTrigger.querySelector('.custom-select-value');
-                
+
                 // Update hidden select for form compatibility
                 columnSelect.innerHTML = '<option value="">Select a column</option>';
-                
+
                 // Update custom dropdown
                 columnSelectOptions.innerHTML = '<div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>';
-                
+
                 columns.forEach(column => {
                     // Add to hidden select
                     const option = document.createElement('option');
                     option.value = column.name;
                     option.textContent = `${column.name} (${column.type || 'unknown'})`;
                     columnSelect.appendChild(option);
-                    
+
                     // Add to custom dropdown with styled type tag
                     const customOption = document.createElement('div');
                     customOption.className = 'custom-select-option';
                     customOption.dataset.value = column.name;
-                    
+
                     const optionContent = document.createElement('div');
                     optionContent.className = 'option-content';
-                    
+
                     const optionText = document.createElement('span');
                     optionText.className = 'option-text';
                     optionText.textContent = column.name;
-                    
+
                     const typeTag = document.createElement('span');
                     typeTag.className = 'option-type-tag';
                     const shortType = getShortType(column.type);
                     typeTag.textContent = shortType;
                     typeTag.style.backgroundColor = getTagColor(column.type);
-                    
+
                     optionContent.appendChild(optionText);
                     optionContent.appendChild(typeTag);
                     customOption.appendChild(optionContent);
                     columnSelectOptions.appendChild(customOption);
                 });
-                
+
                 // Reset display
                 const resetContent = document.createElement('div');
                 resetContent.className = 'option-content';
@@ -410,35 +410,35 @@
                     console.error("Error fetching model tree:", error);
                     modelTreeContainer.innerHTML = '<p>Error loading models.</p>';
                 });
-                
+
             // Custom dropdown functionality
             const columnSelectWrapper = document.getElementById('columnSelectWrapper');
             const columnSelectTrigger = document.getElementById('columnSelectTrigger');
             const columnSelectOptions = document.getElementById('columnSelectOptions');
             const columnSelectValue = columnSelectTrigger.querySelector('.custom-select-value');
-            
+
             // Toggle dropdown
             columnSelectTrigger.addEventListener('click', function(e) {
                 if (columnSelectWrapper.classList.contains('disabled')) return;
                 e.stopPropagation();
                 columnSelectWrapper.classList.toggle('open');
             });
-            
+
             // Close dropdown when clicking outside
             document.addEventListener('click', function(e) {
                 if (!columnSelectWrapper.contains(e.target)) {
                     columnSelectWrapper.classList.remove('open');
                 }
             });
-            
+
             // Handle option selection
             columnSelectOptions.addEventListener('click', function(e) {
                 const option = e.target.closest('.custom-select-option');
                 if (!option) return;
-                
+
                 const value = option.dataset.value;
                 const optionContent = option.querySelector('.option-content');
-                
+
                 // Update custom dropdown - clone the option content
                 columnSelectValue.innerHTML = '';
                 if (optionContent) {
@@ -452,21 +452,21 @@
                 });
                 option.classList.add('selected');
                 columnSelectWrapper.classList.remove('open');
-                
+
                 // Update hidden select
                 columnSelect.value = value;
                 columnSelect.dispatchEvent(new Event('change'));
             });
-            
+
             // Sync with hidden select for compatibility
             columnSelect.addEventListener('change', function() {
                 const hasSelection = this.value && selectedModelData;
                 loadLineageBtn.disabled = !hasSelection;
             });
-            
+
             loadLineageBtn.addEventListener('click', function() {
                 const column = columnSelect.value;
-                if (selectedModelData && selectedModelData.model_name && column) { 
+                if (selectedModelData && selectedModelData.model_name && column) {
                     fetch(`/api/lineage/${selectedModelData.model_name}/${column}`)
                         .then(response => response.json())
                         .then(data => {
@@ -476,19 +476,22 @@
                                 document.getElementById('impactAnalysisCard').style.display = 'none';
                                 return;
                             }
-                            
+
                             graphInstance = initGraph(data);
-                            
+
                             // Show impact analysis card after lineage is loaded
                             const impactCard = document.getElementById('impactAnalysisCard');
                             if (impactCard) {
                                 impactCard.style.display = 'block';
                             }
                         })
-                        .catch(error => { 
+                        .catch(error => {
                             console.error("Fetch error:", error);
                             graphContainer.innerHTML = `<p class="error-message">Failed to fetch lineage data.</p>`;
-                            document.getElementById('impactAnalysisCard').style.display = 'none';
+                            const impactCard = document.getElementById('impactAnalysisCard');
+                            if (impactCard) {
+                                impactCard.style.display = 'none';
+                            }
                          });
                 }
             });
@@ -510,7 +513,7 @@
                     if (selectedModelData && selectedModelData.model_name && column) {
                         loadImpactBtn.disabled = true;
                         loadImpactBtn.textContent = 'Loading...';
-                        
+
                         fetch(`/api/impact-analysis/${selectedModelData.model_name}/${column}`)
                         .then(response => {
                             if (!response.ok) {
@@ -525,16 +528,16 @@
                         .then(data => {
                             loadImpactBtn.disabled = false;
                             loadImpactBtn.textContent = 'Analyze Impact';
-                            
+
                             if (data.error) {
                                 impactContent.innerHTML = `<p class="error-message">Error: ${data.error}</p>`;
                                 impactPanel.style.display = 'block';
                                 return;
                             }
-                            
+
                             displayImpactAnalysis(data, selectedModelData.model_name, column);
                             impactPanel.style.display = 'block';
-                            
+
                             // Hide the card when analysis is shown
                             const impactCard = document.getElementById('impactAnalysisCard');
                             if (impactCard) {
@@ -593,7 +596,7 @@
                 const affectedModels = data.affected_models || [];
                 const affectedColumns = data.affected_columns || [];
                 const affectedExposures = data.affected_exposures || [];
-                
+
                 // Separate critical and low-impact columns
                 const criticalColumns = affectedColumns.filter(col => col.severity === 'critical');
                 const lowImpactColumns = affectedColumns.filter(col => col.severity === 'low_impact');
@@ -607,7 +610,7 @@
                             </svg>
                         </div>
                         <div class="impact-intro-text">
-                            <strong>Understanding the impact:</strong> This analysis shows what will be affected if you modify the logic of <code>${modelName}.${columnName}</code>. 
+                            <strong>Understanding the impact:</strong> This analysis shows what will be affected if you modify the logic of <code>${modelName}.${columnName}</code>.
                             Review the transformed columns below as they may need updates when the source column changes.
                         </div>
                     </div>
@@ -695,13 +698,13 @@
                             </div>
                             <div class="columns-list">
                     `;
-                    
+
                     criticalColumns.forEach(col => {
                         const colModelName = col.model || 'unknown';
                         const colColumnName = col.column || 'unknown';
                         const transformationType = col.transformation_type || 'unknown';
                         const modelInfo = affectedModels.find(m => m.name === colModelName);
-                        
+
                         html += `
                             <div class="column-card critical-card">
                                 <div class="column-card-header">
@@ -728,7 +731,7 @@
                             </div>
                         `;
                     });
-                    
+
                     html += `</div></div>`;
                 }
 
@@ -752,7 +755,7 @@
                             </div>
                             <div class="exposures-grid">
                     `;
-                    
+
                     affectedExposures.forEach(exposure => {
                         const exposureName = exposure.name || 'Unknown';
                         const exposureType = exposure.type || 'unknown';
@@ -790,14 +793,14 @@
                             </div>
                         `;
                     });
-                    
+
                     html += `</div></div>`;
                 }
 
                 // AFFECTED MODELS - Group by models that contain critical columns
                 if (affectedModels.length > 0) {
                     const modelsWithCritical = new Set(criticalColumns.map(col => col.model));
-                    
+
                     html += `
                         <div class="impact-section">
                             <div class="section-header">
@@ -817,7 +820,7 @@
                             </div>
                             <div class="model-grid">
                     `;
-                    
+
                     affectedModels.forEach(model => {
                         const modelName = model.name || '';
                         const schemaName = model.schema_name || '';
@@ -825,7 +828,7 @@
                         const isMart = model.resource_type === 'model' && (modelName.includes('mart') || schemaName.includes('mart'));
                         const columnsInModel = affectedColumns.filter(col => col.model === modelName);
                         const criticalInModel = columnsInModel.filter(col => col.severity === 'critical').length;
-                        
+
                         html += `
                             <div class="model-card ${hasCritical ? 'model-card-critical' : ''} ${isMart ? 'model-card-mart' : ''}">
                                 <div class="model-card-header">
@@ -846,7 +849,7 @@
                             </div>
                         `;
                     });
-                    
+
                     html += `</div></div>`;
                 }
 
@@ -872,12 +875,12 @@
                             </div>
                             <div class="columns-list">
                     `;
-                    
+
                     lowImpactColumns.forEach(col => {
                         const colModelName = col.model || 'unknown';
                         const colColumnName = col.column || 'unknown';
                         const transformationType = col.transformation_type || 'unknown';
-                        
+
                         html += `
                             <div class="column-card low-impact-card">
                                 <div class="column-card-header">
@@ -891,7 +894,7 @@
                             </div>
                         `;
                     });
-                    
+
                     html += `</div></div>`;
                 }
 

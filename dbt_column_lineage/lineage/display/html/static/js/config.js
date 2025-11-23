@@ -15,8 +15,8 @@ function createConfig(container) {
             cornerRadius: 8
         },
         layout: {
-            xSpacing: 350,
-            ySpacing: 150,
+            xSpacing: 150,
+            ySpacing: 40,
             verticalUsage: 0.8
         },
         colors: {
