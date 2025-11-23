@@ -25,9 +25,7 @@ class ParserContext:
     cte_sources: Dict[str, Dict[str, str]]
     cte_to_model: Optional[Dict[str, str]]
     cte_transformation_types: Dict[str, Dict[str, str]] = field(default_factory=dict)
-    cte_sql_expressions: Dict[str, Dict[str, Optional[str]]] = field(
-        default_factory=dict
-    )
+    cte_sql_expressions: Dict[str, Dict[str, Optional[str]]] = field(default_factory=dict)
     cte_base_tables: Dict[str, Set[str]] = field(default_factory=dict)
     column_definitions: Optional[Dict[str, Any]] = None
 
@@ -80,9 +78,7 @@ class StarExpressionHandler:
             isinstance(expr, exp.Column) and getattr(expr, "is_star", False)
         )
 
-    def get_star_source_table(
-        self, expr: Any, aliases: Dict[str, str], table_context: str
-    ) -> str:
+    def get_star_source_table(self, expr: Any, aliases: Dict[str, str], table_context: str) -> str:
         if isinstance(expr, exp.Column) and expr.table:
             star_table_alias = str(expr.table)
             return aliases.get(star_table_alias, star_table_alias)
@@ -97,9 +93,7 @@ class StarExpressionHandler:
                 for col_expr in except_clause:
                     if isinstance(col_expr, exp.Column):
                         col_name = (
-                            str(col_expr.this)
-                            if hasattr(col_expr, "this")
-                            else str(col_expr)
+                            str(col_expr.this) if hasattr(col_expr, "this") else str(col_expr)
                         )
                         # Strip SQL comments from excluded column names
                         col_name = strip_sql_comments(col_name)
@@ -109,9 +103,7 @@ class StarExpressionHandler:
     def get_cte_transformation_info(
         self, context: ParserContext, cte_name: str, col_name: str
     ) -> tuple[str, Optional[str]]:
-        trans_type = context.cte_transformation_types.get(cte_name, {}).get(
-            col_name, "direct"
-        )
+        trans_type = context.cte_transformation_types.get(cte_name, {}).get(col_name, "direct")
         sql_expr = context.cte_sql_expressions.get(cte_name, {}).get(col_name)
         return trans_type, sql_expr
 
@@ -210,9 +202,7 @@ class ExpressionAnalyzer:
         self, expr: exp.Column, context: ParserContext, is_aliased: bool
     ) -> List[ColumnLineage]:
         col_name = (
-            str(expr.this).lower()
-            if hasattr(expr, "this") and expr.this
-            else str(expr).lower()
+            str(expr.this).lower() if hasattr(expr, "this") and expr.this else str(expr).lower()
         )
         # Strip SQL comments that might be included in the column name
         col_name = strip_sql_comments(col_name)
@@ -221,13 +211,9 @@ class ExpressionAnalyzer:
         if forward_result is not None:
             return forward_result
 
-        return self.parser._analyze_column_reference(
-            expr, col_name, context, is_aliased
-        )
+        return self.parser._analyze_column_reference(expr, col_name, context, is_aliased)
 
-    def _default_handler(
-        self, expr: Any, context: ParserContext
-    ) -> List[ColumnLineage]:
+    def _default_handler(self, expr: Any, context: ParserContext) -> List[ColumnLineage]:
         source_cols = self.parser._extract_source_columns(expr, context)
         normalized_source_cols = self.parser._normalize_source_columns(source_cols)
         return [
@@ -368,9 +354,7 @@ class SQLColumnParser:
 
         return mappings
 
-    def _normalize_table_ref(
-        self, column: str, aliases: Dict[str, str], table_context: str
-    ) -> str:
+    def _normalize_table_ref(self, column: str, aliases: Dict[str, str], table_context: str) -> str:
         column = strip_sql_comments(column)
         table_part, col = split_qualified_name(column)
         if not table_part:
@@ -472,20 +456,23 @@ class SQLColumnParser:
             if from_table == star_table_alias:
                 for join in select.find_all(exp.Join):
                     if join.alias and join.alias == star_table_alias:
-                        from_table = (
-                            str(join.this) if hasattr(join, "this") else from_table
-                        )
+                        if hasattr(join, "this"):
+                            join_table = join.this
+                            if isinstance(join_table, exp.Table):
+                                from_table = str(join_table.name).lower()
+                            else:
+                                from_table = str(join_table).lower()
                         break
                 from_clause = select.find(exp.From)
                 if from_clause:
                     table_expr = from_clause.find(exp.Table)
                     if table_expr and table_expr.alias == star_table_alias:
                         from_table = (
-                            str(table_expr.name)
+                            str(table_expr.name).lower()
                             if hasattr(table_expr, "name")
                             else from_table
                         )
-            return from_table
+            return from_table.lower() if from_table else table_context
         else:
             return table_context
 
@@ -502,14 +489,10 @@ class SQLColumnParser:
                     context.cte_sources[cte_name][src_col_name] = src_col_source
                     if from_table in context.cte_transformation_types:
                         context.cte_transformation_types[cte_name][src_col_name] = (
-                            context.cte_transformation_types[from_table].get(
-                                src_col_name, "direct"
-                            )
+                            context.cte_transformation_types[from_table].get(src_col_name, "direct")
                         )
                     else:
-                        context.cte_transformation_types[cte_name][
-                            src_col_name
-                        ] = "direct"
+                        context.cte_transformation_types[cte_name][src_col_name] = "direct"
                     if from_table in context.cte_sql_expressions:
                         context.cte_sql_expressions[cte_name][src_col_name] = (
                             context.cte_sql_expressions[from_table].get(src_col_name)
@@ -517,9 +500,7 @@ class SQLColumnParser:
                     else:
                         context.cte_sql_expressions[cte_name][src_col_name] = None
             if from_table in context.cte_base_tables:
-                context.cte_base_tables[cte_name].update(
-                    context.cte_base_tables[from_table]
-                )
+                context.cte_base_tables[cte_name].update(context.cte_base_tables[from_table])
 
     def _store_column_lineage_in_cte(
         self,
@@ -535,9 +516,7 @@ class SQLColumnParser:
                 context.cte_sources[cte_name][col_name] = f"{context.table_context}.*"
             else:
                 context.cte_sources[cte_name][col_name] = col_name
-        context.cte_transformation_types[cte_name][
-            col_name
-        ] = lineage.transformation_type
+        context.cte_transformation_types[cte_name][col_name] = lineage.transformation_type
         context.cte_sql_expressions[cte_name][col_name] = lineage.sql_expression
 
     def _resolve_column_source(
@@ -607,9 +586,7 @@ class SQLColumnParser:
         trans_type = "direct"
         sql_expr = None
         if table in context.cte_sources and col_name in context.cte_sources[table]:
-            trans_type = context.cte_transformation_types.get(table, {}).get(
-                col_name, "direct"
-            )
+            trans_type = context.cte_transformation_types.get(table, {}).get(col_name, "direct")
             sql_expr = context.cte_sql_expressions.get(table, {}).get(col_name)
         elif is_aliased:
             trans_type = "renamed"
@@ -678,9 +655,7 @@ class SQLColumnParser:
         columns = set()
         for col in expr.find_all(exp.Column):
             col_name = (
-                str(col.this).lower()
-                if hasattr(col, "this") and col.this
-                else str(col).lower()
+                str(col.this).lower() if hasattr(col, "this") and col.this else str(col).lower()
             )
             # Strip SQL comments that might be included in the column name
             col_name = strip_sql_comments(col_name)
