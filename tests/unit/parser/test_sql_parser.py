@@ -1,4 +1,5 @@
 from dbt_column_lineage.parser import SQLColumnParser
+from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
 
 
 def test_simple_select_with_join():
@@ -769,3 +770,236 @@ def test_complex_query_structure():
         for src in lineage_item.source_columns
     }
     assert len(event_id_sources) > 0
+
+
+def test_strip_sql_comments_utility():
+    """Test the strip_sql_comments utility function."""
+    # Test /* ... */ style comments
+    assert strip_sql_comments("customer_name /* customer data */") == "customer_name"
+    assert strip_sql_comments("col /* comment */ name") == "col name"
+    assert strip_sql_comments("table.col /* comment */") == "table.col"
+
+    # Test -- style comments
+    assert strip_sql_comments("customer_name -- comment") == "customer_name"
+    assert strip_sql_comments("col -- inline comment") == "col"
+
+    # Test multiline comments
+    assert strip_sql_comments("col /* multi\nline\ncomment */") == "col"
+
+    # Test multiple comments
+    assert strip_sql_comments("col /* first */ /* second */") == "col"
+    assert strip_sql_comments("col /* comment */ -- another") == "col"
+
+    # Test edge cases
+    assert strip_sql_comments("") == ""
+    assert strip_sql_comments("   ") == ""
+    assert strip_sql_comments("no_comments") == "no_comments"
+    assert strip_sql_comments("/* only comment */") == ""
+
+
+def test_column_with_block_comment():
+    """Test parsing SQL with /* ... */ comments in column names."""
+    sql = """
+    select
+        customer_name /* customer data */,
+        order_id /* order reference */
+    from customers
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    # Column names should be clean (no comments)
+    assert "customer_name" in lineage
+    assert "order_id" in lineage
+    assert "customer_name /* customer data */" not in lineage
+    assert "order_id /* order reference */" not in lineage
+
+    # Source columns should also be clean
+    customer_sources = {
+        src
+        for lineage_item in lineage["customer_name"]
+        for src in lineage_item.source_columns
+    }
+    assert all("/*" not in src and "*/" not in src for src in customer_sources)
+
+
+def test_column_with_line_comment():
+    """Test parsing SQL with -- comments in column names."""
+    sql = """
+    select
+        customer_name, -- customer identifier
+        order_id -- order reference
+    from customers
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    assert "customer_name" in lineage
+    assert "order_id" in lineage
+    assert "--" not in str(lineage["customer_name"][0].source_columns)
+
+
+def test_qualified_column_with_comment():
+    """Test parsing qualified column names with comments."""
+    sql = """
+    select
+        customers.customer_name /* customer data */,
+        orders.order_id
+    from customers
+    join orders on customers.id = orders.customer_id
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    assert "customer_name" in lineage
+    assert "order_id" in lineage
+
+    # Source columns should be clean
+    customer_sources = {
+        src
+        for lineage_item in lineage["customer_name"]
+        for src in lineage_item.source_columns
+    }
+    assert all("/*" not in src and "*/" not in src for src in customer_sources)
+
+
+def test_cte_with_comments():
+    """Test parsing CTEs with comments in column references."""
+    sql = """
+    with customer_summary as (
+        select
+            customer_name /* customer identifier */,
+            order_id
+        from customers
+    )
+    select
+        customer_name,
+        order_id
+    from customer_summary
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    assert "customer_name" in lineage
+    assert "order_id" in lineage
+
+    # Source columns should trace back correctly without comments
+    customer_sources = {
+        src
+        for lineage_item in lineage["customer_name"]
+        for src in lineage_item.source_columns
+    }
+    assert all("/*" not in src and "*/" not in src for src in customer_sources)
+
+
+def test_comments_in_join_condition():
+    """Test parsing joins with comments in column references."""
+    sql = """
+    select
+        c.customer_name /* customer data */,
+        o.order_id
+    from customers c
+    join orders o on c.id /* join key */ = o.customer_id
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    assert "customer_name" in lineage
+    assert "order_id" in lineage
+
+    # All source columns should be clean
+    for col_name, lineage_list in lineage.items():
+        for lineage_item in lineage_list:
+            for src in lineage_item.source_columns:
+                assert "/*" not in src and "*/" not in src
+                assert "--" not in src or src.index("--") == len(src) - 2  # Only at end
+
+
+def test_comments_in_aliased_columns():
+    """Test parsing aliased columns with comments."""
+    sql = """
+    select
+        customer_name /* customer identifier */ as customer,
+        order_id -- order reference
+    from customers
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    assert "customer" in lineage
+    assert "order_id" in lineage
+
+    # Source columns should be clean
+    customer_sources = {
+        src
+        for lineage_item in lineage["customer"]
+        for src in lineage_item.source_columns
+    }
+    assert all("/*" not in src and "*/" not in src for src in customer_sources)
+
+
+def test_comments_in_star_exclude():
+    """Test parsing SELECT * EXCLUDE with comments."""
+    sql = """
+    select * exclude (
+        customer_name /* customer identifier */,
+        order_id -- order reference
+    )
+    from customers
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    # Excluded columns should not appear in lineage
+    assert "customer_name" not in lineage
+    assert "order_id" not in lineage
+
+
+def test_comments_in_complex_query():
+    """Test parsing a complex query with comments in multiple places."""
+    sql = """
+    with customer_data as (
+        select
+            customer_name /* customer identifier */,
+            order_id -- order reference
+        from customers /* source table */
+    ),
+    filtered_customers as (
+        select
+            customer_name,
+            order_id
+        from customer_data
+        where customer_name is not null /* filter */
+    )
+    select
+        customer_name /* final */,
+        order_id
+    from filtered_customers
+    """
+
+    parser = SQLColumnParser()
+    result = parser.parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    assert "customer_name" in lineage
+    assert "order_id" in lineage
+
+    # Verify all source columns are clean
+    for col_name, lineage_list in lineage.items():
+        for lineage_item in lineage_list:
+            for src in lineage_item.source_columns:
+                assert "/*" not in src and "*/" not in src
