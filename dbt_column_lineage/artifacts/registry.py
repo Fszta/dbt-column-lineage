@@ -64,6 +64,19 @@ class ModelRegistry:
             downstream_deps = self._manifest_reader.get_model_downstream()
             model_exposures = self._manifest_reader.get_model_exposures()
 
+            manifest_sources = self._manifest_reader.manifest.get("sources", {})
+            for source_id, source_node in manifest_sources.items():
+                source_name = source_node.get("source_name")
+                source_identifier = (
+                    source_node.get("identifier", "").lower()
+                    if source_node.get("identifier")
+                    else source_node.get("name", "").lower()
+                )
+
+                source_model = models.get(source_identifier)
+                if source_model and source_model.resource_type == "source" and source_name:
+                    source_model.source_name = source_name.lower()
+
             for model_name, model in models.items():
                 model.upstream = upstream_deps.get(model_name, set())
                 model.downstream = downstream_deps.get(model_name, set())

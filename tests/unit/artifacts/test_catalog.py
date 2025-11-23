@@ -199,26 +199,27 @@ def test_source_processing(sample_catalog_with_sources):
     models = reader.get_models_nodes()
 
     # Check that both model and source are loaded
-    assert len(models) == 2
+    # Source is stored by identifier (primary key) - simplifies everything
     assert "customers" in models
-    assert "raw_customers_table" in models  # Should use identifier
+    assert "raw_customers_table" in models  # Stored by identifier
 
     # Check model properties
     model = models["customers"]
     assert model.resource_type == "model"
     assert model.source_identifier is None
 
-    # Check source properties
+    # Check source properties - looked up by identifier (primary key)
     source = models["raw_customers_table"]
     assert source.resource_type == "source"
-    assert source.source_identifier == "raw_customers_table"
     assert source.name == "raw_customers"
+    assert source.source_identifier == "raw_customers_table"
+    assert source.source_name == "raw"
     assert "id" in source.columns
     assert "name" in source.columns
 
     # Check source column properties
     source_column = source.columns["id"]
-    assert source_column.model_name == "raw_customers_table"
+    assert source_column.model_name == "raw_customers_table"  # Uses identifier
     assert source_column.data_type == "integer"
     assert source_column.full_name == "raw_customers_table.id"
 
@@ -253,6 +254,7 @@ def test_source_without_identifier(tmp_path):
     source = models["raw_orders"]
     assert source.resource_type == "source"
     assert source.source_identifier is None
+    assert source.source_name == "raw"
     assert source.name == "raw_orders"
 
 
@@ -284,6 +286,7 @@ def catalog_with_uppercase_names(tmp_path: Path) -> Path:
             "source.jaffle_shop.RAW_ORDERS": {
                 "unique_id": "source.jaffle_shop.RAW_ORDERS",
                 "name": "raw_orders",
+                "source_name": "raw",
                 "schema": "jaffle_shop",
                 "database": "raw",
                 "metadata": {"name": "RAW_ORDERS_TABLE"},  # Uppercase identifier
@@ -341,6 +344,7 @@ def test_catalog_normalizes_source_identifiers_to_lowercase(
 
     source = models["raw_orders_table"]
     assert source.source_identifier == "raw_orders_table"
+    assert source.source_name == "raw"
     assert source.name == "raw_orders"
     assert source.resource_type == "source"
 

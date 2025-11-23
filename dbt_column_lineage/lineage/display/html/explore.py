@@ -103,17 +103,25 @@ class LineageExplorer:
                         if node_type == "folder":
                             node["children"] = []
                         else:
-                            node["model_name"] = model_data["registry_key"]
+                            node["model_name"] = model_data.get(
+                                "model_name", model_data["registry_key"]
+                            )
                             node["display_name"] = part
                             node["columns"] = model_data.get("columns", [])
                             node["resource_type"] = model_data["resource_type"]
                             if "exposure_data" in model_data:
                                 node["exposure_data"] = model_data["exposure_data"]
-                            # node['full_path'] = model_data['full_path']
 
                         current_level.append(node)
-                        # Sort folders first, then models, alphabetically within each type
                         current_level.sort(key=lambda x: (x["type"] != "folder", x["name"]))
+                    elif node_type != "folder" and is_last_part:
+                        if "model_name" in model_data:
+                            node["model_name"] = model_data["model_name"]
+                        node["display_name"] = part
+                        if "columns" in model_data:
+                            node["columns"] = model_data["columns"]
+                        if "resource_type" in model_data:
+                            node["resource_type"] = model_data["resource_type"]
 
                     if node_type == "folder":
                         if "children" not in node:
@@ -125,15 +133,12 @@ class LineageExplorer:
                 resource_type = getattr(model, "resource_type", None)
                 model_name_for_path = model_registry_key
 
-                # Group sources under a dedicated "source" folder
                 if resource_type == "source":
-                    # For sources, use: source / source_name / table_name
-                    # The registry key format is typically "source_name.table_name"
-                    if "." in model_registry_key:
-                        source_name, table_name = model_registry_key.rsplit(".", 1)
-                        path_parts = ["source", source_name, table_name]
+                    source_name = getattr(model, "source_name", None)
+                    if source_name:
+                        path_parts = ["source", source_name, model_registry_key]
                     else:
-                        path_parts = ["source", model_name_for_path]
+                        path_parts = ["source", model_registry_key]
                 elif resource_path_str:
                     p = Path(resource_path_str)
                     path_parts = list(p.parent.parts) + [model_name_for_path]
@@ -151,6 +156,7 @@ class LineageExplorer:
 
                 model_data_payload = {
                     "registry_key": model_registry_key,
+                    "model_name": model_registry_key,
                     "columns": columns,
                     "resource_type": resource_type,
                 }
@@ -408,19 +414,21 @@ class LineageExplorer:
 
     def _set_column_info(self, column: Column) -> None:
         """Set the main column info for display."""
+        model_name = column.model_name
+
         self.data.column_info = ColumnInfo(
             name=column.name,
-            model=column.model_name,
+            model=model_name,
             type=column.data_type,
             description=column.description,
         )
 
-        resource_type = self._get_model_resource_type(column.model_name)
+        resource_type = self._get_model_resource_type(model_name)
 
         self._add_node(
-            id=f"col_{column.model_name}_{column.name}",
+            id=f"col_{model_name}_{column.name}",
             label=column.name,
-            model=column.model_name,
+            model=model_name,
             data_type=column.data_type,
             is_main=True,
             resource_type=resource_type,

@@ -8,6 +8,7 @@ class ColumnLineage(BaseModel):
     sql_expression: Optional[str] = None
     description: Optional[str] = None
 
+
 class Column(BaseModel):
     name: str
     model_name: str
@@ -20,6 +21,7 @@ class Column(BaseModel):
     def full_name(self) -> str:
         return f"{self.model_name}.{self.name}"
 
+
 class Exposure(BaseModel):
     name: str
     type: str
@@ -31,19 +33,17 @@ class Exposure(BaseModel):
     resource_path: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
+
 class ModelDependency(BaseModel):
     model_name: str
     depends_on: Set[str]
 
 
 class Model(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-        protected_namespaces=()
-    )
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
     name: str
-    schema_name: str = Field(alias='schema') # Handle base model shadow attribute `schema`
+    schema_name: str = Field(alias="schema")  # Handle base model shadow attribute `schema`
     database: str
     columns: Dict[str, Column] = Field(default_factory=dict)
     metadata: Optional[Dict[str, Any]] = None
@@ -55,8 +55,9 @@ class Model(BaseModel):
     resource_type: Literal["model", "source", "seed", "test", "exposure"]
     resource_path: Optional[str] = None
     source_identifier: Optional[str] = None
+    source_name: Optional[str] = None
+
 
 class SQLParseResult(BaseModel):
     column_lineage: Dict[str, List[ColumnLineage]]
     star_sources: Set[str] = Field(default_factory=set)
-    
