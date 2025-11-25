@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
+from typing import Dict, Any
 from dbt.cli.main import dbtRunner
 import duckdb
 
 
-def setup_test_db(project_dir: Path):
+def setup_test_db(project_dir: Path) -> Path:
     """Set up a test DuckDB database with sample data."""
     db_path = project_dir / "test.duckdb"
     if db_path.exists():
@@ -58,7 +59,7 @@ def setup_test_db(project_dir: Path):
     return db_path
 
 
-def setup_dbt_project(project_dir: Path) -> dict:
+def setup_dbt_project(project_dir: Path) -> Dict[str, Any]:
     """Setup dbt project and return paths to artifacts."""
     dbt = dbtRunner()
 
@@ -78,8 +79,9 @@ def setup_dbt_project(project_dir: Path) -> dict:
         ).fetchall()
         for table in tables:
             print(f"- {table[0]}")
-            count = conn.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()[0]
-            print(f"  Rows: {count}")
+            count = conn.execute(f"SELECT COUNT(*) FROM {table[0]}").fetchone()
+            if count:
+                print(f"  Rows: {count[0]}")
 
         conn.close()
 
@@ -95,11 +97,14 @@ def setup_dbt_project(project_dir: Path) -> dict:
                 if hasattr(res, "exception") and res.exception:
                     error_msg += f": {res.exception}"
 
-                if hasattr(res, "result"):
-                    if hasattr(res.result, "errors") and res.result.errors:
-                        error_msg += f"\nErrors: {res.result.errors}"
-                    if hasattr(res.result, "error") and res.result.error:
-                        error_msg += f"\nError: {res.result.error}"
+                if hasattr(res, "result") and res.result:
+                    result_obj = res.result
+                    errors = getattr(result_obj, "errors", None)
+                    if errors:
+                        error_msg += f"\nErrors: {errors}"
+                    error = getattr(result_obj, "error", None)
+                    if error:
+                        error_msg += f"\nError: {error}"
 
                 # If it's the docs generate command, try to get more info about the database
                 if cmd[0] == "docs" and cmd[1] == "generate":
@@ -107,14 +112,19 @@ def setup_dbt_project(project_dir: Path) -> dict:
                         conn = duckdb.connect(str(db_path))
 
                         # Check if the source tables exist
-                        for source_table in ["raw_accounts", "raw_countries", "raw_transactions"]:
-                            exists = conn.execute(
+                        for source_table in [
+                            "raw_accounts",
+                            "raw_countries",
+                            "raw_transactions",
+                        ]:
+                            result = conn.execute(
                                 f"""
                                 SELECT COUNT(*)
                                 FROM information_schema.tables
                                 WHERE table_schema='main' AND table_name='{source_table}'
                             """
-                            ).fetchone()[0]
+                            ).fetchone()
+                            exists = result[0] if result else 0
                             if exists:
                                 print(f"Table {source_table} exists")
                             else:

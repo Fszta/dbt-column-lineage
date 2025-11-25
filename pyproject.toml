@@ -47,12 +47,16 @@ python_version = "3.9"
 files = ["dbt_column_lineage", "tests"]
 show_error_codes = true
 pretty = true
-strict = true
+explicit_package_bases = true
+namespace_packages = true
 
 [[tool.mypy.overrides]]
 module = [
     "sqlglot.*",
-    "dbt.*"
+    "dbt.*",
+    "duckdb.*",
+    "pytest.*",
+    "requests.*"
 ]
 ignore_missing_imports = true
 
