@@ -54,3 +54,6 @@ jobs:
 
     - name: Run integration tests
       run: poetry run test-integration
+
+    - name: Run e2e
+      run: poetry run test-e2e
