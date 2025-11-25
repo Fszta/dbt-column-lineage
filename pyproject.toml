@@ -25,6 +25,7 @@ dbt-col-lineage = "dbt_column_lineage.cli.main:main"
 test = "run_tests:run_tests"
 test-unit = "run_tests:run_tests_unit"
 test-integration = "run_tests:run_tests_integration"
+test-e2e = "run_tests:run_tests_e2e"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.4,<9.0.0"
