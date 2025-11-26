@@ -1,0 +1,99 @@
+/**
+ * Layout styles - Container, sidebar, graph area
+ */
+
+.container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.sidebar {
+    width: 300px;
+    padding: 0;
+    border: none;
+    background-color: transparent;
+    overflow-y: auto; /* Allow sidebar scroll */
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    box-shadow: none;
+}
+
+.sidebar-toggle {
+  text-align: right;
+  margin-bottom: 15px;
+}
+
+.sidebar-toggle button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.sidebar-toggle button:hover {
+  background: var(--secondary);
+}
+
+.sidebar.collapsed {
+  width: 50px;
+  padding: 15px 10px;
+}
+
+.sidebar.collapsed .controls h3,
+.sidebar.collapsed .info-panel h3,
+.sidebar.collapsed .controls button,
+.sidebar.collapsed #nodeInfo,
+.sidebar.collapsed .info-panel {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-toggle button svg {
+  transform: rotate(180deg);
+}
+
+#graph {
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden; /* Ensure SVG/graph controls overflow */
+    background-color: #f9fafc;
+    background-image:
+      radial-gradient(circle, rgba(130, 150, 175, 0.5) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: -1px -1px;
+}
+
+/* Clone controls to graph area */
+#graph::after {
+  content: "";
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 150px;
+  height: 200px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.sidebar .controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 10px var(--shadow);
+  z-index: 100;
+  width: auto;
+}
+
+/* Make sure buttons get pointer events */
+.sidebar .controls button {
+  pointer-events: auto;
+}
+
+.sidebar .controls #relayout {
+  display: none;
+}
