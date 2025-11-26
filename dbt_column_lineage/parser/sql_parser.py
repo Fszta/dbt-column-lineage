@@ -2,7 +2,7 @@ import re
 import logging
 from dataclasses import dataclass, field
 from sqlglot import parse_one, exp
-from typing import Dict, List, Set, Optional, Any, Callable
+from typing import Dict, List, Set, Optional, Any, Callable, Literal, cast
 from dbt_column_lineage.models.schema import ColumnLineage, SQLParseResult
 from dbt_column_lineage.parser.sql_parser_utils import (
     get_table_aliases,
@@ -70,7 +70,7 @@ class CTEHandler:
 
 
 class StarExpressionHandler:
-    def __init__(self):
+    def __init__(self) -> None:
         self._cte_handler: Optional[CTEHandler] = None
 
     def is_star_expression(self, expr: Any) -> bool:
@@ -119,7 +119,7 @@ class StarExpressionHandler:
         for join_table in all_tables:
             if join_table in context.cte_sources:
                 if len(context.cte_sources[join_table]) > 0:
-                    for col_name, col_source in context.cte_sources[join_table].items():
+                    for col_name, col_source in sorted(context.cte_sources[join_table].items()):
                         if col_name.lower() not in excluded_col_names:
                             trans_type, sql_expr = self.get_cte_transformation_info(
                                 context, join_table, col_name
@@ -127,15 +127,18 @@ class StarExpressionHandler:
                             columns[col_name.lower()] = [
                                 ColumnLineage(
                                     source_columns={col_source},
-                                    transformation_type=trans_type,
+                                    transformation_type=cast(
+                                        Literal["direct", "renamed", "derived"], trans_type
+                                    ),
                                     sql_expression=sql_expr,
                                 )
                             ]
                 if join_table in context.cte_base_tables:
                     star_sources.update(context.cte_base_tables[join_table])
-                self._cte_handler.trace_base_tables(
-                    join_table, context.cte_to_model, context.cte_sources, star_sources
-                )
+                if self._cte_handler:
+                    self._cte_handler.trace_base_tables(
+                        join_table, context.cte_to_model, context.cte_sources, star_sources
+                    )
             elif context.cte_to_model and join_table in context.cte_to_model:
                 star_sources.add(context.cte_to_model[join_table])
 
@@ -149,7 +152,7 @@ class StarExpressionHandler:
     ) -> bool:
         if source_table in context.cte_sources:
             if len(context.cte_sources[source_table]) > 0:
-                for col_name, col_source in context.cte_sources[source_table].items():
+                for col_name, col_source in sorted(context.cte_sources[source_table].items()):
                     if col_name.lower() not in excluded_col_names:
                         trans_type, sql_expr = self.get_cte_transformation_info(
                             context, source_table, col_name
@@ -157,7 +160,9 @@ class StarExpressionHandler:
                         columns[col_name.lower()] = [
                             ColumnLineage(
                                 source_columns={col_source},
-                                transformation_type=trans_type,
+                                transformation_type=cast(
+                                    Literal["direct", "renamed", "derived"], trans_type
+                                ),
                                 sql_expression=sql_expr,
                             )
                         ]
@@ -165,24 +170,27 @@ class StarExpressionHandler:
             if source_table in context.cte_base_tables:
                 star_sources.update(context.cte_base_tables[source_table])
 
-            self._cte_handler.trace_base_tables(
-                source_table, context.cte_to_model, context.cte_sources, star_sources
-            )
+            if self._cte_handler:
+                self._cte_handler.trace_base_tables(
+                    source_table, context.cte_to_model, context.cte_sources, star_sources
+                )
             return True
         return False
 
 
 class ExpressionAnalyzer:
-    def __init__(self, parser: "SQLColumnParser"):
+    def __init__(self, parser: "SQLColumnParser") -> None:
         self.parser = parser
-        self._handlers: Dict[type, Callable] = {}
+        self._handlers: Dict[type, Callable[[Any, ParserContext, bool], List[ColumnLineage]]] = {}
         self._register_default_handlers()
 
-    def _register_default_handlers(self):
+    def _register_default_handlers(self) -> None:
         self.register_handler(exp.Alias, self._handle_alias)
         self.register_handler(exp.Column, self._handle_column)
 
-    def register_handler(self, expr_type: type, handler: Callable):
+    def register_handler(
+        self, expr_type: type, handler: Callable[[Any, ParserContext, bool], List[ColumnLineage]]
+    ) -> None:
         self._handlers[expr_type] = handler
 
     def analyze(
@@ -253,14 +261,28 @@ class SQLColumnParser:
             cte_base_tables,
         )
 
-        columns = {}
-        star_sources = set()
+        columns: Dict[str, List[ColumnLineage]] = {}
+        star_sources: Set[str] = set()
 
         final_select = get_final_select(parsed)
         if not final_select:
-            selects_to_process = parsed.find_all(exp.Select)
+            selects_to_process: List[Any] = list(parsed.find_all(exp.Select))
         else:
             selects_to_process = [final_select]
+            if len(final_select.expressions) == 1:
+                expr = final_select.expressions[0]
+                if self._star_handler.is_star_expression(expr):
+                    from_clause = final_select.find(exp.From)
+                    if from_clause:
+                        table = from_clause.find(exp.Table)
+                        if table:
+                            table_name = str(table.name).lower()
+                            for cte in parsed.find_all(exp.CTE):
+                                if cte.alias.lower() == table_name:
+                                    cte_select = cte.this.find(exp.Select)
+                                    if cte_select:
+                                        selects_to_process = [cte_select]
+                                        break
 
         for select in selects_to_process:
             table_context = get_table_context(select)
@@ -484,7 +506,7 @@ class SQLColumnParser:
         context: ParserContext,
     ) -> None:
         if from_table in context.cte_sources:
-            for src_col_name, src_col_source in context.cte_sources[from_table].items():
+            for src_col_name, src_col_source in sorted(context.cte_sources[from_table].items()):
                 if src_col_name.lower() not in excluded_col_names:
                     context.cte_sources[cte_name][src_col_name] = src_col_source
                     if from_table in context.cte_transformation_types:
@@ -510,7 +532,8 @@ class SQLColumnParser:
         context: ParserContext,
     ) -> None:
         if lineage.source_columns:
-            context.cte_sources[cte_name][col_name] = next(iter(lineage.source_columns))
+            sorted_sources = sorted(lineage.source_columns)
+            context.cte_sources[cte_name][col_name] = sorted_sources[0]
         else:
             if context.table_context:
                 context.cte_sources[cte_name][col_name] = f"{context.table_context}.*"
@@ -531,12 +554,21 @@ class SQLColumnParser:
         if table_part:
             table = table_part
 
-        if table in cte_sources and col_name in cte_sources[table]:
-            return cte_sources[table][col_name]
-        elif table and cte_to_model and table in cte_to_model:
-            return f"{cte_to_model[table]}.{col_name}"
+        col_name_lower = col_name.lower() if col_name else col_name
+
+        if table in cte_sources:
+            if col_name in cte_sources[table]:
+                return cte_sources[table][col_name]
+            if col_name_lower in cte_sources[table]:
+                return cte_sources[table][col_name_lower]
+            for key in sorted(cte_sources[table].keys()):
+                if key.lower() == col_name_lower:
+                    return cte_sources[table][key]
+
+        if table and cte_to_model and table in cte_to_model:
+            return f"{cte_to_model[table]}.{col_name_lower}"
         elif table:
-            return f"{table}.{col_name}"
+            return f"{table}.{col_name_lower}"
         return column
 
     def _handle_forward_reference(
@@ -600,7 +632,7 @@ class SQLColumnParser:
         return [
             ColumnLineage(
                 source_columns={resolved_source},
-                transformation_type=trans_type,
+                transformation_type=cast(Literal["direct", "renamed", "derived"], trans_type),
                 sql_expression=sql_expr,
             )
         ]
@@ -653,7 +685,9 @@ class SQLColumnParser:
             visited_forward_refs = set()
 
         columns = set()
-        for col in expr.find_all(exp.Column):
+        all_columns = list(expr.find_all(exp.Column))
+        all_columns.sort(key=lambda c: str(c).lower())
+        for col in all_columns:
             col_name = (
                 str(col.this).lower() if hasattr(col, "this") and col.this else str(col).lower()
             )

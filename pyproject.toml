@@ -25,12 +25,15 @@ dbt-col-lineage = "dbt_column_lineage.cli.main:main"
 test = "run_tests:run_tests"
 test-unit = "run_tests:run_tests_unit"
 test-integration = "run_tests:run_tests_integration"
+test-e2e = "run_tests:run_tests_e2e"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.4,<9.0.0"
 mypy = ">=1.15.0,<2.0.0"
 mkdocs-material = ">=9.5.0,<10.0.0"
 mkdocs-click = ">=0.8.1,<0.9.0"
+requests = ">=2.32.0,<3.0.0"
+types-requests = ">=2.32.0,<3.0.0"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -44,12 +47,16 @@ python_version = "3.9"
 files = ["dbt_column_lineage", "tests"]
 show_error_codes = true
 pretty = true
-strict = true
+explicit_package_bases = true
+namespace_packages = true
 
 [[tool.mypy.overrides]]
 module = [
     "sqlglot.*",
-    "dbt.*"
+    "dbt.*",
+    "duckdb.*",
+    "pytest.*",
+    "requests.*"
 ]
 ignore_missing_imports = true
 
