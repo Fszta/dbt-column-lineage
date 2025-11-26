@@ -219,7 +219,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('stroke-linejoin', 'round');
 
     // Model title text
-    foregroundGroup.append('text')
+    const modelTitleText = foregroundGroup.append('text')
         .attr('class', 'model-title')
         .attr('x', 44)
         .attr('y', config.box.titleHeight / 2 + 5)
@@ -242,6 +242,41 @@ function drawModels(g, state, config, dragBehavior) {
                 self.attr('data-original-text', d.name);
             }
         });
+
+    // Add tooltip for truncated model titles
+    modelTitleText.each(function(d) {
+        const self = d3.select(this);
+        const originalText = self.attr('data-original-text');
+        if (originalText && originalText !== d.name) {
+            self
+                .style('pointer-events', 'all')
+                .style('cursor', 'help')
+                .on('mouseenter', function(event) {
+                    showTooltip(event, originalText);
+                })
+                .on('mouseleave', function() {
+                    hideTooltip();
+                })
+                .on('mousemove', function(event) {
+                    const tooltip = createTooltip();
+                    let x, y;
+                    if (event.pageX !== undefined && event.pageY !== undefined) {
+                        x = event.pageX;
+                        y = event.pageY;
+                    } else if (event.clientX !== undefined && event.clientY !== undefined) {
+                        x = event.clientX + window.scrollX;
+                        y = event.clientY + window.scrollY;
+                    } else {
+                        const sourceEvent = event.sourceEvent || event;
+                        x = (sourceEvent.pageX || sourceEvent.clientX || 0) + (window.scrollX || 0);
+                        y = (sourceEvent.pageY || sourceEvent.clientY || 0) + (window.scrollY || 0);
+                    }
+                    tooltip
+                        .style('left', (x + 10) + 'px')
+                        .style('top', (y - 10) + 'px');
+                });
+        }
+    });
 
     // Add expand/collapse icon for models with downstream dependencies
     const expandIconGroup = foregroundGroup.append('g')
@@ -479,7 +514,7 @@ function drawColumns(nodes, state, config, onColumnClick) {
                 .attr('data-id', col.id);
 
             // --- Clickable Background ---
-            columnGroup.append('rect')
+            const columnBackground = columnGroup.append('rect')
                 .attr('class', 'column-background')
                 .attr('x', 0)
                 .attr('y', 0)
@@ -489,13 +524,46 @@ function drawColumns(nodes, state, config, onColumnClick) {
                 .style('cursor', 'pointer')
                 .on('click', function() {
                     onColumnClick(col.id, model.name);
-                })
-                .on('mouseenter', function() {
-                    d3.select(this).attr('fill', 'rgba(0,0,0,0.03)');  // Subtle hover effect
-                })
-                .on('mouseleave', function() {
-                    d3.select(this).attr('fill', 'transparent');
                 });
+
+            // Set up hover handlers - add tooltip if column name is truncated
+            if (col.name.length > 18) {
+                columnBackground
+                    .on('mouseenter', function(event) {
+                        d3.select(this).attr('fill', 'rgba(0,0,0,0.03)');
+                        showTooltip(event, col.name);
+                    })
+                    .on('mouseleave', function() {
+                        d3.select(this).attr('fill', 'transparent');
+                        hideTooltip();
+                    })
+                    .on('mousemove', function(event) {
+                        const tooltip = createTooltip();
+                        let x, y;
+                        if (event.pageX !== undefined && event.pageY !== undefined) {
+                            x = event.pageX;
+                            y = event.pageY;
+                        } else if (event.clientX !== undefined && event.clientY !== undefined) {
+                            x = event.clientX + window.scrollX;
+                            y = event.clientY + window.scrollY;
+                        } else {
+                            const sourceEvent = event.sourceEvent || event;
+                            x = (sourceEvent.pageX || sourceEvent.clientX || 0) + (window.scrollX || 0);
+                            y = (sourceEvent.pageY || sourceEvent.clientY || 0) + (window.scrollY || 0);
+                        }
+                        tooltip
+                            .style('left', (x + 10) + 'px')
+                            .style('top', (y - 10) + 'px');
+                    });
+            } else {
+                columnBackground
+                    .on('mouseenter', function() {
+                        d3.select(this).attr('fill', 'rgba(0,0,0,0.03)');
+                    })
+                    .on('mouseleave', function() {
+                        d3.select(this).attr('fill', 'transparent');
+                    });
+            }
 
             // --- Left Color Indicator ---
             columnGroup.append('rect')
@@ -509,7 +577,7 @@ function drawColumns(nodes, state, config, onColumnClick) {
                 .attr('opacity', 0.7);
 
             // --- Column Name Text ---
-            columnGroup.append('text')
+            const columnNameText = columnGroup.append('text')
                 .attr('class', 'column-name')
                 .attr('x', 12)
                 .attr('y', (config.box.columnHeight - config.box.columnPadding) / 2)
@@ -680,7 +748,7 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
 
-    foregroundGroup.append('text')
+    const exposureTitleText = foregroundGroup.append('text')
         .attr('class', 'exposure-title')
         .attr('x', 44)
         .attr('y', config.box.titleHeight / 2 + 5)
@@ -701,6 +769,41 @@ function drawExposures(g, state, config, dragBehavior) {
                 self.attr('data-original-text', d.name);
             }
         });
+
+    // Add tooltip for truncated exposure titles
+    exposureTitleText.each(function(d) {
+        const self = d3.select(this);
+        const originalText = self.attr('data-original-text');
+        if (originalText && originalText !== d.name) {
+            self
+                .style('pointer-events', 'all')
+                .style('cursor', 'help')
+                .on('mouseenter', function(event) {
+                    showTooltip(event, originalText);
+                })
+                .on('mouseleave', function() {
+                    hideTooltip();
+                })
+                .on('mousemove', function(event) {
+                    const tooltip = createTooltip();
+                    let x, y;
+                    if (event.pageX !== undefined && event.pageY !== undefined) {
+                        x = event.pageX;
+                        y = event.pageY;
+                    } else if (event.clientX !== undefined && event.clientY !== undefined) {
+                        x = event.clientX + window.scrollX;
+                        y = event.clientY + window.scrollY;
+                    } else {
+                        const sourceEvent = event.sourceEvent || event;
+                        x = (sourceEvent.pageX || sourceEvent.clientX || 0) + (window.scrollX || 0);
+                        y = (sourceEvent.pageY || sourceEvent.clientY || 0) + (window.scrollY || 0);
+                    }
+                    tooltip
+                        .style('left', (x + 10) + 'px')
+                        .style('top', (y - 10) + 'px');
+                });
+        }
+    });
 
     const detailsContainer = foregroundGroup.append('g')
         .attr('class', 'exposure-details')
