@@ -1,0 +1,50 @@
+/**
+ * Base styles - CSS variables, resets, and fundamental styles
+ */
+
+:root {
+  --primary: #4a6fa5;
+  --primary-light: #6989b9;
+  --secondary: #f8f9fa;
+  --accent: #ff9100;
+  --text-dark: #333;
+  --text-light: #666;
+  --border: #e0e0e0;
+  --shadow: rgba(0,0,0,0.1);
+  --model-bg: #ffffff;
+  --column-bg: #f8fafc;
+  --edge-color: #9eb3c6;
+  --edge-highlight: #ff9100;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #f8f9fa;
+    color: var(--text-dark);
+    display: flex;
+    height: 100vh;
+    overflow: hidden; /* Prevent body scroll */
+}
+
+.error-message {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-left: 4px solid #dc2626;
+    border-radius: 8px;
+    color: #dc2626;
+    padding: 20px 24px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    margin: 20px auto;
+    max-width: 600px;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
