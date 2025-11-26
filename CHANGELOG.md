@@ -1,3 +1,22 @@
+## [0.6.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.5.0...v0.6.0) (2025-11-26)
+
+
+### Features
+
+* add column relationship summary card to lineage view ([e3b1ce9](https://github.com/Fszta/dbt-column-lineage/commit/e3b1ce97cb3046d3176b5a29a40102621f3fc286))
+* add expand/collapse functionality for lineage graph ([#25](https://github.com/Fszta/dbt-column-lineage/issues/25)) ([f9a88a6](https://github.com/Fszta/dbt-column-lineage/commit/f9a88a6f0f3e299f11c498b2aad56a533408d4fd))
+* add search input and filtering to column selector ([ab6c8c2](https://github.com/Fszta/dbt-column-lineage/commit/ab6c8c294612132f8f4ad9528c0efa710fabd170))
+* add strip_sql_comments utility function ([28cdf95](https://github.com/Fszta/dbt-column-lineage/commit/28cdf95dffa5090d63dcafcd7bf6f144232dbec6))
+* improve SQL parser with forward references, EXCLUDE clause, and nested subquery support ([#24](https://github.com/Fszta/dbt-column-lineage/issues/24)) ([4a2bc73](https://github.com/Fszta/dbt-column-lineage/commit/4a2bc739c64596bf201d7a94b3b0cd4e94013a1e))
+
+
+### Bug Fixes
+
+* handle uppercase source ([85abcee](https://github.com/Fszta/dbt-column-lineage/commit/85abcee2f9ee9afb5469a057cb760aad596aa033))
+* non deterministic behavior ([7b27132](https://github.com/Fszta/dbt-column-lineage/commit/7b271326f40bbb758a087a75cde9ca8201453e26))
+* strip SQL comments in parser ([db91629](https://github.com/Fszta/dbt-column-lineage/commit/db9162911f943e57776511fc58d8a5cb340d9025))
+* strip SQL comments in service layer ([4f617c4](https://github.com/Fszta/dbt-column-lineage/commit/4f617c40e35c06ef7f4791390b26e0d799a1f863))
+
 ## [0.5.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.4.0...v0.5.0) (2025-11-16)
 
 
