@@ -164,3 +164,61 @@ function createExposureEdgePath(d, state, config) {
              ${controlX2},${targetY}
              ${targetX},${targetY}`;
 }
+
+let tooltip = null;
+
+function createTooltip() {
+    if (tooltip) return tooltip;
+
+    tooltip = d3.select('body')
+        .append('div')
+        .attr('class', 'column-tooltip')
+        .style('position', 'absolute')
+        .style('opacity', 0)
+        .style('pointer-events', 'none')
+        .style('background', 'rgba(0, 0, 0, 0.85)')
+        .style('color', 'white')
+        .style('padding', '6px 10px')
+        .style('border-radius', '4px')
+        .style('font-size', '12px')
+        .style('white-space', 'nowrap')
+        .style('z-index', '10000')
+        .style('box-shadow', '0 2px 8px rgba(0, 0, 0, 0.2)');
+
+    return tooltip;
+}
+
+function showTooltip(event, text) {
+    const tooltip = createTooltip();
+
+    // Get coordinates - handle both MouseEvent and D3 event objects
+    let x, y;
+    if (event.pageX !== undefined && event.pageY !== undefined) {
+        x = event.pageX;
+        y = event.pageY;
+    } else if (event.clientX !== undefined && event.clientY !== undefined) {
+        x = event.clientX + window.scrollX;
+        y = event.clientY + window.scrollY;
+    } else {
+        // Fallback - try to get from sourceEvent
+        const sourceEvent = event.sourceEvent || event;
+        x = (sourceEvent.pageX || sourceEvent.clientX || 0) + (window.scrollX || 0);
+        y = (sourceEvent.pageY || sourceEvent.clientY || 0) + (window.scrollY || 0);
+    }
+
+    tooltip
+        .text(text)
+        .style('left', (x + 10) + 'px')
+        .style('top', (y - 10) + 'px')
+        .transition()
+        .duration(200)
+        .style('opacity', 1);
+}
+
+function hideTooltip() {
+    if (tooltip) {
+        tooltip.transition()
+            .duration(200)
+            .style('opacity', 0);
+    }
+}
