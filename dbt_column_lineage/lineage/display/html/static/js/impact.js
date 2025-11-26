@@ -109,38 +109,76 @@ const ImpactModule = (function() {
                             </div>
                         </div>
                     </div>
-                    <div class="columns-list">
+                    <div class="model-groups-list">
             `;
 
+            // Group columns by model
+            const columnsByModel = {};
             criticalColumns.forEach(col => {
                 const colModelName = col.model || 'unknown';
-                const colColumnName = col.column || 'unknown';
-                const transformationType = col.transformation_type || 'unknown';
-                const modelInfo = affectedModels.find(m => m.name === colModelName);
+                if (!columnsByModel[colModelName]) {
+                    columnsByModel[colModelName] = [];
+                }
+                columnsByModel[colModelName].push(col);
+            });
+
+            // Sort models alphabetically for consistent display
+            const sortedModelNames = Object.keys(columnsByModel).sort();
+
+            sortedModelNames.forEach((modelName, modelIndex) => {
+                const modelColumns = columnsByModel[modelName];
+                const modelInfo = affectedModels.find(m => m.name === modelName);
+                const modelId = `model-group-${modelIndex}`;
 
                 html += `
-                    <div class="column-card critical-card">
-                        <div class="column-card-header">
-                            <div class="column-card-title">
-                                <span class="column-model">${colModelName}</span>
-                                <span class="column-separator">.</span>
-                                <span class="column-name-bold">${colColumnName}</span>
+                    <div class="model-group">
+                        <div class="model-group-header" data-model-group-id="${modelId}" data-collapsed="true">
+                            <div class="model-group-title">
+                                <span class="model-group-toggle-icon" id="${modelId}-icon">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </span>
+                                <span class="model-group-name">${modelName}</span>
+                                <span class="model-group-count">${modelColumns.length} transformation${modelColumns.length !== 1 ? 's' : ''}</span>
                             </div>
-                            <span class="transformation-badge critical-transformation">${transformationType}</span>
                         </div>
-                        ${col.sql_expression ? `
-                            <div class="column-card-body">
-                                <div class="sql-expression-card">
-                                    <div class="sql-expression-label">Transformation Logic</div>
-                                    <code class="sql-expression-code">${escapeHtml(col.sql_expression)}</code>
+                        <div class="model-group-content collapsed" id="${modelId}">
+                            <div class="columns-list">
+                `;
+
+                modelColumns.forEach(col => {
+                    const colColumnName = col.column || 'unknown';
+                    const transformationType = col.transformation_type || 'unknown';
+
+                    html += `
+                        <div class="column-card critical-card">
+                            <div class="column-card-header">
+                                <div class="column-card-title">
+                                    <span class="column-name-bold">${colColumnName}</span>
                                 </div>
+                                <span class="transformation-badge critical-transformation">${transformationType}</span>
                             </div>
-                        ` : ''}
-                        ${modelInfo && modelInfo.schema_name ? `
-                            <div class="column-card-footer">
-                                <span class="schema-info">${modelInfo.database || ''}.${modelInfo.schema_name}</span>
+                            ${col.sql_expression ? `
+                                <div class="column-card-body">
+                                    <div class="sql-expression-card">
+                                        <div class="sql-expression-label">Transformation Logic</div>
+                                        <code class="sql-expression-code">${escapeHtml(col.sql_expression)}</code>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${modelInfo && modelInfo.schema_name ? `
+                                <div class="column-card-footer">
+                                    <span class="schema-info">${modelInfo.database || ''}.${modelInfo.schema_name}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+
+                html += `
                             </div>
-                        ` : ''}
+                        </div>
                     </div>
                 `;
             });
@@ -318,6 +356,37 @@ const ImpactModule = (function() {
                 if (columnsList) {
                     columnsList.classList.toggle('collapsed');
                     this.textContent = columnsList.classList.contains('collapsed') ? 'Show' : 'Hide';
+                }
+            });
+        });
+
+        const modelGroupHeaders = impactContent.querySelectorAll('.model-group-header');
+        modelGroupHeaders.forEach(header => {
+            header.addEventListener('click', function() {
+                const modelId = this.getAttribute('data-model-group-id');
+                const content = document.getElementById(modelId);
+                const icon = document.getElementById(`${modelId}-icon`);
+
+                if (content) {
+                    const isCollapsed = content.classList.contains('collapsed');
+                    content.classList.toggle('collapsed');
+                    this.setAttribute('data-collapsed', !isCollapsed);
+
+                    if (icon) {
+                        if (isCollapsed) {
+                            icon.innerHTML = `
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            `;
+                        } else {
+                            icon.innerHTML = `
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            `;
+                        }
+                    }
                 }
             });
         });
