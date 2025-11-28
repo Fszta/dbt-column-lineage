@@ -148,21 +148,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             const initialData = {{ data | tojson }};
             const isExploreMode = {% if explore_mode %}true{% else %}false{% endif %};
-
-            const closeRelationshipSummaryCard = document.getElementById('closeRelationshipSummaryCard');
-            if (closeRelationshipSummaryCard) {
-                closeRelationshipSummaryCard.addEventListener('click', function() {
-                    document.getElementById('relationshipSummaryCard').style.display = 'none';
-                });
-            }
-
-            const closeImpactAnalysisCard = document.getElementById('closeImpactAnalysisCard');
-            if (closeImpactAnalysisCard) {
-                closeImpactAnalysisCard.addEventListener('click', function() {
-                    document.getElementById('impactAnalysisCard').style.display = 'none';
-                });
-            }
-
             window.app.init(initialData, isExploreMode);
         });
     </script>
