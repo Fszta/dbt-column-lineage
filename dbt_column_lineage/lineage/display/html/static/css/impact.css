@@ -802,12 +802,17 @@
     align-items: baseline;
     gap: 4px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .column-model {
     font-size: 13px;
     color: var(--text-light);
     font-weight: 500;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .column-separator {
@@ -819,6 +824,10 @@
     font-size: 14px;
     font-weight: 700;
     color: var(--text-dark);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .transformation-badge {
@@ -829,6 +838,7 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .transformation-badge.critical-transformation {
@@ -1076,12 +1086,17 @@
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .exposure-card-name {
     font-size: 14px;
     font-weight: 700;
     color: var(--text-dark);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .exposure-card-type {
@@ -1092,6 +1107,7 @@
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
+    flex-shrink: 0;
 }
 
 .exposure-card-body {
