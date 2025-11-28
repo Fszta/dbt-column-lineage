@@ -1,36 +1,55 @@
-# DBT Column Lineage
+<div class="hero-section" markdown>
 
-Working with large dbt projects, I kept needing to answer a critical question: **"What happens if I change this column?"** Understanding the downstream impact of schema changes is essential for safe refactoring and confident deployments.
+# Understand Impact Before You Change
 
-DBT Column Lineage provides powerful **impact analysis** to help you understand which models, transformations, and dashboards will be affected before you make changes. It uses column-level data lineage as the foundation for this analysis.
+Know exactly what breaks when you modify a column. Impact analysis powered by column-level data lineage for dbt projects.
 
-## What is DBT Column Lineage?
+<div class="hero-buttons" markdown="1">
 
-DBT Column Lineage analyzes your dbt project artifacts (manifest & catalog) and compiled SQL to build column-level data lineage. This lineage enables comprehensive impact analysis, showing you exactly what breaks when you modify a column.
+[:octicons-rocket-24: Quick Start](getting-started/quickstart.md){ .md-button .md-button--primary }
+[:octicons-book-24: View Features](features/impact-analysis.md){ .md-button }
+
+</div>
+
+</div>
+
+## The Problem
+
+Working with large dbt projects, I kept needing to answer a critical question: **"What happens if I change this column?"**
+
+Understanding the downstream impact of schema changes is essential for safe refactoring and confident deployments. Without visibility into column-level dependencies, making changes becomes a risky guessing game.
+
+## The Solution
+
+DBT Column Lineage provides **impact analysis** powered by column-level data lineage. Before you modify a column, see exactly:
+
+- Which models depend on it
+- Which transformations use it (SUM, CASE, etc.)
+- Which dashboards and exposures will break
 
 ![Demo](assets/demo_lineage.gif)
 
-## Features
+## Why It Matters
 
 <div class="grid cards" markdown>
 
--   :material-chart-line:{ .lg .middle } __Impact Analysis__
+-   :material-shield-check:{ .md .middle } __Safe Refactoring__
 
     ---
 
-    Understand downstream effects of column changes before making them. See which models, transformations, and dashboards will be affected.
+    Make schema changes with confidence, knowing exactly what will be affected
 
--   :material-compass-outline:{ .lg .middle } __Interactive Explorer__
-
-    ---
-
-    A local web server with an intuitive UI to explore model and column lineage visually
-
--   :material-target:{ .lg .middle } __Column-Level Lineage__
+-   :material-speedometer:{ .md .middle } __Faster Development__
 
     ---
 
-    Track which source columns contribute to each downstream column, enabling precise impact assessment
+    Stop guessing and start building. Understand dependencies instantly
+
+-   :material-chart-line:{ .md .middle } __Impact Analysis__
+
+    ---
+
+    See the blast radius of changes before you deploy
 
 </div>
 
@@ -45,11 +64,3 @@ dbt-col-lineage --explore
 ```
 
 [:octicons-arrow-right-24: Get Started](getting-started/quickstart.md){ .md-button .md-button--primary }
-
-## Why Use Impact Analysis?
-
-- **Safe Refactoring**: Understand downstream effects of schema changes before making them
-- **Change Planning**: Identify which models and dashboards need updates
-- **Risk Assessment**: See the blast radius of column modifications
-- **Debugging**: Trace data issues to their source using column lineage
-- **Data Governance**: Track sensitive data through your pipeline
