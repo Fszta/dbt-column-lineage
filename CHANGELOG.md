@@ -1,3 +1,19 @@
+## [0.7.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.6.0...v0.7.0) (2025-11-28)
+
+
+### Features
+
+* **folder-tree:** add tooltip for truncated models ([8043352](https://github.com/Fszta/dbt-column-lineage/commit/80433521975d9f509e28abb09ed3947ed76dcbe1))
+* **impact-analysis:** group transformations by model with toggle ([60e5044](https://github.com/Fszta/dbt-column-lineage/commit/60e5044bd55bb70fa8fcee042b13c812335fad9f))
+* **lineage:** add tooltips for truncated column and model names ([fdf141e](https://github.com/Fszta/dbt-column-lineage/commit/fdf141e65facc845e2dbc70216b16fd808182281))
+* **snapshots:** add dbt snapshots support ([a84bf63](https://github.com/Fszta/dbt-column-lineage/commit/a84bf6314e07b29547e1c830aa17185f4492d16d))
+
+
+### Bug Fixes
+
+* **impact-analysis:** close buttons for impact/relationship summary cards ([6b9ddf1](https://github.com/Fszta/dbt-column-lineage/commit/6b9ddf127677037d8aecb949b700131027236dce))
+* **impact-analysis:** truncate long names and fix badge pos ([f9e77b2](https://github.com/Fszta/dbt-column-lineage/commit/f9e77b283fa14294f9e6d913bcc57121216a2fab))
+
 ## [0.6.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.5.0...v0.6.0) (2025-11-26)
 
 
