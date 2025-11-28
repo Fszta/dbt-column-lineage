@@ -172,7 +172,11 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('rx', 8)
         .attr('ry', 8)
         .style('fill', 'white')
-        .style('stroke', '#e2e8f0')
+        .style('stroke', d => {
+            const modelType = d.type || 'model';
+            if (modelType === 'snapshot') return '#fbbf24';
+            return '#e2e8f0';
+        })
         .style('stroke-width', 1);
 
     const foregroundGroup = modelGroups.append('g')
@@ -190,6 +194,7 @@ function drawModels(g, state, config, dragBehavior) {
             const modelType = d.type || 'model';
             if (modelType === 'source') return '#f0f4f8';
             if (modelType === 'seed') return '#f0f8f4';
+            if (modelType === 'snapshot') return '#fefce8';
             return '#f8fafc';
         })
         .style('stroke', 'none');
@@ -212,6 +217,7 @@ function drawModels(g, state, config, dragBehavior) {
             const modelType = d.type || 'model';
             if (modelType === 'source') return '#4a6fa5';
             if (modelType === 'seed') return '#4caf50';
+            if (modelType === 'snapshot') return '#eab308';
             return '#4a6fa5';
         })
         .attr('stroke-width', '2')
@@ -223,6 +229,11 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('class', 'model-title')
         .attr('x', 44)
         .attr('y', config.box.titleHeight / 2 + 5)
+        .style('fill', d => {
+            const modelType = d.type || 'model';
+            if (modelType === 'snapshot') return '#ca8a04';
+            return null;
+        })
         .text(d => d.name)
         .each(function(d) {
             // Truncate text if too long (leave space for expand icon)
@@ -378,7 +389,11 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('width', config.box.width - 2)
         .attr('height', 28)
         .attr('x', 1)
-        .attr('fill', d => d.type === 'source' ? '#e9f0fa' : '#f1f5f9')
+        .attr('fill', d => {
+            if (d.type === 'source') return '#e9f0fa';
+            if (d.type === 'snapshot') return '#fef9c3';
+            return '#f1f5f9';
+        })
         .style('stroke', 'none');
 
     columnsHeader.append('text')

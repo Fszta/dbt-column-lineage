@@ -119,7 +119,7 @@ def test_derived_columns_lineage(registry):
         assert column.lineage, f"No lineage found for {model_name}.{column_name}"
 
         assert any(
-            l.transformation_type == expected_type for l in column.lineage
+            lineage.transformation_type == expected_type for lineage in column.lineage
         ), f"{model_name}.{column_name} should have {expected_type} transformation"
 
 
@@ -199,6 +199,49 @@ def test_source_model_types(registry):
         assert (
             node.resource_type == expected_type
         ), f"{node_name} should be a {expected_type}, got {node.resource_type}"
+
+
+def test_snapshot_support(registry):
+    """Test that snapshots are loaded and have correct dependencies."""
+    models = registry.get_models()
+
+    snapshot_name = "accounts_snapshot"
+    if snapshot_name not in models:
+        snapshots = {
+            name: model for name, model in models.items() if model.resource_type == "snapshot"
+        }
+        if not snapshots:
+            pytest.skip("No snapshots found in registry. Ensure dbt snapshot has been run.")
+        else:
+            snapshot_name = list(snapshots.keys())[0]
+            snapshot = snapshots[snapshot_name]
+    else:
+        snapshot = models[snapshot_name]
+
+    assert (
+        snapshot.resource_type == "snapshot"
+    ), f"{snapshot_name} should have resource_type 'snapshot', got {snapshot.resource_type}"
+
+    assert (
+        "stg_accounts" in snapshot.upstream
+    ), f"{snapshot_name} should depend on stg_accounts, got upstream: {snapshot.upstream}"
+
+    stg_accounts = models["stg_accounts"]
+    assert (
+        snapshot_name in stg_accounts.downstream
+    ), f"stg_accounts should have {snapshot_name} as downstream dependency, got downstream: {stg_accounts.downstream}"
+
+    assert len(snapshot.columns) > 0, f"{snapshot_name} should have columns"
+    assert "account_id" in snapshot.columns, f"{snapshot_name} should have account_id column"
+    assert (
+        "account_holder" in snapshot.columns
+    ), f"{snapshot_name} should have account_holder column"
+    assert "country_id" in snapshot.columns, f"{snapshot_name} should have country_id column"
+
+    assert snapshot.resource_path is not None, f"{snapshot_name} should have resource_path"
+    assert (
+        "snapshots" in snapshot.resource_path
+    ), f"resource_path should include snapshots directory, got {snapshot.resource_path}"
 
 
 def test_source_dependencies(registry):

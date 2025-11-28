@@ -1216,6 +1216,11 @@ svg {
     filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.3));
 }
 
+.snapshot-icon {
+    color: #eab308;
+    filter: drop-shadow(0 0 4px rgba(234, 179, 8, 0.3));
+}
+
 .node-content:hover .tree-icon {
     transform: scale(1.1);
     filter: drop-shadow(0 0 8px currentColor);

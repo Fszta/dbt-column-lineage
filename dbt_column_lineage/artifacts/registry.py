@@ -119,6 +119,9 @@ class ModelRegistry:
         """Process and apply column lineage to models."""
         logger = logging.getLogger(__name__)
 
+        if self._sql_parser is None:
+            raise RegistryError("SQL parser not initialized. Call load() first.")
+
         successful_parses = 0
         failed_parses = 0
         skipped_models = 0

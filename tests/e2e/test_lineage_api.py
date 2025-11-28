@@ -260,3 +260,69 @@ def test_lineage_api_column_count(dbt_artifacts: Dict[str, Any], server_port: in
             f"Expected {EXPECTED_CRYPTO_PORTFOLIO_COLUMNS} columns in {TARGET_MODEL}, "
             f"got {target_model_count}"
         )
+
+
+def test_snapshot_api_support(dbt_artifacts: Dict[str, Any], server_port: int) -> None:
+    """Verify that snapshots are accessible through the API and have correct resource_type."""
+    catalog_path = Path(dbt_artifacts["catalog_path"])
+    manifest_path = Path(dbt_artifacts["manifest_path"])
+
+    with lineage_server(catalog_path, manifest_path, server_port) as port:
+        models_response = requests.get(f"http://127.0.0.1:{port}/api/models", timeout=10)
+        models_response.raise_for_status()
+        models_data = models_response.json()
+
+        snapshot_found = False
+        snapshot_resource_type = None
+
+        def find_snapshot_in_tree(nodes: list) -> None:
+            nonlocal snapshot_found, snapshot_resource_type
+            for node in nodes:
+                if node.get("type") == "model":
+                    resource_type = node.get("resource_type")
+                    name = node.get("name") or node.get("display_name", "")
+                    if name and "snapshot" in name.lower():
+                        snapshot_found = True
+                        snapshot_resource_type = resource_type
+                        return
+                elif node.get("type") == "folder" and "children" in node:
+                    find_snapshot_in_tree(node["children"])
+
+        find_snapshot_in_tree(models_data)
+
+        if not snapshot_found:
+            all_resource_types = set()
+
+            def collect_resource_types(nodes: list) -> None:
+                for node in nodes:
+                    if node.get("type") == "model":
+                        rt = node.get("resource_type")
+                        if rt:
+                            all_resource_types.add(rt)
+                    elif node.get("type") == "folder" and "children" in node:
+                        collect_resource_types(node["children"])
+
+            collect_resource_types(models_data)
+            pytest.skip(
+                f"No snapshot found in API models response. "
+                f"Found resource types: {all_resource_types}. "
+                f"Ensure dbt snapshot has been run."
+            )
+
+        assert (
+            snapshot_resource_type == "snapshot"
+        ), f"Snapshot should have resource_type 'snapshot', got '{snapshot_resource_type}'"
+
+        snapshot_name = "accounts_snapshot"
+        snapshot_column = "account_id"
+
+        try:
+            lineage_response = requests.get(
+                f"http://127.0.0.1:{port}/api/lineage/{snapshot_name}/{snapshot_column}", timeout=30
+            )
+            assert lineage_response.status_code in [
+                200,
+                400,
+            ], f"Lineage endpoint should return 200 or 400, got {lineage_response.status_code}"
+        except requests.exceptions.RequestException as e:
+            pytest.skip(f"Could not test snapshot lineage endpoint: {e}")

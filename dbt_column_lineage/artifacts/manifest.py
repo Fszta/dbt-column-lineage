@@ -50,7 +50,8 @@ class ManifestReader:
         upstream: Dict[str, Set[str]] = {}
 
         for _, node in self.manifest.get("nodes", {}).items():
-            if node.get("resource_type") == "model":
+            resource_type = node.get("resource_type")
+            if resource_type in ("model", "snapshot"):
                 model_name = node.get("name")
                 if not model_name:
                     continue
@@ -73,6 +74,9 @@ class ManifestReader:
                             # Fallback to source name if identifier not found
                             source_name = parts[-1].lower()
                             upstream[model_name].add(source_name)
+                    elif parts[0] == "snapshot":
+                        dep_name = parts[-1].lower()
+                        upstream[model_name].add(dep_name)
 
         return upstream
 
@@ -163,6 +167,9 @@ class ManifestReader:
                     else:
                         source_name = parts[-1].lower()
                         exposure_deps[exposure_name].add(source_name)
+                elif parts[0] == "snapshot":
+                    dep_name = parts[-1].lower()
+                    exposure_deps[exposure_name].add(dep_name)
 
         return exposure_deps
 
