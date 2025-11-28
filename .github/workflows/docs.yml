@@ -3,6 +3,9 @@ name: Deploy Documentation
 on:
   release:
     types: [published]
+  repository_dispatch:
+    types: [trigger-docs]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,4 +37,3 @@ jobs:
           publish_branch: gh-pages
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
-
