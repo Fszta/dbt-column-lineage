@@ -40,6 +40,29 @@ const ExploreModule = (function() {
             .replace('timestamp with time zone', 'timestamptz');
     }
 
+    let tooltipElement = null;
+
+    function setupTooltip(nodeContent, span, labelText) {
+        if (!tooltipElement) {
+            tooltipElement = document.createElement('div');
+            tooltipElement.style.cssText = 'position:absolute;background:rgba(0,0,0,0.85);color:white;padding:6px 10px;border-radius:4px;font-size:12px;white-space:nowrap;z-index:10000;pointer-events:none;opacity:0;transition:opacity 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.2)';
+            document.body.appendChild(tooltipElement);
+        }
+
+        nodeContent.addEventListener('mouseenter', (e) => {
+            if (span.scrollWidth > span.clientWidth) {
+                tooltipElement.textContent = labelText;
+                tooltipElement.style.left = (e.pageX || e.clientX + window.scrollX) + 10 + 'px';
+                tooltipElement.style.top = (e.pageY || e.clientY + window.scrollY) - 10 + 'px';
+                tooltipElement.style.opacity = '1';
+            }
+        });
+
+        nodeContent.addEventListener('mouseleave', () => {
+            tooltipElement.style.opacity = '0';
+        });
+    }
+
     function renderTree(nodes, container, level = 0) {
         const ul = document.createElement('ul');
         ul.classList.add('model-tree');
@@ -57,7 +80,8 @@ const ExploreModule = (function() {
             iconContainer.classList.add('icon-container');
 
             const span = document.createElement('span');
-            span.textContent = node.type === 'model' ? node.display_name : node.name;
+            const labelText = node.type === 'model' ? node.display_name : node.name;
+            span.textContent = labelText;
             span.classList.add('node-label');
 
             if (node.type === 'folder') {
@@ -94,6 +118,7 @@ const ExploreModule = (function() {
                     nodeContent.appendChild(iconContainer);
                     nodeContent.appendChild(span);
                     li.appendChild(nodeContent);
+                    setupTooltip(nodeContent, span, labelText);
 
                     nodeContent.addEventListener('click', () => {
                         document.querySelectorAll('.model-tree .node-content.selected').forEach(el => el.classList.remove('selected'));
@@ -129,6 +154,7 @@ const ExploreModule = (function() {
                     nodeContent.appendChild(span);
                     li.appendChild(nodeContent);
                     span.dataset.modelName = node.model_name;
+                    setupTooltip(nodeContent, span, labelText);
 
                     nodeContent.addEventListener('click', () => {
                         document.querySelectorAll('.model-tree .node-content.selected').forEach(el => el.classList.remove('selected'));
