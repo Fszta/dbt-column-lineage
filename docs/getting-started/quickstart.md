@@ -41,77 +41,30 @@ dbt-col-lineage --explore \
     --port 8080  # Optional, defaults to 8000
 ```
 
-This starts a local web server where you can explore your lineage interactively.
+This starts a local web server where you can explore your lineage interactively and perform impact analysis.
 
-## Static Analysis
+## Impact Analysis Workflow
 
-For terminal output or documentation, use static analysis:
+1. **Select a column**: Choose a model and column from the sidebar
+2. **Load lineage**: The graph will show how data flows through your transformations
+3. **Analyze impact**: Click "Analyze Impact" to see:
+   - Which models depend on this column
+   - Which transformations use this column (and may need review)
+   - Which dashboards and exposures will be impacted
 
-### Text Format
-
-```bash
-# Show all dependencies for a model
-dbt-col-lineage --select my_model --format text
-
-# Show downstream dependencies for a specific column
-dbt-col-lineage --select stg_orders.order_id+ --format text
-
-# Show upstream dependencies for a column
-dbt-col-lineage --select +final_table.revenue --format text
-```
-
-### DOT Format (GraphViz)
-
-Generate DOT files that can be rendered as images:
-
-```bash
-dbt-col-lineage --select my_model --format dot --output my_lineage
-```
-
-Then render with GraphViz:
-
-```bash
-# Install GraphViz (if needed)
-# macOS: brew install graphviz
-# Ubuntu/Debian: sudo apt-get install graphviz
-
-# Render as PNG
-dot -Tpng my_lineage.dot -o my_lineage.png
-
-# Render as SVG
-dot -Tsvg my_lineage.dot -o my_lineage.svg
-```
-
-## Selection Syntax
-
-The selection syntax follows this pattern: `[+]model_name[.column_name][+]`
-
-| Syntax | Meaning | Example |
-|--------|---------|---------|
-| `model` | Both directions | `stg_orders` |
-| `+model` | Upstream only | `+stg_orders` |
-| `model+` | Downstream only | `stg_orders+` |
-| `model.column` | Column-level | `stg_orders.order_id` |
-| `+model.column` | Upstream column | `+fct_orders.total_revenue` |
-| `model.column+` | Downstream column | `stg_transactions.amount+` |
+This helps you understand the downstream effects of column changes before you make them.
 
 ## Common Use Cases
 
-**Trace a column's origins:**
-```bash
-dbt-col-lineage --select +orders.total_amount --format text
-```
+**Before modifying a column:**
+- Understand which transformations depend on it
+- Identify which dashboards need updates
+- Plan your change strategy
 
-**Understand impact of changes:**
-```bash
-dbt-col-lineage --select stg_customers.email+ --format text
-```
+**During refactoring:**
+- Track the blast radius of schema changes
+- Prioritize which models to update first
+- Ensure no downstream dependencies are missed
 
-**Generate documentation diagram:**
-```bash
-dbt-col-lineage --select dim_customers --format dot --output customers_lineage
-dot -Tsvg customers_lineage.dot -o customers_lineage.svg
-```
-
-!!! warning "Column Names Are Case-Sensitive"
-    Make sure to use the exact column name as it appears in your dbt models.
+!!! tip "Learn More"
+    Check out the [Impact Analysis](../features/impact-analysis.md) guide for detailed information about using this feature.

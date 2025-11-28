@@ -1,7 +1,7 @@
 [project]
 name = "dbt-col-lineage"
 version = "0.6.0"
-description = "A simple tool to extract dbt column lineage"
+description = "Impact analysis for dbt projects using column-level data lineage"
 authors = [
     {name = "Fszta"}
 ]

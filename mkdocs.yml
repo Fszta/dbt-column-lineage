@@ -1,5 +1,5 @@
 site_name: DBT Column Lineage
-site_description: Visualize and understand column-level data lineage in your dbt projects
+site_description: Impact analysis for dbt projects using column-level data lineage
 site_url: https://fszta.github.io/dbt-column-lineage/
 repo_url: https://github.com/Fszta/dbt-column-lineage
 repo_name: Fszta/dbt-column-lineage
@@ -11,26 +11,16 @@ extra:
       link: https://github.com/Fszta/dbt-column-lineage
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/dbt-col-lineage/
+  generator: false
 
 theme:
   name: material
   logo: assets/logo.svg
   favicon: assets/favicon.svg
   palette:
-    # Light mode
     - scheme: default
-      primary: teal
-      accent: deep orange
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    # Dark mode
-    - scheme: slate
-      primary: teal
-      accent: deep orange
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
+      primary: indigo
+      accent: deep purple
   font:
     text: Roboto
     code: Roboto Mono
@@ -50,8 +40,12 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
+extra_css:
+  - stylesheets/custom.css
+
 plugins:
-  - search
+  - search:
+      lang: en
 
 markdown_extensions:
   - pymdownx.highlight:

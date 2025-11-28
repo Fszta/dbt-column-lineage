@@ -1,10 +1,12 @@
 # Impact Analysis
 
-Understand the downstream effects of changing a column before you make the change.
+**The core feature of DBT Column Lineage** - understand the downstream effects of changing a column before you make the change.
 
 ## Overview
 
-Impact Analysis helps you answer the critical question: **"What happens if I change this column?"**
+Impact Analysis is the primary reason to use DBT Column Lineage. It helps you answer the critical question: **"What happens if I change this column?"**
+
+Column-level lineage is the tool that enables this analysis. By tracking how data flows through your transformations at the column level, we can show you exactly what will be affected when you modify a column.
 
 When you select a column in the Interactive Explorer, you can analyze its impact across your entire dbt project. This feature shows you:
 
@@ -50,4 +52,3 @@ The impact analysis categorizes columns into:
 - Track the blast radius of schema changes
 - Prioritize which models to update first
 - Ensure no downstream dependencies are missed
-
