@@ -52,7 +52,7 @@ class Model(BaseModel):
     downstream: Set[str] = Field(default_factory=set)
     compiled_sql: Optional[str] = None
     language: Optional[str] = None
-    resource_type: Literal["model", "source", "seed", "test", "exposure"]
+    resource_type: Literal["model", "source", "seed", "test", "exposure", "snapshot"]
     resource_path: Optional[str] = None
     source_identifier: Optional[str] = None
     source_name: Optional[str] = None

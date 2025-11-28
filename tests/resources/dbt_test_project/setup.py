@@ -85,7 +85,7 @@ def setup_dbt_project(project_dir: Path) -> Dict[str, Any]:
 
         conn.close()
 
-        commands = [["run"], ["docs", "generate"]]
+        commands = [["run"], ["snapshot"], ["docs", "generate"]]
 
         for cmd in commands:
             print(f"\nRunning dbt {' '.join(cmd)}")
