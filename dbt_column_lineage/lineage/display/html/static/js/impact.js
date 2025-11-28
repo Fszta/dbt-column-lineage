@@ -552,8 +552,24 @@ const ImpactModule = (function() {
         });
     }
 
+    function setupCardCloseButtons() {
+        document.getElementById('graph')?.addEventListener('click', function(e) {
+            const btn = e.target.closest('button[id^="close"]');
+            if (!btn) return;
+
+            const cardMap = {
+                'closeRelationshipSummaryCard': 'relationshipSummaryCard',
+                'closeImpactAnalysisCard': 'impactAnalysisCard'
+            };
+
+            const card = document.getElementById(cardMap[btn.id]);
+            if (card) card.style.display = 'none';
+        });
+    }
+
     function init() {
         setupImpactPanel();
+        setupCardCloseButtons();
     }
 
     return {
