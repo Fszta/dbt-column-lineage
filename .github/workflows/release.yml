@@ -67,3 +67,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: trigger-publish
+
+      - name: Trigger docs deployment
+        if: steps.changelog.outputs.skipped != 'true'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: trigger-docs
