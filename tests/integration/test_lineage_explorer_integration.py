@@ -127,3 +127,24 @@ def test_lineage_without_impact_summary(lineage_service):
     assert "edges" in data, "Lineage edges should still be present"
     assert len(data["nodes"]) > 0, "Should have nodes even when impact_summary is None"
     assert len(data["edges"]) > 0, "Should have edges even when impact_summary is None"
+
+
+def test_upstream_lineage_returns_full_chain(lineage_service):
+    """Test that upstream lineage returns the full chain, not just direct dependencies."""
+    upstream = lineage_service._get_upstream_lineage("transactions", "country_name")
+
+    assert "stg_countries" in upstream
+    assert "country_name" in upstream["stg_countries"]
+    assert "raw_countries" in upstream
+    assert "name" in upstream["raw_countries"]
+
+
+def test_upstream_lineage_source_columns_point_to_actual_sources(lineage_service):
+    """Test that source_columns point to actual sources, not self."""
+    upstream = lineage_service._get_upstream_lineage("transactions", "country_name")
+
+    stg_lineage = upstream["stg_countries"]["country_name"]
+    source_cols = stg_lineage.source_columns
+
+    assert "stg_countries.country_name" not in source_cols
+    assert any("raw_countries" in src for src in source_cols)

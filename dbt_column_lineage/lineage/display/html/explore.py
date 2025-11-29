@@ -391,6 +391,30 @@ class LineageExplorer:
             ):
                 self.data.edges.append(edge)
 
+        if direction == "upstream" and main_node_id and self.lineage_service:
+            try:
+                if self._start_model and self._start_column:
+                    model_obj = self.lineage_service.registry.get_model(self._start_model)
+                    col_obj = model_obj.columns.get(self._start_column)
+                    if col_obj and col_obj.lineage:
+                        for lin in col_obj.lineage:
+                            for source in lin.source_columns:
+                                split_result = self._split_qualified_name(source)
+                                if split_result:
+                                    src_model, src_col = split_result
+                                    src_node_id = f"col_{src_model}_{src_col}"
+                                    edge = GraphEdge(
+                                        source=src_node_id, target=main_node_id
+                                    ).model_dump()
+                                    if not any(
+                                        e["source"] == edge["source"]
+                                        and e["target"] == edge["target"]
+                                        for e in self.data.edges
+                                    ):
+                                        self.data.edges.append(edge)
+            except Exception as e:
+                logger.debug(f"Could not create main_node upstream edges: {e}")
+
         if direction == "downstream" and self.lineage_service:
             try:
                 if "exposures" not in refs or not isinstance(refs["exposures"], set):
@@ -598,10 +622,15 @@ class LineageExplorer:
                     node_ids.add(col_node_id)
 
                 if direction == "upstream" and hasattr(lineage, "source_columns"):
-                    target_id = main_node_id if main_node_id else col_node_id
-                    self._process_source_columns(
-                        lineage.source_columns, target_id, refs, nodes, edges, node_ids
-                    )
+                    filtered_sources = [
+                        src
+                        for src in lineage.source_columns
+                        if not src.lower().endswith(f"{model_name}.{col_name}".lower())
+                    ]
+                    if filtered_sources:
+                        self._process_source_columns(
+                            filtered_sources, col_node_id, refs, nodes, edges, node_ids
+                        )
                 elif direction == "downstream" and hasattr(lineage, "source_columns"):
                     self._add_downstream_edges(lineage.source_columns, col_node_id, edges)
 

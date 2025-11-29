@@ -144,6 +144,24 @@ class LineageService:
         """Process a source reference and add it to upstream_refs."""
         upstream_refs.sources.add(source)
 
+    def _merge_upstream_refs(
+        self,
+        target: LineageReferences,
+        source_dict: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]],
+    ) -> None:
+        """Merge source refs dict into target LineageReferences."""
+        for key, value in source_dict.items():
+            if key == "sources" and isinstance(value, set):
+                target.sources.update(value)
+            elif key == "direct_refs" and isinstance(value, set):
+                target.direct_refs.update(value)
+            elif key == "exposures" and isinstance(value, set):
+                target.exposures.update(value)
+            elif isinstance(value, dict):
+                if key not in target.models:
+                    target.models[key] = {}
+                target.models[key].update(value)
+
     def _process_model_reference(
         self,
         src_model: str,
@@ -154,14 +172,19 @@ class LineageService:
     ) -> None:
         """Process a model reference and add it to upstream_refs."""
         try:
-            self.registry.get_model(src_model)
+            model_obj = self.registry.get_model(src_model)
 
             if src_model not in upstream_refs.models:
                 upstream_refs.models[src_model] = {}
 
-            upstream_refs.models[src_model][src_column] = lineage
+            col_obj = model_obj.columns.get(src_column)
+            if col_obj and col_obj.lineage:
+                upstream_refs.models[src_model][src_column] = col_obj.lineage[0]
+            else:
+                upstream_refs.models[src_model][src_column] = lineage
 
-            self._get_upstream_lineage(src_model, src_column, visited)
+            recursive_refs = self._get_upstream_lineage(src_model, src_column, visited)
+            self._merge_upstream_refs(upstream_refs, recursive_refs)
 
         except Exception:
             self._process_source_reference(f"{src_model}.{src_column}", upstream_refs)
@@ -347,7 +370,11 @@ class LineageService:
                                     col.lineage,
                                     key=lambda lineage: (
                                         lineage.transformation_type,
-                                        sorted(lineage.source_columns)[0] if lineage.source_columns else "",
+                                        (
+                                            sorted(lineage.source_columns)[0]
+                                            if lineage.source_columns
+                                            else ""
+                                        ),
                                     ),
                                 )
                                 for lineage in sorted_lineage:
