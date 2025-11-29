@@ -6,7 +6,8 @@ Know exactly what breaks when you modify a column. Impact analysis powered by co
 
 <div class="hero-buttons" markdown="1">
 
-[:octicons-rocket-24: Quick Start](getting-started/quickstart.md){ .md-button .md-button--primary }
+[:octicons-rocket-24: Quick Start](getting-started/quickstart.md){ .md-button }
+[:octicons-globe-24: Live Demo](https://dbt-column-lineage.onrender.com){ .md-button .md-button--primary }
 [:octicons-book-24: View Features](features/impact-analysis.md){ .md-button }
 
 </div>

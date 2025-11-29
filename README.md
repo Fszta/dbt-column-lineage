@@ -5,7 +5,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/dbt-col-lineage?style=flat-square&logo=python)](https://pypi.org/project/dbt-col-lineage/)
 [![License](https://img.shields.io/github/license/Fszta/dbt-column-lineage?style=flat-square)](LICENSE)
 
-📖 **[Documentation](https://fszta.github.io/dbt-column-lineage/)** | 🐛 [Report Bug](https://github.com/Fszta/dbt-column-lineage/issues) | 💡 [Request Feature](https://github.com/Fszta/dbt-column-lineage/issues)
+📖 **[Documentation](https://fszta.github.io/dbt-column-lineage/)** | 🚀 [Live Demo](https://dbt-column-lineage.onrender.com) | 🐛 [Report Bug](https://github.com/Fszta/dbt-column-lineage/issues) | 💡 [Request Feature](https://github.com/Fszta/dbt-column-lineage/issues)
 
 ## Overview
 
