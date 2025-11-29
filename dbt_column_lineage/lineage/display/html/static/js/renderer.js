@@ -204,13 +204,13 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('class', 'model-icon')
         .attr('width', 24)
         .attr('height', 24)
-        .attr('x', 12)
+        .attr('x', 36)
         .attr('y', config.box.titleHeight / 2 - 12)
         .attr('viewBox', '0 0 24 24')
         .append('path')
         .attr('d', function(d) {
             const modelType = d.type || 'model';
-            return getModelIcon(modelType);
+            return getModelIcon(modelType)
         })
         .attr('fill', 'none')
         .attr('stroke', d => {
@@ -224,10 +224,10 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
 
-    // Model title text
+    // Model title text (shifted right for upstream expand icon)
     const modelTitleText = foregroundGroup.append('text')
         .attr('class', 'model-title')
-        .attr('x', 44)
+        .attr('x', 66)
         .attr('y', config.box.titleHeight / 2 + 5)
         .style('fill', d => {
             const modelType = d.type || 'model';
@@ -289,6 +289,81 @@ function drawModels(g, state, config, dragBehavior) {
         }
     });
 
+    const upstreamIconX = 20;
+    const upstreamIconY = config.box.titleHeight / 2;
+
+    const expandUpstreamIconGroup = foregroundGroup.append('g')
+        .attr('class', 'expand-upstream-icon-group')
+        .attr('data-model-name', d => d.name)
+        .style('display', d => {
+            const upstream = state.modelUpstream.get(d.name);
+            return (upstream && upstream.size > 0) ? 'block' : 'none';
+        })
+        .style('cursor', 'pointer')
+        .style('opacity', 0.7)
+        .on('mouseenter', function() { d3.select(this).style('opacity', 1); })
+        .on('mouseleave', function() { d3.select(this).style('opacity', 0.7); })
+        .on('click', function(event, d) {
+            event.stopPropagation();
+            event.preventDefault();
+            if (d && d.name) {
+                const upstream = state.modelUpstream.get(d.name);
+                if (upstream && upstream.size > 0) {
+                    let hasVisibleUpstream = false;
+                    upstream.forEach(upstreamModel => {
+                        if (state.visibleModels.has(upstreamModel)) {
+                            hasVisibleUpstream = true;
+                        }
+                    });
+                    if (hasVisibleUpstream) {
+                        if (window.collapseUpstream) window.collapseUpstream(d.name);
+                    } else {
+                        if (window.expandUpstream) window.expandUpstream(d.name);
+                    }
+                }
+            }
+        });
+
+    expandUpstreamIconGroup.append('circle')
+        .attr('cx', upstreamIconX)
+        .attr('cy', upstreamIconY)
+        .attr('r', 8)
+        .attr('fill', 'white')
+        .attr('stroke', '#64748b')
+        .attr('stroke-width', 1.5);
+
+    const upstreamPlusSize = 6;
+    expandUpstreamIconGroup.append('line')
+        .attr('class', 'expand-upstream-line')
+        .attr('x1', upstreamIconX - upstreamPlusSize / 2)
+        .attr('y1', upstreamIconY)
+        .attr('x2', upstreamIconX + upstreamPlusSize / 2)
+        .attr('y2', upstreamIconY)
+        .attr('stroke', '#64748b')
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round');
+
+    expandUpstreamIconGroup.append('line')
+        .attr('class', 'expand-upstream-line')
+        .attr('x1', upstreamIconX)
+        .attr('y1', upstreamIconY - upstreamPlusSize / 2)
+        .attr('x2', upstreamIconX)
+        .attr('y2', upstreamIconY + upstreamPlusSize / 2)
+        .attr('stroke', '#64748b')
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round');
+
+    expandUpstreamIconGroup.append('line')
+        .attr('class', 'collapse-upstream-line')
+        .attr('x1', upstreamIconX - upstreamPlusSize / 2)
+        .attr('y1', upstreamIconY)
+        .attr('x2', upstreamIconX + upstreamPlusSize / 2)
+        .attr('y2', upstreamIconY)
+        .attr('stroke', '#64748b')
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round')
+        .style('display', 'none');
+
     // Add expand/collapse icon for models with downstream dependencies
     const expandIconGroup = foregroundGroup.append('g')
         .attr('class', 'expand-icon-group')
@@ -299,17 +374,12 @@ function drawModels(g, state, config, dragBehavior) {
         })
         .style('cursor', 'pointer')
         .style('opacity', 0.7)
-        .on('mouseenter', function() {
-            d3.select(this).style('opacity', 1);
-        })
-        .on('mouseleave', function() {
-            d3.select(this).style('opacity', 0.7);
-        })
+        .on('mouseenter', function() { d3.select(this).style('opacity', 1); })
+        .on('mouseleave', function() { d3.select(this).style('opacity', 0.7); })
         .on('click', function(event, d) {
             event.stopPropagation();
             event.preventDefault();
             if (d && d.name) {
-                // Check if downstream models are visible to determine expand or collapse
                 const downstream = state.modelDownstream.get(d.name);
                 if (downstream && downstream.size > 0) {
                     let hasVisibleDownstream = false;
@@ -318,17 +388,10 @@ function drawModels(g, state, config, dragBehavior) {
                             hasVisibleDownstream = true;
                         }
                     });
-
                     if (hasVisibleDownstream) {
-                        // Collapse: hide downstream models
-                        if (window.collapseDownstream) {
-                            window.collapseDownstream(d.name);
-                        }
+                        if (window.collapseDownstream) window.collapseDownstream(d.name);
                     } else {
-                        // Expand: show downstream models
-                        if (window.expandDownstream) {
-                            window.expandDownstream(d.name);
-                        }
+                        if (window.expandDownstream) window.expandDownstream(d.name);
                     }
                 }
             }

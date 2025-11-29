@@ -77,6 +77,16 @@ function initGraph(data) {
         collapseDownstreamInternal(modelName, state, config);
     };
 
+    window.expandUpstream = function(modelName) {
+        if (!modelName || !state || !config) return;
+        expandUpstreamInternal(modelName, state, config);
+    };
+
+    window.collapseUpstream = function(modelName) {
+        if (!modelName || !state || !config) return;
+        collapseUpstreamInternal(modelName, state, config);
+    };
+
     // Filter models and edges based on visibility
     filterGraphByVisibility(state, config);
 
@@ -178,6 +188,37 @@ function updateExpandIcons(state) {
         const collapseLine = d3.select(this).select('.collapse-line');
 
         if (hasVisibleDownstream) {
+            expandLines.style('display', 'none');
+            collapseLine.style('display', 'block');
+        } else {
+            expandLines.style('display', 'block');
+            collapseLine.style('display', 'none');
+        }
+    });
+
+    d3.selectAll('.expand-upstream-icon-group').each(function() {
+        const modelName = d3.select(this).attr('data-model-name');
+        if (!modelName) return;
+
+        const upstream = state.modelUpstream.get(modelName);
+        if (!upstream || upstream.size === 0) {
+            d3.select(this).style('display', 'none');
+            return;
+        }
+
+        let hasVisibleUpstream = false;
+        upstream.forEach(upstreamModel => {
+            if (state.visibleModels.has(upstreamModel)) {
+                hasVisibleUpstream = true;
+            }
+        });
+
+        d3.select(this).style('display', 'block');
+
+        const expandLines = d3.select(this).selectAll('.expand-upstream-line');
+        const collapseLine = d3.select(this).select('.collapse-upstream-line');
+
+        if (hasVisibleUpstream) {
             expandLines.style('display', 'none');
             collapseLine.style('display', 'block');
         } else {
@@ -544,9 +585,7 @@ function collapseDownstreamInternal(modelName, state, config) {
     if (!state || !config || !modelName) return;
 
     const expandingKey = `_expanding_${modelName}`;
-    if (state[expandingKey]) {
-        return;
-    }
+    if (state[expandingKey]) return;
     state[expandingKey] = true;
 
     const allDownstreamModels = getAllDownstreamModels(modelName, state);
@@ -556,31 +595,7 @@ function collapseDownstreamInternal(modelName, state, config) {
         return;
     }
 
-    const nodesToRemove = new Set();
-
     allDownstreamModels.forEach(downstreamModel => {
-        let isReachableFromOther = false;
-
-        state.visibleModels.forEach(visibleModelName => {
-            if (visibleModelName === modelName) {
-                return;
-            }
-
-            const visibleModelDownstream = state.modelDownstream.get(visibleModelName);
-            if (visibleModelDownstream && visibleModelDownstream.has(downstreamModel)) {
-                const allVisibleModelDownstream = getAllDownstreamModels(visibleModelName, state);
-                if (allVisibleModelDownstream.has(downstreamModel)) {
-                    isReachableFromOther = true;
-                }
-            }
-        });
-
-        if (!isReachableFromOther) {
-            nodesToRemove.add(downstreamModel);
-        }
-    });
-
-    nodesToRemove.forEach(downstreamModel => {
         state.visibleModels.delete(downstreamModel);
     });
 
@@ -713,6 +728,292 @@ function collapseDownstreamInternal(modelName, state, config) {
                             .transition()
                             .duration(300)
                             .attr('d', path);
+                    }
+                }
+            } else {
+                d3.select(this).style('display', 'none');
+            }
+        });
+
+        filterGraphByVisibility(state, config);
+        state[expandingKey] = false;
+    });
+}
+
+function getAllUpstreamModels(modelName, state, visited = new Set()) {
+    if (visited.has(modelName)) return new Set();
+    visited.add(modelName);
+
+    const allUpstream = new Set();
+    const immediateUpstream = state.modelUpstream.get(modelName);
+
+    if (immediateUpstream && immediateUpstream.size > 0) {
+        immediateUpstream.forEach(upstreamModel => {
+            allUpstream.add(upstreamModel);
+            const nestedUpstream = getAllUpstreamModels(upstreamModel, state, visited);
+            nestedUpstream.forEach(model => allUpstream.add(model));
+        });
+    }
+    return allUpstream;
+}
+
+function expandUpstreamInternal(modelName, state, config) {
+    if (!state || !config || !modelName) return;
+
+    const expandingKey = `_expanding_upstream_${modelName}`;
+    if (state[expandingKey]) return;
+    state[expandingKey] = true;
+
+    const upstreamModels = state.modelUpstream.get(modelName);
+    if (!upstreamModels || upstreamModels.size === 0) {
+        state[expandingKey] = false;
+        return;
+    }
+
+    upstreamModels.forEach(upstreamModel => {
+        state.visibleModels.add(upstreamModel);
+    });
+
+    const currentTransform = state.zoom && state.svg ? d3.zoomTransform(state.svg.node()) : null;
+    const parentModel = state.models.find(m => m && m.name === modelName);
+
+    let defaultX, defaultY;
+    if (parentModel && typeof parentModel.x === 'number' && !isNaN(parentModel.x) &&
+        typeof parentModel.y === 'number' && !isNaN(parentModel.y)) {
+        defaultX = parentModel.x - config.box.width - config.layout.xSpacing;
+        defaultY = parentModel.y;
+    } else {
+        defaultX = config.box.padding;
+        defaultY = config.box.padding;
+    }
+
+    const avgHeight = config.box.titleHeight + 28 + config.box.padding;
+    let currentYTop = defaultY - avgHeight / 2;
+
+    upstreamModels.forEach((upstreamModel) => {
+        let item = state.models.find(m => m && m.name === upstreamModel);
+        if (item) {
+            if (!item.height || isNaN(item.height)) {
+                item.columnsCollapsed = item.columnsCollapsed || false;
+                item.height = config.box.titleHeight + 28 +
+                    ((item.columns && item.columns.length) ? (item.columns.length * config.box.columnHeight) : 0) +
+                    config.box.padding;
+                if (item.columnsCollapsed) item.height = config.box.titleHeight + 28;
+            }
+
+            const hasValidPosition = typeof item.x === 'number' && !isNaN(item.x) &&
+                typeof item.y === 'number' && !isNaN(item.y) &&
+                !(item.x === 0 && item.y === 0);
+
+            if (!hasValidPosition) {
+                item.x = defaultX;
+                item.y = currentYTop + item.height / 2;
+                currentYTop = currentYTop + item.height + config.layout.ySpacing;
+            } else {
+                const itemTop = item.y - item.height / 2;
+                const itemBottom = itemTop + item.height;
+                if (itemBottom > currentYTop) {
+                    currentYTop = itemBottom + config.layout.ySpacing;
+                }
+            }
+        }
+    });
+
+    state.models.forEach(model => {
+        if (model && state.visibleModels.has(model.name)) {
+            if (!model.height || isNaN(model.height)) {
+                model.columnsCollapsed = model.columnsCollapsed || false;
+                model.height = config.box.titleHeight + 28 +
+                    ((model.columns && model.columns.length) ? (model.columns.length * config.box.columnHeight) : 0) +
+                    config.box.padding;
+                if (model.columnsCollapsed) model.height = config.box.titleHeight + 28;
+            }
+
+            if (typeof model.x !== 'number' || isNaN(model.x) ||
+                typeof model.y !== 'number' || isNaN(model.y) ||
+                (model.x === 0 && model.y === 0)) {
+                model.x = defaultX;
+                model.y = defaultY;
+            }
+        }
+    });
+
+    if (currentTransform && state.zoom && state.svg &&
+        !isNaN(currentTransform.x) && !isNaN(currentTransform.y) &&
+        !isNaN(currentTransform.k) && currentTransform.k > 0) {
+        state.svg.call(state.zoom.transform, currentTransform);
+    }
+
+    d3.selectAll('.model:not(.model-exposure)').each(function(d) {
+        if (!d || !d.name) return;
+
+        const isVisible = state.visibleModels.has(d.name);
+        const wasVisible = d3.select(this).style('display') !== 'none';
+
+        if (isVisible && (typeof d.x !== 'number' || isNaN(d.x) ||
+            typeof d.y !== 'number' || isNaN(d.y) ||
+            typeof d.height !== 'number' || isNaN(d.height))) {
+            state.visibleModels.delete(d.name);
+            d3.select(this).style('display', 'none');
+            return;
+        }
+
+        if (isVisible && !wasVisible) {
+            const modelEl = d3.select(this);
+            modelEl
+                .style('display', 'block')
+                .attr('transform', d => `translate(${d.x},${d.y - d.height/2})`)
+                .style('opacity', 0);
+            modelEl.transition().duration(300).style('opacity', 1);
+        } else if (isVisible) {
+            d3.select(this).style('display', 'block');
+        } else {
+            d3.select(this).style('display', 'none');
+        }
+    });
+
+    requestAnimationFrame(() => {
+        d3.selectAll('.model:not(.model-exposure)').filter(d => d && d.name && state.visibleModels.has(d.name)).each(function(d) {
+            if (d.columns && Array.isArray(d.columns)) {
+                d.columns.forEach((col, i) => {
+                    const columnCenter = {
+                        x: d.x,
+                        y: d.y - d.height/2 + config.box.titleHeight + 28 +
+                            (i * config.box.columnHeight) +
+                            (config.box.columnHeight - config.box.columnPadding) / 2
+                    };
+                    state.columnPositions.set(col.id, columnCenter);
+                });
+            }
+        });
+
+        d3.selectAll('.edge.lineage').each(function(d) {
+            if (!d || !d.source || !d.target) {
+                d3.select(this).style('display', 'none');
+                return;
+            }
+
+            const sourceNode = state.nodeIndex.get(d.source);
+            const targetNode = state.nodeIndex.get(d.target);
+
+            if (sourceNode && targetNode) {
+                const sourceVisible = state.visibleModels.has(sourceNode.model);
+                const targetVisible = state.visibleModels.has(targetNode.model);
+                const shouldShow = sourceVisible && targetVisible;
+                const wasVisible = d3.select(this).style('display') !== 'none';
+
+                if (shouldShow) {
+                    const path = createEdgePath(d, state, config);
+                    if (path && path !== '' && !path.includes('NaN')) {
+                        const edgeEl = d3.select(this);
+                        const markerEnd = edgeEl.attr('marker-end') || 'url(#arrowhead)';
+
+                        if (!wasVisible) {
+                            edgeEl
+                                .style('display', 'block')
+                                .style('opacity', 0)
+                                .attr('marker-end', markerEnd)
+                                .transition().duration(300)
+                                .style('opacity', 1)
+                                .attr('d', path);
+                        } else {
+                            edgeEl.attr('marker-end', markerEnd).transition().duration(300).attr('d', path);
+                        }
+                    } else {
+                        d3.select(this).style('display', 'none');
+                    }
+                } else {
+                    d3.select(this).style('display', 'none');
+                }
+            } else {
+                d3.select(this).style('display', 'none');
+            }
+        });
+
+        updateExpandIcons(state);
+        state[expandingKey] = false;
+    });
+}
+
+function collapseUpstreamInternal(modelName, state, config) {
+    if (!state || !config || !modelName) return;
+
+    const expandingKey = `_expanding_upstream_${modelName}`;
+    if (state[expandingKey]) return;
+    state[expandingKey] = true;
+
+    const allUpstreamModels = getAllUpstreamModels(modelName, state);
+
+    if (allUpstreamModels.size === 0) {
+        state[expandingKey] = false;
+        return;
+    }
+
+    allUpstreamModels.forEach(upstreamModel => {
+        state.visibleModels.delete(upstreamModel);
+    });
+
+    const currentTransform = state.zoom && state.svg ? d3.zoomTransform(state.svg.node()) : null;
+
+    if (currentTransform && state.zoom && state.svg &&
+        !isNaN(currentTransform.x) && !isNaN(currentTransform.y) &&
+        !isNaN(currentTransform.k) && currentTransform.k > 0) {
+        state.svg.call(state.zoom.transform, currentTransform);
+    }
+
+    d3.selectAll('.model:not(.model-exposure)').each(function(d) {
+        if (!d || !d.name) return;
+        const isVisible = state.visibleModels.has(d.name);
+        if (!isVisible) {
+            d3.select(this)
+                .transition().duration(300)
+                .style('opacity', 0)
+                .on('end', function() { d3.select(this).style('display', 'none'); });
+        }
+    });
+
+    requestAnimationFrame(() => {
+        d3.selectAll('.model:not(.model-exposure)').filter(d => d && d.name && state.visibleModels.has(d.name)).each(function(d) {
+            if (d.columns && Array.isArray(d.columns)) {
+                d.columns.forEach((col, i) => {
+                    const columnCenter = {
+                        x: d.x,
+                        y: d.y - d.height/2 + config.box.titleHeight + 28 +
+                            (i * config.box.columnHeight) +
+                            (config.box.columnHeight - config.box.columnPadding) / 2
+                    };
+                    state.columnPositions.set(col.id, columnCenter);
+                });
+            }
+        });
+
+        d3.selectAll('.edge.lineage').each(function(d) {
+            if (!d || !d.source || !d.target) {
+                d3.select(this).style('display', 'none');
+                return;
+            }
+
+            const sourceNode = state.nodeIndex.get(d.source);
+            const targetNode = state.nodeIndex.get(d.target);
+
+            if (sourceNode && targetNode) {
+                const sourceVisible = state.visibleModels.has(sourceNode.model);
+                const targetVisible = state.visibleModels.has(targetNode.model);
+                const shouldShow = sourceVisible && targetVisible;
+
+                if (!shouldShow) {
+                    const edgeEl = d3.select(this);
+                    const markerEnd = edgeEl.attr('marker-end') || 'url(#arrowhead)';
+                    edgeEl.attr('marker-end', markerEnd)
+                        .transition().duration(300)
+                        .style('opacity', 0)
+                        .on('end', function() { d3.select(this).style('display', 'none'); });
+                } else {
+                    const path = createEdgePath(d, state, config);
+                    if (path && path !== '' && !path.includes('NaN')) {
+                        const edgeEl = d3.select(this);
+                        const markerEnd = edgeEl.attr('marker-end') || 'url(#arrowhead)';
+                        edgeEl.attr('marker-end', markerEnd).transition().duration(300).attr('d', path);
                     }
                 }
             } else {
