@@ -17,8 +17,9 @@ function createState() {
             upstream: new Map(),
             downstream: new Map()
         },
-        visibleModels: new Set(), // Track which models are visible
-        modelDownstream: new Map() // Track downstream models for each model
+        visibleModels: new Set(),
+        modelDownstream: new Map(),
+        modelUpstream: new Map()
     };
 }
 
@@ -81,6 +82,7 @@ function processData(data, state) {
 
     buildLineageMaps(data, state);
     buildModelDownstreamMap(data, state);
+    buildModelUpstreamMap(data, state);
     initializeVisibility(data, state);
     layoutModels(data, state);
 }
@@ -116,6 +118,25 @@ function buildModelDownstreamMap(data, state) {
         });
 
         state.modelDownstream.set(model.name, downstreamModels);
+    });
+}
+
+function buildModelUpstreamMap(data, state) {
+    state.models.forEach(model => {
+        const upstreamModels = new Set();
+        const modelColumns = model.columns.map(col => col.id);
+
+        data.edges.filter(e => e.type === 'lineage').forEach(edge => {
+            const targetNode = state.nodeIndex.get(edge.target);
+            if (targetNode && modelColumns.includes(edge.target)) {
+                const sourceNode = state.nodeIndex.get(edge.source);
+                if (sourceNode && sourceNode.model !== model.name) {
+                    upstreamModels.add(sourceNode.model);
+                }
+            }
+        });
+
+        state.modelUpstream.set(model.name, upstreamModels);
     });
 }
 
