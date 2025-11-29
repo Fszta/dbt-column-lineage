@@ -67,7 +67,10 @@ module = [
     "duckdb.*",
     "pytest.*",
     "requests.*",
-    "pydantic.*"
+    "pydantic.*",
+    "fastapi.*",
+    "uvicorn.*",
+    "click.*"
 ]
 ignore_missing_imports = true
 

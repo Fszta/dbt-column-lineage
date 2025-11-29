@@ -326,3 +326,38 @@ def test_snapshot_api_support(dbt_artifacts: Dict[str, Any], server_port: int) -
             ], f"Lineage endpoint should return 200 or 400, got {lineage_response.status_code}"
         except requests.exceptions.RequestException as e:
             pytest.skip(f"Could not test snapshot lineage endpoint: {e}")
+
+
+def test_upstream_lineage_returns_full_chain(
+    dbt_artifacts: Dict[str, Any], server_port: int
+) -> None:
+    """Verify API returns full upstream chain with proper edges."""
+    catalog_path = Path(dbt_artifacts["catalog_path"])
+    manifest_path = Path(dbt_artifacts["manifest_path"])
+
+    with lineage_server(catalog_path, manifest_path, server_port) as port:
+        response_data = _get_lineage_response(port, "accounts_tiering", "country_id")
+
+        models_in_response = {
+            node["model"] for node in response_data.get("nodes", []) if node.get("type") == "column"
+        }
+        expected_models = {
+            "accounts_tiering",
+            "int_monthly_account_metrics",
+            "int_transactions_enriched",
+            "stg_accounts",
+            "raw_accounts",
+        }
+        assert expected_models.issubset(
+            models_in_response
+        ), f"Missing upstream models. Expected {expected_models}, got {models_in_response}"
+
+        edges = response_data.get("edges", [])
+        lineage_edges = [e for e in edges if e.get("type") == "lineage"]
+
+        edge_targets = {e["target"] for e in lineage_edges}
+        assert "col_accounts_tiering_country_id" in edge_targets, "Missing edge to main node"
+        assert (
+            "col_int_monthly_account_metrics_country_id" in edge_targets
+        ), "Missing intermediate edge"
+        assert "col_stg_accounts_country_id" in edge_targets, "Missing edge to stg model"
