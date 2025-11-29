@@ -129,11 +129,18 @@ function createExposureEdgePath(d, state, config) {
     let sourceX, sourceY, targetX, targetY;
 
     if (sourceNode.type === 'column') {
+        const sourceModelName = sourceNode.model;
+        const sourceModel = state.models.find(m => m && m.name === sourceModelName);
+        if (!sourceModel) return '';
+
         const sourcePos = state.columnPositions.get(d.source);
         if (!sourcePos || typeof sourcePos.x !== 'number' || isNaN(sourcePos.x) ||
             typeof sourcePos.y !== 'number' || isNaN(sourcePos.y)) return '';
-        sourceX = sourcePos.x;
-        sourceY = sourcePos.y;
+
+        sourceX = sourceModel.x + config.box.width - config.box.padding;
+        sourceY = sourceModel.columnsCollapsed
+            ? sourceModel.y - sourceModel.height/2 + config.box.titleHeight + 14
+            : sourcePos.y;
     } else {
         return '';
     }
@@ -143,8 +150,8 @@ function createExposureEdgePath(d, state, config) {
         if (!exposure || typeof exposure.x !== 'number' || isNaN(exposure.x) ||
             typeof exposure.y !== 'number' || isNaN(exposure.y) ||
             typeof exposure.height !== 'number' || isNaN(exposure.height)) return '';
-        targetX = exposure.x + config.box.width / 2;
-        targetY = exposure.y - exposure.height / 2;
+        targetX = exposure.x + config.box.padding;
+        targetY = exposure.y;
     } else {
         return '';
     }
