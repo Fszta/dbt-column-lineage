@@ -22,32 +22,37 @@ function getModelIcon(modelType) {
 }
 
 
-// Update the getTagColor function with slightly darker colors
+// Get color for data type tags - muted, professional palette
 function getTagColor(type) {
     const typeStr = type.toLowerCase();
-    const defaultColor = '#cbd5e1';
+    const defaultColor = '#94a3b8';
 
+    // Numeric types - blue
     if (typeStr.includes('int') || typeStr.includes('decimal') ||
         typeStr.includes('numeric') || typeStr.includes('double') ||
         typeStr.includes('float')) {
-        return '#7cb7fc';
+        return '#3b82f6';
     }
 
+    // String types - emerald
     if (typeStr.includes('varchar') || typeStr.includes('char') ||
         typeStr.includes('text') || typeStr.includes('string')) {
-        return '#4ddba4';
+        return '#10b981';
     }
 
+    // Date/time types - violet
     if (typeStr.includes('date') || typeStr.includes('time')) {
-        return '#b29dfc';
+        return '#8b5cf6';
     }
 
+    // Boolean types - rose
     if (typeStr.includes('bool')) {
-        return '#f98b8b';
+        return '#f43f5e';
     }
 
-    if (typeStr.includes('variant')) {
-        return '#fca154';
+    // Variant/json types - amber
+    if (typeStr.includes('variant') || typeStr.includes('json') || typeStr.includes('object')) {
+        return '#f59e0b';
     }
 
     return defaultColor;
@@ -184,14 +189,15 @@ function createTooltip() {
         .style('position', 'absolute')
         .style('opacity', 0)
         .style('pointer-events', 'none')
-        .style('background', 'rgba(0, 0, 0, 0.85)')
+        .style('background', '#1e293b')
         .style('color', 'white')
-        .style('padding', '6px 10px')
+        .style('padding', '5px 8px')
         .style('border-radius', '4px')
         .style('font-size', '12px')
+        .style('font-family', "'JetBrains Mono', monospace")
         .style('white-space', 'nowrap')
         .style('z-index', '10000')
-        .style('box-shadow', '0 2px 8px rgba(0, 0, 0, 0.2)');
+        .style('box-shadow', '0 2px 8px rgba(0, 0, 0, 0.15)');
 
     return tooltip;
 }

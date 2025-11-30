@@ -10,9 +10,9 @@ function createConfig(container) {
             width: 250,
             padding: 15,
             titleHeight: 40,
-            columnHeight: 30,
-            columnPadding: 5,
-            cornerRadius: 8
+            columnHeight: 28,
+            columnPadding: 4,
+            cornerRadius: 6
         },
         layout: {
             xSpacing: 150,
@@ -20,15 +20,15 @@ function createConfig(container) {
             verticalUsage: 0.8
         },
         colors: {
-            model: '#f5f5f5',
-            title: '#f8f9fa',
-            column: '#f0f0f0',
-            columnHover: '#e0e0e0',
-            edge: '#999',
-            edgeDimmed: '#97a4b0',
-            edgeHighlight: '#ff6b6b',
-            selectedColumn: '#ffcccb',
-            relatedColumn: '#fff0c0',
+            model: '#ffffff',
+            title: '#f8fafc',
+            column: '#f8fafc',
+            columnHover: '#f1f5f9',
+            edge: '#cbd5e1',
+            edgeDimmed: '#e2e8f0',
+            edgeHighlight: '#f59e0b',
+            selectedColumn: '#fef3c7',
+            relatedColumn: '#ecfdf5',
         }
     };
 }
