@@ -10,6 +10,31 @@ const ExploreModule = (function() {
 
     let selectedModelData = null;
     let allTreeData = [];
+    let currentSearchTerm = '';
+
+    function countItems(node) {
+        if (node.type !== 'folder') return 1;
+        if (!node.children || node.children.length === 0) return 0;
+        return node.children.reduce((sum, child) => sum + countItems(child), 0);
+    }
+
+    function highlightText(text, searchTerm) {
+        if (!searchTerm) return text;
+        const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return text.replace(regex, '<span class="highlight">$1</span>');
+    }
+
+    function getTypeBadge(resourceType) {
+        const typeLabels = {
+            'model': 'model',
+            'source': 'source',
+            'seed': 'seed',
+            'snapshot': 'snap',
+            'exposure': 'exposure'
+        };
+        const label = typeLabels[resourceType] || resourceType;
+        return `<span class="node-type-badge ${resourceType}">${label}</span>`;
+    }
 
     function getTagColor(type) {
         if (!type) return '#cbd5e1';
@@ -82,20 +107,29 @@ const ExploreModule = (function() {
 
             const span = document.createElement('span');
             const labelText = node.type === 'model' ? node.display_name : node.name;
-            span.textContent = labelText;
+            span.innerHTML = currentSearchTerm ? highlightText(labelText, currentSearchTerm) : labelText;
             span.classList.add('node-label');
+            span.dataset.originalText = labelText;
 
             if (node.type === 'folder') {
                 nodeContent.classList.add('folder');
                 iconContainer.innerHTML = iconFolderClosed;
                 nodeContent.appendChild(iconContainer);
                 nodeContent.appendChild(span);
+
+                const itemCount = countItems(node);
+                if (itemCount > 0) {
+                    const countBadge = document.createElement('span');
+                    countBadge.classList.add('folder-count');
+                    countBadge.textContent = itemCount;
+                    nodeContent.appendChild(countBadge);
+                }
+
                 li.appendChild(nodeContent);
 
                 nodeContent.addEventListener('click', () => {
                     li.classList.toggle('expanded');
-                    const nestedUl = li.querySelector('ul');
-                    const icon = iconContainer.querySelector('.folder-icon');
+                    const nestedUl = li.querySelector(':scope > ul');
                     if (nestedUl) {
                         nestedUl.classList.toggle('active');
                         if (li.classList.contains('expanded')) {
@@ -107,7 +141,7 @@ const ExploreModule = (function() {
                 });
                 if (node.children && node.children.length > 0) {
                     renderTree(node.children, li, level + 1);
-                    const childUl = li.querySelector('ul');
+                    const childUl = li.querySelector(':scope > ul');
                     if (childUl) childUl.classList.remove('active');
                 } else {
                     li.classList.add('empty-folder');
@@ -118,6 +152,7 @@ const ExploreModule = (function() {
                     iconContainer.innerHTML = iconExposure;
                     nodeContent.appendChild(iconContainer);
                     nodeContent.appendChild(span);
+                    nodeContent.insertAdjacentHTML('beforeend', getTypeBadge('exposure'));
                     li.appendChild(nodeContent);
                     setupTooltip(nodeContent, span, labelText);
 
@@ -154,6 +189,9 @@ const ExploreModule = (function() {
                     iconContainer.innerHTML = modelIcon;
                     nodeContent.appendChild(iconContainer);
                     nodeContent.appendChild(span);
+                    if (node.resource_type) {
+                        nodeContent.insertAdjacentHTML('beforeend', getTypeBadge(node.resource_type));
+                    }
                     li.appendChild(nodeContent);
                     span.dataset.modelName = node.model_name;
                     setupTooltip(nodeContent, span, labelText);
@@ -174,13 +212,21 @@ const ExploreModule = (function() {
 
     function filterTree(searchTerm, modelTreeContainer) {
         const term = searchTerm.toLowerCase().trim();
+        currentSearchTerm = term;
         const allNodes = modelTreeContainer.querySelectorAll('.tree-node');
+
+        let existingEmpty = modelTreeContainer.querySelector('.tree-empty-state');
+        if (existingEmpty) existingEmpty.remove();
 
         allNodes.forEach(node => {
             node.style.display = '';
+            const label = node.querySelector('.node-label');
+            if (label && label.dataset.originalText) {
+                label.innerHTML = term ? highlightText(label.dataset.originalText, term) : label.dataset.originalText;
+            }
             if (node.classList.contains('tree-node-folder') && term !== '') {
                 node.classList.remove('expanded');
-                const nestedUl = node.querySelector('ul.nested');
+                const nestedUl = node.querySelector(':scope > ul.nested');
                 if (nestedUl) nestedUl.classList.remove('active');
                 const iconContainer = node.querySelector('.icon-container');
                 if (iconContainer) iconContainer.innerHTML = iconFolderClosed;
@@ -191,13 +237,15 @@ const ExploreModule = (function() {
 
         const modelNodes = modelTreeContainer.querySelectorAll('.tree-node-model, .tree-node-exposure');
         const foldersToShow = new Set();
+        let matchCount = 0;
 
         modelNodes.forEach(modelLi => {
             const label = modelLi.querySelector('.node-label');
-            const modelName = label ? label.textContent.toLowerCase() : '';
-            const matches = modelName.includes(term);
+            const originalText = label ? (label.dataset.originalText || label.textContent) : '';
+            const matches = originalText.toLowerCase().includes(term);
 
             if (matches) {
+                matchCount++;
                 modelLi.style.display = 'block';
                 let current = modelLi.parentElement;
                 while (current && current !== modelTreeContainer) {
@@ -217,7 +265,7 @@ const ExploreModule = (function() {
                 folderLi.style.display = 'block';
                 if (!folderLi.classList.contains('expanded')) {
                     folderLi.classList.add('expanded');
-                    const nestedUl = folderLi.querySelector('ul.nested');
+                    const nestedUl = folderLi.querySelector(':scope > ul.nested');
                     if (nestedUl) nestedUl.classList.add('active');
                     const iconContainer = folderLi.querySelector('.icon-container');
                     if (iconContainer) iconContainer.innerHTML = iconFolderOpen;
@@ -226,6 +274,21 @@ const ExploreModule = (function() {
                 folderLi.style.display = 'none';
             }
         });
+
+        if (matchCount === 0) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'tree-empty-state';
+            emptyState.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    <line x1="8" y1="11" x2="14" y2="11"></line>
+                </svg>
+                <p>No models found for "${term}"</p>
+                <span class="empty-hint">Try a different search term</span>
+            `;
+            modelTreeContainer.appendChild(emptyState);
+        }
     }
 
     function populateColumnSelector(columns) {
@@ -412,12 +475,29 @@ const ExploreModule = (function() {
         const graphContainer = document.getElementById('graph');
         const modelTreeContainer = document.getElementById('model-tree-container');
         const searchInput = document.getElementById('modelSearchInput');
+        const searchContainer = document.getElementById('searchBarContainer');
+        const searchClearBtn = document.getElementById('searchClearBtn');
 
         setupColumnDropdown();
 
         searchInput.addEventListener('input', (e) => {
-            filterTree(e.target.value, modelTreeContainer);
+            const value = e.target.value;
+            filterTree(value, modelTreeContainer);
+            if (searchContainer) {
+                searchContainer.classList.toggle('has-value', value.length > 0);
+            }
         });
+
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                filterTree('', modelTreeContainer);
+                if (searchContainer) {
+                    searchContainer.classList.remove('has-value');
+                }
+                searchInput.focus();
+        });
+        }
 
         columnSelect.addEventListener('change', function() {
             const hasSelection = this.value && selectedModelData;
