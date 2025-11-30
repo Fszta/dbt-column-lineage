@@ -12,6 +12,7 @@
             };
             exploreController = ExploreModule.init(initialData, graphInstanceRef);
             ImpactModule.init();
+            ModelDetailsModule.init();
         }
     }
 

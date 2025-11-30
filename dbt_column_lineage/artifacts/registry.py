@@ -84,6 +84,11 @@ class ModelRegistry:
                     model.downstream.update(model_exposures[model_name])
                 model.language = self._manifest_reader.get_model_language(model_name)
                 model.resource_path = self._manifest_reader.get_model_resource_path(model_name)
+
+                node = self._manifest_reader._find_node(model_name)
+                if node:
+                    model.description = node.get("description")
+                    model.tags = node.get("tags", [])
         except Exception as e:
             raise RegistryError(f"Failed to apply dependencies: {e}")
 

@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: "Staging model for raw transaction data. Cleanses and standardizes transaction records from the raw source, including type casting and column renaming."
+
+  - name: stg_accounts
+    description: "Staging model for account data. Transforms raw account information into a standardized format with proper data types."
+    config:
+      tags: ['PII']
+
+  - name: stg_countries
+    description: "Staging model for country reference data. Provides standardized country information used across the data warehouse."
+
+  - name: stg_crypto_trades
+    description: "Staging model for cryptocurrency trade data. Processes raw crypto trading information for downstream analytics."

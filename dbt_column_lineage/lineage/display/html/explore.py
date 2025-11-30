@@ -232,6 +232,24 @@ class LineageExplorer:
                 logger.debug(traceback.format_exc())
                 return {"error": str(e)}
 
+        @self.app.get("/api/model/{model_name}/details")
+        async def get_model_details(model_name: str) -> Dict[str, Any]:
+            if not self.lineage_service:
+                return {"error": "Lineage service not initialized"}
+
+            try:
+                model = self.lineage_service.registry.get_model(model_name)
+                return {
+                    "name": model.name,
+                    "description": model.description,
+                    "tags": model.tags,
+                    "resource_type": model.resource_type,
+                    "schema": model.schema_name,
+                    "database": model.database,
+                }
+            except Exception as e:
+                return {"error": str(e)}
+
         @self.app.get("/api/impact-analysis/{model}/{column}")
         async def get_impact_analysis(model: str, column: str) -> Dict[str, Any]:
             if not self.lineage_service:

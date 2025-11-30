@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: int_transactions_enriched
+    description: "Intermediate model that enriches transaction data with account holder information and categorizes transaction amounts. Adds monthly aggregation and amount categorization logic."
+    config:
+      tags: ['PII']
+
+  - name: int_monthly_account_metrics
+    description: "Intermediate model calculating monthly metrics per account, including transaction counts, total amounts, and average transaction values."
+    config:
+      tags: ['PII']
+
+  - name: int_trade_flow
+    description: "Intermediate model tracking cryptocurrency trade flows and aggregating trade volumes by time periods."

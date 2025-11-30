@@ -1,0 +1,7 @@
+version: 2
+
+snapshots:
+  - name: accounts_snapshot
+    description: "Snapshot of account data using SCD Type 2 strategy. Tracks historical changes to account holder and country information over time."
+    config:
+      tags: ['PII']
