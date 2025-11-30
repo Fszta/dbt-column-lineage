@@ -116,38 +116,18 @@
                 </div>
             </div>
             <div id="impactAnalysisCard" class="impact-analysis-card" style="display: none;">
-                <div class="impact-card-header">
-                    <div class="impact-card-title">
-                        <span class="impact-card-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
-                                <circle cx="12" cy="12" r="5"></circle>
-                            </svg>
-                        </span>
-                        <div>
-                            <h4>What happens if I change this column?</h4>
-                            <p class="impact-card-subtitle">Understand the impact of modifying this column's logic on downstream models, transformations, and dashboards</p>
-                        </div>
-                    </div>
-                    <button class="impact-card-close" id="closeImpactAnalysisCard">×</button>
-                </div>
-                <div class="impact-card-content">
-                    <div class="impact-card-explanation">
-                        <p>
-                            <strong>Impact Analysis</strong> shows you what will be affected if you modify this column:
-                        </p>
-                        <ul>
-                            <li>Which <strong>models and columns</strong> depend on this column</li>
-                            <li>Which <strong>transformations</strong> (SUM, CASE, etc.) use this column and may need review</li>
-                            <li>Which <strong>dashboards and exposures</strong> will be impacted</li>
-                        </ul>
-                        <p>
-                            This helps you understand the <strong>blast radius</strong> of your changes before making them.
-                        </p>
-                    </div>
-                    <button id="loadImpactAnalysisFromCard" class="impact-card-button">
+                <div class="impact-card-compact">
+                    <span class="impact-card-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 16v-4M12 8h.01"></path>
+                        </svg>
+                    </span>
+                    <span class="impact-card-label">See what's affected if this column changed</span>
+                    <button id="loadImpactAnalysisFromCard" class="impact-card-button-compact">
                         Analyze Impact
                     </button>
+                    <button class="impact-card-close-compact" id="closeImpactAnalysisCard">×</button>
                 </div>
             </div>
         </div>
