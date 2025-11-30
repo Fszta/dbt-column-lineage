@@ -1480,10 +1480,14 @@
     display: none;
 }
 
-.relationship-summary-close {
+.relationship-summary-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.relationship-summary-toggle {
     background: none;
     border: none;
-    font-size: 20px;
     color: var(--slate-400);
     cursor: pointer;
     padding: 0;
@@ -1495,17 +1499,40 @@
     border-radius: 8px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
-    line-height: 1;
 }
 
-.relationship-summary-close:hover {
+.relationship-summary-toggle:hover {
     background: rgba(148, 163, 184, 0.15);
     color: var(--slate-700);
-    transform: scale(1.1);
+}
+
+.relationship-summary-toggle svg {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.relationship-summary-card.collapsed .relationship-summary-toggle svg {
+    transform: rotate(180deg);
 }
 
 .relationship-summary-content {
     padding: 12px 14px;
+    overflow: hidden;
+    transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.2s ease;
+    max-height: 300px;
+    opacity: 1;
+}
+
+.relationship-summary-card.collapsed .relationship-summary-content {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+.relationship-summary-card.collapsed .relationship-summary-header {
+    border-bottom: none;
 }
 
 .relationship-summary-metrics {
