@@ -314,11 +314,18 @@ function highlightLineage(columnId, state, config) {
         }
     });
 
-    // Make all edges lighter but still visible
-    d3.selectAll('.edge').transition().duration(200)
+    // Make all lineage edges lighter but still visible (keep exposure edges visible)
+    d3.selectAll('.edge.lineage').transition().duration(200)
         .style('stroke', config.colors.edgeDimmed)
         .style('stroke-width', 1)
         .style('stroke-opacity', 0.5)
+        .attr('marker-end', 'url(#arrowhead)');
+
+    // Keep exposure edges visible with their purple color
+    d3.selectAll('.edge.exposure').transition().duration(200)
+        .style('stroke', '#a855f7')
+        .style('stroke-width', 2)
+        .style('stroke-opacity', 0.7)
         .attr('marker-end', 'url(#arrowhead)');
 
     // Highlight relevant edges (both upstream and downstream)
@@ -340,10 +347,17 @@ function resetHighlights(state, config) {
         .transition().duration(200)
         .attr('fill', 'transparent');
 
-    // Reset edge highlighting
-    d3.selectAll('.edge').transition().duration(200)
+    // Reset lineage edge highlighting
+    d3.selectAll('.edge.lineage').transition().duration(200)
         .style('stroke', config.colors.edge)
         .style('stroke-width', 1.5)
+        .style('stroke-opacity', 1)
+        .attr('marker-end', 'url(#arrowhead)');
+
+    // Restore exposure edge color
+    d3.selectAll('.edge.exposure').transition().duration(200)
+        .style('stroke', '#a855f7')
+        .style('stroke-width', 2)
         .style('stroke-opacity', 1)
         .attr('marker-end', 'url(#arrowhead)');
 }

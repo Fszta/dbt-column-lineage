@@ -169,15 +169,17 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('class', 'model-container')
         .attr('width', config.box.width)
         .attr('height', d => d.height)
-        .attr('rx', 8)
-        .attr('ry', 8)
+        .attr('rx', 6)
+        .attr('ry', 6)
         .style('fill', 'white')
         .style('stroke', d => {
             const modelType = d.type || 'model';
-            if (modelType === 'snapshot') return '#fbbf24';
-            return '#e2e8f0';
+            if (modelType === 'snapshot') return '#f59e0b';
+            if (modelType === 'source') return '#14b8a6';
+            if (modelType === 'seed') return '#22c55e';
+            return '#0891b2';  // Teal for regular models
         })
-        .style('stroke-width', 1);
+        .style('stroke-width', 1.5);
 
     const foregroundGroup = modelGroups.append('g')
         .attr('class', 'model-foreground');
@@ -189,13 +191,13 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('height', config.box.titleHeight)
         .attr('x', 1)
         .attr('y', 1)
-        .attr('rx', 7)
+        .attr('rx', 5)
         .style('fill', d => {
             const modelType = d.type || 'model';
-            if (modelType === 'source') return '#f0f4f8';
-            if (modelType === 'seed') return '#f0f8f4';
-            if (modelType === 'snapshot') return '#fefce8';
-            return '#f8fafc';
+            if (modelType === 'source') return '#ecfdf5';
+            if (modelType === 'seed') return '#f0fdf4';
+            if (modelType === 'snapshot') return '#fef3c7';
+            return '#f0f9ff';  // Light cyan for models
         })
         .style('stroke', 'none');
 
@@ -215,10 +217,10 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('fill', 'none')
         .attr('stroke', d => {
             const modelType = d.type || 'model';
-            if (modelType === 'source') return '#4a6fa5';
-            if (modelType === 'seed') return '#4caf50';
-            if (modelType === 'snapshot') return '#eab308';
-            return '#4a6fa5';
+            if (modelType === 'source') return '#0d9488';
+            if (modelType === 'seed') return '#10b981';
+            if (modelType === 'snapshot') return '#f59e0b';
+            return '#0891b2';
         })
         .attr('stroke-width', '2')
         .attr('stroke-linecap', 'round')
@@ -231,8 +233,9 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('y', config.box.titleHeight / 2 + 5)
         .style('fill', d => {
             const modelType = d.type || 'model';
-            if (modelType === 'snapshot') return '#ca8a04';
-            return null;
+            if (modelType === 'snapshot') return '#b45309';
+            if (modelType === 'source') return '#0f766e';
+            return '#1e293b';
         })
         .text(d => d.name)
         .each(function(d) {
@@ -327,12 +330,12 @@ function drawModels(g, state, config, dragBehavior) {
     expandUpstreamIconGroup.append('circle')
         .attr('cx', upstreamIconX)
         .attr('cy', upstreamIconY)
-        .attr('r', 8)
+        .attr('r', 7)
         .attr('fill', 'white')
-        .attr('stroke', '#64748b')
-        .attr('stroke-width', 1.5);
+        .attr('stroke', '#94a3b8')
+        .attr('stroke-width', 1);
 
-    const upstreamPlusSize = 6;
+    const upstreamPlusSize = 5;
     expandUpstreamIconGroup.append('line')
         .attr('class', 'expand-upstream-line')
         .attr('x1', upstreamIconX - upstreamPlusSize / 2)
@@ -340,7 +343,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('x2', upstreamIconX + upstreamPlusSize / 2)
         .attr('y2', upstreamIconY)
         .attr('stroke', '#64748b')
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 1.5)
         .attr('stroke-linecap', 'round');
 
     expandUpstreamIconGroup.append('line')
@@ -350,7 +353,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('x2', upstreamIconX)
         .attr('y2', upstreamIconY + upstreamPlusSize / 2)
         .attr('stroke', '#64748b')
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 1.5)
         .attr('stroke-linecap', 'round');
 
     expandUpstreamIconGroup.append('line')
@@ -360,7 +363,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('x2', upstreamIconX + upstreamPlusSize / 2)
         .attr('y2', upstreamIconY)
         .attr('stroke', '#64748b')
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 1.5)
         .attr('stroke-linecap', 'round')
         .style('display', 'none');
 
@@ -403,13 +406,13 @@ function drawModels(g, state, config, dragBehavior) {
     expandIconGroup.append('circle')
         .attr('cx', iconX)
         .attr('cy', iconY)
-        .attr('r', 8)
+        .attr('r', 7)
         .attr('fill', 'white')
-        .attr('stroke', '#64748b')
-        .attr('stroke-width', 1.5);
+        .attr('stroke', '#94a3b8')
+        .attr('stroke-width', 1);
 
     // Plus sign (horizontal line) - shown when collapsed
-    const plusSize = 6;
+    const plusSize = 5;
     expandIconGroup.append('line')
         .attr('class', 'expand-line')
         .attr('x1', iconX - plusSize / 2)
@@ -417,7 +420,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('x2', iconX + plusSize / 2)
         .attr('y2', iconY)
         .attr('stroke', '#64748b')
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 1.5)
         .attr('stroke-linecap', 'round');
 
     // Plus sign (vertical line) - shown when collapsed
@@ -428,7 +431,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('x2', iconX)
         .attr('y2', iconY + plusSize / 2)
         .attr('stroke', '#64748b')
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 1.5)
         .attr('stroke-linecap', 'round');
 
     // Minus sign (horizontal line) - shown when expanded
@@ -439,7 +442,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('x2', iconX + plusSize / 2)
         .attr('y2', iconY)
         .attr('stroke', '#64748b')
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 1.5)
         .attr('stroke-linecap', 'round')
         .style('display', 'none');
 
@@ -453,9 +456,9 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('height', 28)
         .attr('x', 1)
         .attr('fill', d => {
-            if (d.type === 'source') return '#e9f0fa';
-            if (d.type === 'snapshot') return '#fef9c3';
-            return '#f1f5f9';
+            if (d.type === 'source') return '#f0fdfa';
+            if (d.type === 'snapshot') return '#fef3c7';
+            return '#f8fafc';
         })
         .style('stroke', 'none');
 
@@ -466,7 +469,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('dominant-baseline', 'middle')
         .attr('fill', '#64748b')
         .attr('font-size', '13px')
-        .text(d => `Columns (${d.columns.length})`);
+        .text('Columns');
 
     const toggleIcon = columnsHeader.append('svg')
         .attr('class', 'toggle-icon')
@@ -1073,9 +1076,9 @@ function drawEdges(g, data, state, config) {
         .attr('marker-end', 'url(#arrowhead)')
         .attr('data-source', d => d.source)
         .attr('data-target', d => d.target)
-        .style('stroke', '#9333ea')
+        .style('stroke', '#a855f7')
         .style('stroke-width', 2)
-        .style('stroke-dasharray', '5,3')
+        .style('stroke-dasharray', '8,4')
         .style('fill', 'none')
         .style('display', d => {
             const sourceNode = state.nodeIndex.get(d.source);

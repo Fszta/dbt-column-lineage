@@ -1,8 +1,3 @@
-/**
- * Impact analysis styles - Panels, cards, metrics
- */
-
-/* Impact Analysis Panel Styles */
 .action-buttons {
     display: flex;
     gap: 8px;
@@ -116,7 +111,6 @@
     -webkit-overflow-scrolling: touch;
 }
 
-/* Impact Hero Section */
 .impact-hero {
     background: var(--model-bg);
     padding: 0;
@@ -622,7 +616,6 @@
     gap: 8px;
 }
 
-/* Model Cards */
 .model-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -762,7 +755,6 @@
     color: var(--text-light);
 }
 
-/* Column Cards */
 .column-card {
     background: var(--model-bg);
     border-radius: 10px;
@@ -1054,7 +1046,6 @@
     text-decoration: underline;
 }
 
-/* Exposure Cards */
 .exposures-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1158,21 +1149,24 @@
     line-height: 1.4;
 }
 
-/* Impact Analysis Card - Floating on Graph */
 .impact-analysis-card {
     position: absolute;
-    bottom: 20px;
-    left: 20px;
+    bottom: 16px;
+    left: 16px;
     width: 280px;
-    max-width: calc(100% - 40px);
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+    max-width: calc(100% - 32px);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 16px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        0 2px 8px rgba(0, 0, 0, 0.04),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.15);
     z-index: 200;
     animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.95);
 }
 
 @keyframes slideInUp {
@@ -1190,9 +1184,9 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 12px 14px 10px;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.6) 100%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .impact-card-title {
@@ -1236,8 +1230,8 @@
 .impact-card-close {
     background: none;
     border: none;
-    font-size: 24px;
-    color: var(--text-light);
+    font-size: 20px;
+    color: var(--slate-400);
     cursor: pointer;
     padding: 0;
     width: 28px;
@@ -1245,15 +1239,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
-    transition: all 0.2s;
+    border-radius: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
     line-height: 1;
 }
 
 .impact-card-close:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--text-dark);
+    background: rgba(148, 163, 184, 0.15);
+    color: var(--slate-700);
+    transform: scale(1.1);
 }
 
 .impact-card-content {
@@ -1292,15 +1287,18 @@
 .impact-card-button {
     width: 100%;
     padding: 12px 16px;
-    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0.02em;
+    font-size: 12px;
+    font-family: var(--font-sans);
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow:
+        0 4px 12px rgba(167, 139, 250, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
     position: relative;
     overflow: hidden;
 }
@@ -1312,29 +1310,32 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: left 0.5s;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+    transition: left 0.5s ease;
+}
+
+.impact-card-button:hover {
+    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+    box-shadow:
+        0 6px 16px rgba(167, 139, 250, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
 }
 
 .impact-card-button:hover::before {
     left: 100%;
 }
 
-.impact-card-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(139, 92, 246, 0.3);
-}
-
 .impact-card-button:active {
     transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
 }
 
 .impact-card-button:disabled {
-    background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+    background: var(--slate-300);
     cursor: not-allowed;
     opacity: 0.6;
-    transform: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
 }
 
 .impact-card-button.loading {
@@ -1355,30 +1356,33 @@
     animation: spin 1s linear infinite;
 }
 
-/* Column Relationship Summary Card */
 .relationship-summary-card {
     position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 320px;
-    max-width: calc(100% - 40px);
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06);
+    top: 16px;
+    right: 16px;
+    width: 380px;
+    max-width: calc(100% - 32px);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 16px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        0 2px 8px rgba(0, 0, 0, 0.04),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.15);
     z-index: 200;
     animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.95);
 }
 
 .relationship-summary-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 12px 14px 10px;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.6) 100%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .relationship-summary-title {
@@ -1405,25 +1409,22 @@
 }
 
 .relationship-summary-title h4 {
-    margin: 0 0 3px 0;
-    font-size: 14px;
+    margin: 0;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--text-dark);
-    line-height: 1.3;
+    color: var(--slate-700);
+    font-family: var(--font-sans);
 }
 
 .relationship-summary-subtitle {
-    margin: 0;
-    font-size: 12px;
-    color: var(--text-light);
-    line-height: 1.4;
+    display: none;
 }
 
 .relationship-summary-close {
     background: none;
     border: none;
-    font-size: 24px;
-    color: var(--text-light);
+    font-size: 20px;
+    color: var(--slate-400);
     cursor: pointer;
     padding: 0;
     width: 28px;
@@ -1431,69 +1432,85 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
-    transition: all 0.2s;
+    border-radius: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
     line-height: 1;
 }
 
 .relationship-summary-close:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--text-dark);
+    background: rgba(148, 163, 184, 0.15);
+    color: var(--slate-700);
+    transform: scale(1.1);
 }
 
 .relationship-summary-content {
-    padding: 14px;
+    padding: 12px 14px;
 }
 
 .relationship-summary-metrics {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
     width: 100%;
 }
 
 .summary-metric {
     display: flex;
+    flex-direction: row;
     align-items: center;
+    justify-content: flex-start;
     gap: 10px;
-    padding: 10px;
-    background: #f8fafc;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    transition: all 0.2s;
+    padding: 10px 12px;
+    background: var(--slate-50);
+    border-radius: 6px;
     min-width: 0;
+    text-align: left;
+    border-left: 3px solid transparent;
 }
 
 .summary-metric:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    background: var(--slate-100);
 }
 
 .summary-metric-critical {
-    background: #fff4e6;
-    border-color: var(--accent);
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-left-color: #f59e0b;
 }
 
 .summary-metric-critical:hover {
-    background: #ffe8cc;
-    border-color: var(--accent);
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.summary-metric-pass-through {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-left-color: #10b981;
+}
+
+.summary-metric-pass-through:hover {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+}
+
+.summary-metric-models {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-left-color: #3b82f6;
+}
+
+.summary-metric-models:hover {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+
+.summary-metric-exposures {
+    background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+    border-left-color: #8b5cf6;
+}
+
+.summary-metric-exposures:hover {
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
 }
 
 .summary-metric-icon {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.summary-metric-critical .summary-metric-icon {
-    color: var(--accent);
+    display: none;
 }
 
 .summary-metric-icon svg {
@@ -1504,42 +1521,44 @@
 .summary-metric-content {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .summary-metric-value {
     font-size: 20px;
     font-weight: 700;
-    color: var(--text-dark);
-    line-height: 1.2;
-    margin-bottom: 2px;
+    color: var(--slate-700);
+    line-height: 1;
+    font-family: var(--font-mono);
 }
 
 .summary-metric-critical .summary-metric-value {
-    color: var(--accent);
+    color: #d97706;
+}
+
+.summary-metric-pass-through .summary-metric-value {
+    color: #059669;
+}
+
+.summary-metric-models .summary-metric-value {
+    color: #2563eb;
+}
+
+.summary-metric-exposures .summary-metric-value {
+    color: #7c3aed;
 }
 
 .summary-metric-label {
-    font-size: 11px;
-    color: var(--text-light);
-    line-height: 1.3;
+    font-size: 10px;
+    color: var(--slate-600);
+    line-height: 1.2;
     font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-}
-
-.summary-metric-pass-through .summary-metric-icon {
-    color: #10b981;
-}
-
-.summary-metric-models .summary-metric-icon {
-    color: #3b82f6;
-}
-
-.summary-metric-exposures .summary-metric-icon {
-    color: #8b5cf6;
+    text-transform: capitalize;
+    letter-spacing: 0;
+    text-align: left;
+    width: 100%;
 }
 
 @media (max-width: 768px) {
