@@ -56,6 +56,8 @@ class Model(BaseModel):
     resource_path: Optional[str] = None
     source_identifier: Optional[str] = None
     source_name: Optional[str] = None
+    description: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
 
 
 class SQLParseResult(BaseModel):
