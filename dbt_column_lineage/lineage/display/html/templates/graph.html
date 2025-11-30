@@ -95,7 +95,7 @@
         </div>
         <div id="graph">
             <div id="relationshipSummaryCard" class="relationship-summary-card" style="display: none;">
-                <div class="relationship-summary-header">
+                <div class="relationship-summary-header" id="toggleRelationshipSummary">
                     <div class="relationship-summary-title">
                         <span class="relationship-summary-icon">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -108,9 +108,13 @@
                             <p class="relationship-summary-subtitle">Relationship overview for this column</p>
                         </div>
                     </div>
-                    <button class="relationship-summary-close" id="closeRelationshipSummaryCard">×</button>
+                    <button class="relationship-summary-toggle" id="collapseRelationshipSummaryCard">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="18 15 12 9 6 15"></polyline>
+                        </svg>
+                    </button>
                 </div>
-                <div class="relationship-summary-content">
+                <div class="relationship-summary-content" id="relationshipSummaryContent">
                     <div class="relationship-summary-metrics" id="relationshipSummaryMetrics">
                         <!-- Metrics will be populated by JavaScript -->
                     </div>

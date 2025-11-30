@@ -554,15 +554,23 @@ const ImpactModule = (function() {
 
     function setupCardCloseButtons() {
         document.getElementById('graph')?.addEventListener('click', function(e) {
-            const btn = e.target.closest('button[id^="close"]');
-            if (!btn) return;
+            // Handle collapse toggle for relationship summary
+            const toggleBtn = e.target.closest('#collapseRelationshipSummaryCard, #toggleRelationshipSummary');
+            if (toggleBtn) {
+                const card = document.getElementById('relationshipSummaryCard');
+                if (card) card.classList.toggle('collapsed');
+                return;
+            }
+
+            // Handle close buttons for other cards
+            const closeBtn = e.target.closest('button[id^="close"]');
+            if (!closeBtn) return;
 
             const cardMap = {
-                'closeRelationshipSummaryCard': 'relationshipSummaryCard',
                 'closeImpactAnalysisCard': 'impactAnalysisCard'
             };
 
-            const card = document.getElementById(cardMap[btn.id]);
+            const card = document.getElementById(cardMap[closeBtn.id]);
             if (card) card.style.display = 'none';
         });
     }
