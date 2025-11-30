@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: transactions
+    description: "Final mart model combining transaction, account, and country data. Provides a complete view of transactions with all related dimensions for business reporting and analytics."
+    config:
+      tags: ['PII']
+
+  - name: accounts_tiering
+    description: "Mart model that categorizes accounts into tiers based on transaction activity and account metrics. Used for customer segmentation and analysis."
+    config:
+      tags: ['PII']
+
+  - name: crypto_portfolio_daily
+    description: "Daily aggregated mart model for cryptocurrency portfolio positions and valuations. Provides end-of-day snapshots for portfolio analysis."
