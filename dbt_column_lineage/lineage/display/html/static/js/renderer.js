@@ -237,7 +237,14 @@ function drawModels(g, state, config, dragBehavior) {
             if (modelType === 'source') return '#0f766e';
             return '#1e293b';
         })
+        .style('cursor', 'pointer')
         .text(d => d.name)
+        .on('click', function(event, d) {
+            event.stopPropagation();
+            if (d && d.name && typeof ModelDetailsModule !== 'undefined') {
+                ModelDetailsModule.showCard(d.name);
+            }
+        })
         .each(function(d) {
             // Truncate text if too long (leave space for expand icon)
             const maxWidth = config.box.width - 80; // More space for expand icon
