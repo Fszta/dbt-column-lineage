@@ -59,6 +59,24 @@ This starts a server (defaulting to port 8000). Open your web browser to the spe
    - Affected models in the dependency chain
    - Affected exposures
 
+### Machine-readable output (AI / automation)
+
+Emit column lineage and downstream impact analysis as a single JSON document —
+ideal for feeding AI agents, CI checks, or other tooling:
+
+```bash
+dbt-col-lineage --select stg_accounts.account_id --format json \
+    --manifest path/to/manifest.json --catalog path/to/catalog.json
+```
+
+The document contains the column's `upstream` and `downstream` lineage (each split
+into `models`, `sources`, `direct_refs`, `exposures`) and, when downstream lineage
+is requested, an `impact` block summarising affected models, columns and exposures.
+
+> Note: the tool works even when your `manifest.json` doesn't embed `compiled_code`
+> (e.g. produced by `dbt parse`), as long as `target/compiled/**` exists — it falls
+> back to the compiled SQL on disk.
+
 ### Options
 
 - `--explore`: Starts the interactive web server for exploring lineage and impact analysis
@@ -66,6 +84,7 @@ This starts a server (defaulting to port 8000). Open your web browser to the spe
 - `--manifest`: Path to the dbt manifest file (default: `target/manifest.json`)
 - `--port`, `-p`: Port for the interactive web server (default: `8000`)
 - `--adapter`: Override the SQL dialect used by the parser (sqlglot dialect name, e.g., `tsql`, `snowflake`, `bigquery`). When provided, this overrides the adapter detected from the dbt manifest.
+- `--format`, `-f`: Output format for `--select`: `text` (default), `dot`, or `json`.
 
 ## Limitations
 - Doesn't support python models
