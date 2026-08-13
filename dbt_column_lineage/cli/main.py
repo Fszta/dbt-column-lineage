@@ -4,7 +4,7 @@ import click
 import logging
 from typing import Optional
 
-from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay
+from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay, JsonDisplay
 from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
 from dbt_column_lineage.lineage.service import LineageService, LineageSelector
 from dbt_column_lineage.lineage.display.base import LineageStaticDisplay
@@ -41,10 +41,10 @@ logging.basicConfig(
     default="target/manifest.json",
     help="Path to the dbt manifest file"
 )
-@click.option('--format', '-f', 
-              type=click.Choice(['text', 'dot']), 
+@click.option('--format', '-f',
+              type=click.Choice(['text', 'dot', 'json']),
               default='text',
-              help='Output format (text or dot graph)')
+              help='Output format (text, dot graph, or machine-readable json)')
 @click.option('--output', '-o', default='lineage',
               help='Output file name for dot format (without extension)')
 @click.option('--port', '-p', 
@@ -84,6 +84,8 @@ def cli(select: str, explore: bool, catalog: str, manifest: str, format: str, ou
                     display = DotDisplay(output, registry=service.registry)
                     display.main_model = selector.model
                     display.main_column = selector.column
+                elif format == 'json':
+                    display = JsonDisplay()
                 else:
                     display = TextDisplay()
 
@@ -96,6 +98,15 @@ def cli(select: str, explore: bool, catalog: str, manifest: str, format: str, ou
                 if selector.downstream:
                     downstream_refs = service._get_downstream_lineage(selector.model, selector.column)
                     display.display_downstream(downstream_refs)
+
+                if format == 'json' and isinstance(display, JsonDisplay):
+                    # Impact analysis is the flagship capability; include it whenever
+                    # downstream lineage was requested so the JSON is self-contained.
+                    if selector.downstream:
+                        display.set_impact(
+                            service.get_column_impact(selector.model, selector.column)
+                        )
+                    display.save()
 
                 if format == 'dot':
                     display.save()

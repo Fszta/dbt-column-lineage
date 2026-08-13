@@ -38,10 +38,9 @@ class ManifestReader:
         """
         dependencies = {}
         for model_id, model_data in self.manifest.get("nodes", {}).items():
-            depends_on = set(
-                f"{dep['alias']}.{dep['alias']}"
-                for dep in model_data.get("depends_on", {}).get("nodes", [])
-            )
+            # `depends_on.nodes` is a list of unique_id strings (e.g. "model.pkg.name"),
+            # not a list of dicts, so index it directly.
+            depends_on = set(model_data.get("depends_on", {}).get("nodes", []))
             dependencies[model_id] = depends_on
         return dependencies
 
@@ -94,13 +93,64 @@ class ManifestReader:
 
         return downstream
 
+    def _resolve_compiled_file(self, node: Dict[str, Any]) -> Optional[Path]:
+        """Locate the on-disk compiled SQL file for a node.
+
+        Many real manifests are produced without embedded ``compiled_code`` (e.g.
+        ``dbt parse`` or ``dbt docs generate`` without a compile step). In that case
+        the compiled SQL still lives under ``target/compiled/**`` on disk, so we
+        reconstruct its path from the manifest location and node metadata.
+        """
+        if not self.manifest_path:
+            return None
+
+        target_dir = self.manifest_path.parent
+        project_root = target_dir.parent
+
+        candidates = []
+
+        # dbt records ``compiled_path`` relative to the project root once compiled.
+        compiled_path = node.get("compiled_path")
+        if compiled_path:
+            candidates.append(project_root / compiled_path)
+            candidates.append(Path(compiled_path))
+
+        # dbt convention: <target>/compiled/<package_name>/<original_file_path>
+        package_name = node.get("package_name")
+        original_file_path = node.get("original_file_path")
+        if package_name and original_file_path:
+            candidates.append(target_dir / "compiled" / package_name / original_file_path)
+
+        for candidate in candidates:
+            try:
+                if candidate.is_file():
+                    return candidate
+            except OSError:
+                continue
+        return None
+
     def get_compiled_sql(self, model_name: str) -> Optional[str]:
-        """Get compiled SQL for a model from the manifest."""
+        """Get compiled SQL for a model.
+
+        Prefers SQL embedded in the manifest, falling back to the compiled file on
+        disk when the manifest was produced without embedded compiled code.
+        """
         node = self._find_node(model_name)
         if not node:
             return None
 
-        return node.get("compiled_sql") or node.get("compiled_code")
+        embedded = node.get("compiled_sql") or node.get("compiled_code")
+        if embedded:
+            return embedded
+
+        compiled_file = self._resolve_compiled_file(node)
+        if compiled_file:
+            try:
+                return compiled_file.read_text()
+            except OSError:
+                return None
+
+        return None
 
     def get_model_path(self, model_name: str) -> Optional[str]:
         """Get the path to the model from the manifest."""
