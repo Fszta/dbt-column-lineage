@@ -1,13 +1,20 @@
 from pathlib import Path
-from typing import Dict, Set, Optional, Any, Union
+from typing import Dict, List, Set, Optional, Any, Tuple, Union, TYPE_CHECKING
 from dataclasses import dataclass, field
 import logging
 
 from dbt_column_lineage.artifacts.registry import ModelRegistry
+
+if TYPE_CHECKING:
+    from dbt_column_lineage.lineage.changeset import ColumnChange
 from dbt_column_lineage.models.schema import ColumnLineage
 from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
 
 logger = logging.getLogger(__name__)
+
+# Higher rank == more severe. Used to keep the worst severity when the same
+# downstream node is reached by several changed columns.
+_SEVERITY_RANK: Dict[str, int] = {"critical": 2, "low_impact": 1}
 
 
 @dataclass
@@ -547,3 +554,84 @@ class LineageService:
         except Exception as e:
             logger.error(f"Error in impact analysis for {model_name}.{column_name}: {e}")
             raise
+
+    def get_changeset_impact(
+        self,
+        changes: List["ColumnChange"],
+        base_service: Optional["LineageService"] = None,
+    ) -> Dict[str, Any]:
+        """Aggregate single-column impact across a changeset into one blast radius.
+
+        ``self`` is the *head* service. Each change is fanned through
+        :meth:`get_column_impact` and downstream nodes are deduplicated by
+        ``(model, column)``, keeping the highest severity per node.
+
+        Removed columns no longer exist in head, so their impact is computed
+        against ``base_service`` (where the column and its downstream consumers
+        still exist). If no base service is supplied, such changes are reported as
+        unresolved rather than silently dropped.
+
+        Returns a dict with the same top-level keys as :meth:`get_column_impact`
+        (``summary``, ``affected_models``, ``affected_columns``,
+        ``affected_exposures``) plus a ``by_change`` breakdown.
+        """
+        # Deferred import: changeset depends on the registry, not the service, so
+        # importing here keeps module load order simple and avoids any cycle.
+        from dbt_column_lineage.lineage.changeset import ChangeKind
+
+        affected_models: Dict[str, Dict[str, Any]] = {}
+        affected_columns: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        affected_exposures: Dict[str, Dict[str, Any]] = {}
+        by_change: List[Dict[str, Any]] = []
+        unresolved = 0
+
+        for change in changes:
+            service = self
+            if change.kind == ChangeKind.REMOVED and base_service is not None:
+                service = base_service
+
+            try:
+                impact = service.get_column_impact(change.model, change.column)
+            except Exception as e:
+                logger.info(
+                    f"Could not resolve impact for {change.model}.{change.column} "
+                    f"({change.kind.value}): {e}"
+                )
+                unresolved += 1
+                by_change.append({**change.to_dict(), "resolved": False})
+                continue
+
+            for model in impact["affected_models"]:
+                affected_models[model["name"]] = model
+
+            for column in impact["affected_columns"]:
+                key = (column["model"], column["column"])
+                existing = affected_columns.get(key)
+                if existing is None or _SEVERITY_RANK.get(
+                    column["severity"], 0
+                ) > _SEVERITY_RANK.get(existing["severity"], 0):
+                    affected_columns[key] = column
+
+            for exposure in impact["affected_exposures"]:
+                affected_exposures[exposure["name"]] = exposure
+
+            by_change.append({**change.to_dict(), "resolved": True, "summary": impact["summary"]})
+
+        deduped_columns = [affected_columns[key] for key in sorted(affected_columns)]
+        critical_count = sum(1 for c in deduped_columns if c["severity"] == "critical")
+        low_impact_count = len(deduped_columns) - critical_count
+
+        return {
+            "summary": {
+                "affected_models": len(affected_models),
+                "affected_columns": len(deduped_columns),
+                "affected_exposures": len(affected_exposures),
+                "critical_count": critical_count,
+                "low_impact_count": low_impact_count,
+                "unresolved_changes": unresolved,
+            },
+            "affected_models": [affected_models[name] for name in sorted(affected_models)],
+            "affected_columns": deduped_columns,
+            "affected_exposures": [affected_exposures[name] for name in sorted(affected_exposures)],
+            "by_change": by_change,
+        }
