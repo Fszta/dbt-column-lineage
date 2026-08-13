@@ -77,6 +77,33 @@ is requested, an `impact` block summarising affected models, columns and exposur
 > (e.g. produced by `dbt parse`), as long as `target/compiled/**` exists — it falls
 > back to the compiled SQL on disk.
 
+### Diff-driven impact (`impact`)
+
+The unit of work in a PR is a *set* of changed columns, not a single one. The
+`impact` command derives that changeset and reports one consolidated blast radius.
+
+Two-manifest diff (the reliable, dbt-native signal — compares the base branch's
+artifacts against the current ones for added / removed / retyped columns and
+changed compiled SQL):
+
+```bash
+dbt-col-lineage impact \
+    --manifest target/manifest.json --catalog target/catalog.json \
+    --base-manifest base/manifest.json --base-catalog base/catalog.json
+```
+
+Git-diff fallback (when only one manifest is available — diffs changed `.sql`
+model files against a git ref and treats touched models as logic changes):
+
+```bash
+dbt-col-lineage impact --git-base main
+```
+
+Output defaults to a human-readable Markdown summary (exposures first, then a
+blast-radius table). Use `--format json` for a machine-readable report — a
+superset of the single-column `impact` block plus a top-level `changeset` and a
+per-change `by_change` breakdown.
+
 ### Options
 
 - `--explore`: Starts the interactive web server for exploring lineage and impact analysis
