@@ -16,7 +16,9 @@ class LineageStaticDisplay(ABC):
         pass
 
     @abstractmethod
-    def display_downstream(self, refs: Dict[str, Dict[str, ColumnLineage]]) -> None:
+    def display_downstream(
+        self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]
+    ) -> None:
         """Display downstream lineage."""
         pass
 

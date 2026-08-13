@@ -103,8 +103,12 @@ class DotDisplay(LineageStaticDisplay):
                      if k not in ('sources', 'direct_refs') and isinstance(v, dict)}
         self._add_refs(model_refs, direction='upstream')
 
-    def display_downstream(self, refs: Dict[str, Dict[str, ColumnLineage]]) -> None:
-        self._add_refs(refs, direction='downstream')
+    def display_downstream(
+        self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]
+    ) -> None:
+        model_refs = {k: v for k, v in refs.items()
+                     if k not in ('exposures', 'sources', 'direct_refs') and isinstance(v, dict)}
+        self._add_refs(model_refs, direction='downstream')
 
     def save(self) -> None:
         self.dot.render(self.output_file, view=True, format='png')
