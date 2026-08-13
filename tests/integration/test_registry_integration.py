@@ -596,3 +596,73 @@ def test_star_sources_matching_with_case_difference(tmp_path: Path) -> None:
         source_columns = {src for lineage in order_id_col.lineage for src in lineage.source_columns}
         # Should have lineage to raw_orders_table.order_id
         assert any("raw_orders_table.order_id" in src for src in source_columns)
+
+
+def test_models_read_schema_and_database_from_catalog_metadata(registry):
+    """Regression: schema/database come from node['metadata'] in dbt's catalog.json.
+
+    They were previously read from non-existent top-level keys and always fell back to
+    the hardcoded 'main' placeholder.
+    """
+    models = registry.get_models()
+    transactions = models["transactions"]
+
+    # The DuckDB test project materializes into database "test", schema "main".
+    # The database value is the key regression: pre-fix it was always "main".
+    assert transactions.database == "test"
+    assert transactions.schema_name == "main"
+
+
+def test_no_model_falls_back_to_main_database(registry):
+    """Regression: no model should silently fall back to the 'main' database placeholder."""
+    models = registry.get_models()
+    assert models, "expected the test project to expose at least one model"
+
+    databases = {model.database for model in models.values()}
+    # Every relation in the test project lives in the "test" DuckDB database.
+    assert databases == {"test"}, f"expected all databases to be 'test', got {databases}"
+
+
+def test_cte_chain_column_resolves_to_base_model_not_cte_alias(registry):
+    """Regression: a column read through a chain of star-passthrough CTEs must resolve to
+    the base model, never to an intermediate CTE alias.
+
+    int_status_flags is `select * from passthrough_one; select * from passthrough_two;
+    select <derived> from ...` where passthrough_one -> stg_transactions. A single
+    cte_to_model hop used to leave the source pointing at the CTE alias 'passthrough_one'
+    /'passthrough_two' (a phantom upstream that is not a model), so the reference was
+    silently dropped. It must now resolve transitively to stg_transactions.
+    """
+    models = registry.get_models()
+    assert "int_status_flags" in models
+    model = models["int_status_flags"]
+
+    # The model's only real upstream is stg_transactions.
+    assert model.upstream == {"stg_transactions"}
+
+    cte_aliases = {"passthrough_one", "passthrough_two", "flagged"}
+
+    def source_tables(column_name):
+        tables = set()
+        for lineage in model.columns[column_name].lineage or []:
+            for src in lineage.source_columns:
+                if "." in src:
+                    tables.add(src.rsplit(".", 1)[0])
+        return tables
+
+    # Derived column: reads status + amount through two passthrough CTEs.
+    executed_tables = source_tables("executed_amount")
+    assert executed_tables, "executed_amount should have resolved upstream columns"
+    assert executed_tables & cte_aliases == set(), (
+        f"CTE aliases leaked into lineage: {executed_tables & cte_aliases}"
+    )
+    assert executed_tables == {"stg_transactions"}, (
+        f"executed_amount should resolve to stg_transactions, got {executed_tables}"
+    )
+
+    # Direct passthrough column resolves the same way.
+    tid_tables = source_tables("transaction_id")
+    assert tid_tables & cte_aliases == set(), (
+        f"CTE aliases leaked into lineage: {tid_tables & cte_aliases}"
+    )
+    assert tid_tables == {"stg_transactions"}

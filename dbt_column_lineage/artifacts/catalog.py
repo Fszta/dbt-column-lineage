@@ -22,11 +22,16 @@ class CatalogReader:
 
         for node_id, model_data in nodes.items():
             resource_type = node_id.split(".")[0]
-            model_name = (model_data.get("name") or node_id.split(".")[-1]).lower()
+            # In dbt's catalog.json the schema/database/name live under `metadata`,
+            # not at the top level of the node.
+            metadata = model_data.get("metadata", {})
+            model_name = (
+                metadata.get("name") or model_data.get("name") or node_id.split(".")[-1]
+            ).lower()
             processed_data = {
                 "name": model_name,
-                "schema": model_data.get("schema") or "main",
-                "database": model_data.get("database") or "main",
+                "schema": metadata.get("schema") or model_data.get("schema") or "main",
+                "database": metadata.get("database") or model_data.get("database") or "main",
                 "columns": {},
                 "resource_type": resource_type,
             }
@@ -59,8 +64,8 @@ class CatalogReader:
 
             processed_data = {
                 "name": table_name,
-                "schema": source_data.get("schema") or "main",
-                "database": source_data.get("database") or "main",
+                "schema": metadata.get("schema") or source_data.get("schema") or "main",
+                "database": metadata.get("database") or source_data.get("database") or "main",
                 "columns": {},
                 "resource_type": "source",
                 "source_identifier": normalized_source_identifier,

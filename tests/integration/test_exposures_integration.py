@@ -1,5 +1,6 @@
 import pytest
 from dbt_column_lineage.lineage.service import LineageService, LineageSelector
+from dbt_column_lineage.lineage.display.text import TextDisplay
 from pathlib import Path
 
 
@@ -10,6 +11,50 @@ def lineage_service(dbt_artifacts):
         catalog_path=Path(dbt_artifacts["catalog_path"]),
         manifest_path=Path(dbt_artifacts["manifest_path"])
     )
+
+
+def test_display_downstream_with_exposures_does_not_crash(lineage_service, capsys):
+    """Regression: display_downstream must render the 'exposures' set key without crashing.
+
+    Downstream lineage returns a dict that mixes {model: {col: lineage}} entries with an
+    'exposures' set. display_downstream used to iterate every value as a dict and call
+    .items() on the set, raising "'set' object has no attribute 'items'".
+    """
+    selector = LineageSelector(
+        model="transactions", column="transaction_id", upstream=False, downstream=True
+    )
+    downstream = lineage_service.get_column_info(selector)["downstream"]
+
+    # Sanity: this column's downstream is exactly the case that used to crash.
+    assert "exposures" in downstream
+    assert isinstance(downstream["exposures"], set)
+
+    # Before the fix this raised AttributeError: 'set' object has no attribute 'items'.
+    TextDisplay().display_downstream(downstream)
+
+    out = capsys.readouterr().out
+    assert "Downstream dependencies:" in out
+    assert "Exposures:" in out
+    assert "transactions_dashboard" in out
+    assert "api_transactions_endpoint" in out
+
+
+def test_display_downstream_with_models_and_exposures(lineage_service, capsys):
+    """Regression: a downstream dict mixing model entries and the exposures set renders fully."""
+    selector = LineageSelector(
+        model="stg_transactions", column="transaction_id", upstream=False, downstream=True
+    )
+    downstream = lineage_service.get_column_info(selector)["downstream"]
+
+    # This column flows into the `transactions` model AND onward to exposures.
+    assert "transactions" in downstream
+    assert "exposures" in downstream
+
+    TextDisplay().display_downstream(downstream)
+
+    out = capsys.readouterr().out
+    assert "Model transactions:" in out
+    assert "Exposures:" in out
 
 
 def test_transactions_lineage_includes_exposures(lineage_service):

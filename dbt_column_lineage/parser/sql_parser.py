@@ -566,10 +566,30 @@ class SQLColumnParser:
                     return cte_sources[table][key]
 
         if table and cte_to_model and table in cte_to_model:
-            return f"{cte_to_model[table]}.{col_name_lower}"
+            base_table = self._resolve_base_table(table, cte_to_model)
+            return f"{base_table}.{col_name_lower}"
         elif table:
             return f"{table}.{col_name_lower}"
         return column
+
+    def _resolve_base_table(self, table: str, cte_to_model: Dict[str, str]) -> str:
+        """Follow cte_to_model transitively until reaching a table that is not a CTE.
+
+        A single cte_to_model lookup can land on another CTE alias (e.g. a chain of
+        star-passthrough CTEs), which would otherwise leak an internal CTE name into the
+        lineage as if it were an upstream model. Walk to the ultimate base table, mirroring
+        CTEHandler.trace_base_tables. A visited set and the self-reference guards prevent
+        infinite loops on recursive/self-referential mappings.
+        """
+        current = table
+        visited: Set[str] = set()
+        while current in cte_to_model and current not in visited:
+            visited.add(current)
+            next_table = cte_to_model[current]
+            if next_table == current or next_table == current.split(".")[-1]:
+                break
+            current = next_table
+        return current
 
     def _handle_forward_reference(
         self,
