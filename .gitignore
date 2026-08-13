@@ -5,6 +5,9 @@ logs/
 .user.yml
 
 # Python
+build/
+dist/
+*.egg-info/
 __pycache__/
 *.py[cod]
 *$py.class

@@ -15,8 +15,8 @@ def sample_manifest(tmp_path):
                 "resource_type": "model",
                 "depends_on": {
                     "nodes": [
-                        {"name": "stg_customers", "alias": "stg_customers"},
-                        {"name": "stg_orders", "alias": "stg_orders"},
+                        "model.jaffle_shop.stg_customers",
+                        "model.jaffle_shop.stg_orders",
                     ]
                 },
             },
@@ -48,7 +48,7 @@ def real_manifest(tmp_path):
             "model.jaffle_shop.orders": {
                 "name": "orders",
                 "resource_type": "model",
-                "depends_on": {"nodes": [{"name": "raw_orders", "alias": "raw_orders"}]},
+                "depends_on": {"nodes": ["source.jaffle_shop.raw_orders"]},
                 "compiled_sql": "SELECT id, user_id, order_date, status, amount FROM raw_orders",
                 "columns": {
                     "id": {"name": "id", "description": "Primary key"},
@@ -64,8 +64,8 @@ def real_manifest(tmp_path):
                 "resource_type": "model",
                 "depends_on": {
                     "nodes": [
-                        {"name": "raw_customers", "alias": "raw_customers"},
-                        {"name": "orders", "alias": "orders"},
+                        "source.jaffle_shop.raw_customers",
+                        "model.jaffle_shop.orders",
                     ]
                 },
                 "compiled_sql": """
@@ -97,8 +97,8 @@ def real_manifest(tmp_path):
                 "resource_type": "model",
                 "depends_on": {
                     "nodes": [
-                        {"name": "customers", "alias": "customers"},
-                        {"name": "orders", "alias": "orders"},
+                        "model.jaffle_shop.customers",
+                        "model.jaffle_shop.orders",
                     ]
                 },
                 "compiled_sql": """
@@ -193,8 +193,8 @@ def test_manifest_loading_and_dependencies(sample_manifest):
 
     assert "model.jaffle_shop.customers" in dependencies
     assert dependencies["model.jaffle_shop.customers"] == {
-        "stg_customers.stg_customers",
-        "stg_orders.stg_orders",
+        "model.jaffle_shop.stg_customers",
+        "model.jaffle_shop.stg_orders",
     }
 
     assert "model.jaffle_shop.stg_customers" in dependencies
@@ -216,9 +216,15 @@ def test_complex_dependencies(real_manifest):
     dependencies = reader.get_model_dependencies()
 
     dependency_tests = {
-        "model.jaffle_shop.orders": {"raw_orders.raw_orders"},
-        "model.jaffle_shop.customers": {"raw_customers.raw_customers", "orders.orders"},
-        "model.jaffle_shop.customer_orders": {"customers.customers", "orders.orders"},
+        "model.jaffle_shop.orders": {"source.jaffle_shop.raw_orders"},
+        "model.jaffle_shop.customers": {
+            "source.jaffle_shop.raw_customers",
+            "model.jaffle_shop.orders",
+        },
+        "model.jaffle_shop.customer_orders": {
+            "model.jaffle_shop.customers",
+            "model.jaffle_shop.orders",
+        },
     }
 
     for model, expected_deps in dependency_tests.items():
