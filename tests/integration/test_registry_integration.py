@@ -596,3 +596,28 @@ def test_star_sources_matching_with_case_difference(tmp_path: Path) -> None:
         source_columns = {src for lineage in order_id_col.lineage for src in lineage.source_columns}
         # Should have lineage to raw_orders_table.order_id
         assert any("raw_orders_table.order_id" in src for src in source_columns)
+
+
+def test_models_read_schema_and_database_from_catalog_metadata(registry):
+    """Regression: schema/database come from node['metadata'] in dbt's catalog.json.
+
+    They were previously read from non-existent top-level keys and always fell back to
+    the hardcoded 'main' placeholder.
+    """
+    models = registry.get_models()
+    transactions = models["transactions"]
+
+    # The DuckDB test project materializes into database "test", schema "main".
+    # The database value is the key regression: pre-fix it was always "main".
+    assert transactions.database == "test"
+    assert transactions.schema_name == "main"
+
+
+def test_no_model_falls_back_to_main_database(registry):
+    """Regression: no model should silently fall back to the 'main' database placeholder."""
+    models = registry.get_models()
+    assert models, "expected the test project to expose at least one model"
+
+    databases = {model.database for model in models.values()}
+    # Every relation in the test project lives in the "test" DuckDB database.
+    assert databases == {"test"}, f"expected all databases to be 'test', got {databases}"
