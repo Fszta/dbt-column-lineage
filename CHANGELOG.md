@@ -1,3 +1,15 @@
+## [0.10.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.9.0...v0.10.0) (2026-08-14)
+
+
+### Features
+
+* **impact:** --scope-git to restrict two-manifest diff to branch-changed models ([f089445](https://github.com/Fszta/dbt-column-lineage/commit/f0894455098b47c6fdf4a6ee4ec9a3a0d5988209))
+
+
+### Bug Fixes
+
+* **ci:** pin Poetry to 2.1.3 in publish workflow ([5f4181e](https://github.com/Fszta/dbt-column-lineage/commit/5f4181e533bf2ce5706e9b04b22af2a7383f07af))
+
 ## [0.9.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.8.0...v0.9.0) (2026-08-14)
 
 
