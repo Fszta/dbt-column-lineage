@@ -23,10 +23,12 @@ jobs:
         cache: 'pip'
     
     - name: Install Poetry
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-    
+      uses: snok/install-poetry@v1
+      with:
+        # Pin Poetry: "latest" (2.4.1) fails to install on the runners, matching
+        # the pin already used in test.yml.
+        version: 2.1.3
+
     - name: Check Poetry version
       run: poetry --version
     
