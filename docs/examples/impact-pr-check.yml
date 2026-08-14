@@ -1,0 +1,57 @@
+# Example PR check — copy into your dbt project's .github/workflows/.
+#
+# On every pull request it builds the base- and head-branch dbt artifacts,
+# runs the two-manifest diff, and posts a sticky column-level blast-radius
+# comment on the PR. It starts non-blocking (fail-on: none); flip fail-on to
+# `exposures` or `critical` once the team trusts the coverage number.
+name: dbt column impact
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write # required to post the sticky comment
+
+jobs:
+  impact:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v4
+
+      # Build the HEAD (PR) artifacts. Replace with your own dbt setup /
+      # profiles. `dbt parse` is enough — the tool falls back to compiled SQL
+      # on disk when manifest.json lacks compiled_code.
+      - name: Build head artifacts
+        run: |
+          pip install dbt-core dbt-<your-adapter>
+          dbt deps
+          dbt compile
+          dbt docs generate
+          mkdir -p artifacts/head
+          cp target/manifest.json target/catalog.json artifacts/head/
+
+      # Build the BASE (target branch) artifacts for the two-manifest diff.
+      - name: Check out base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+      - name: Build base artifacts
+        working-directory: base
+        run: |
+          dbt deps
+          dbt compile
+          dbt docs generate
+          mkdir -p ../artifacts/base
+          cp target/manifest.json target/catalog.json ../artifacts/base/
+
+      - name: Column-level impact assessment
+        uses: Fszta/dbt-column-lineage@v0 # floating major; use @v0.8.0 to pin exactly
+        with:
+          manifest: artifacts/head/manifest.json
+          catalog: artifacts/head/catalog.json
+          base-manifest: artifacts/base/manifest.json
+          base-catalog: artifacts/base/catalog.json
+          fail-on: none # -> exposures | critical | any to enforce the gate

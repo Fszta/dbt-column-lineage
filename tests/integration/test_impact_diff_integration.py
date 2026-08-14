@@ -140,3 +140,62 @@ def test_impact_identical_manifests_report_no_change(dbt_artifacts):
     )
     assert result.exit_code == 0, result.output
     assert "No column changes detected" in result.output
+
+
+@pytest.fixture
+def no_gh_env(monkeypatch):
+    """Ensure CI runs of these tests don't resolve a real PR context and post."""
+    for var in ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_REPOSITORY", "GITHUB_EVENT_PATH"):
+        monkeypatch.delenv(var, raising=False)
+
+
+def _ci_args(dbt_artifacts, base_artifacts, *extra):
+    return [
+        "--manifest",
+        str(dbt_artifacts["manifest_path"]),
+        "--catalog",
+        str(dbt_artifacts["catalog_path"]),
+        "--base-manifest",
+        base_artifacts["manifest"],
+        "--base-catalog",
+        base_artifacts["catalog"],
+        "--ci",
+        *extra,
+    ]
+
+
+def test_ci_without_pr_context_skips_comment(dbt_artifacts, base_artifacts, no_gh_env):
+    result = _run_impact(_ci_args(dbt_artifacts, base_artifacts))
+    # Default --fail-on none -> warn only, exit 0.
+    assert result.exit_code == 0, result.output
+    assert "no PR context" in result.output
+    # Report is still printed to the log.
+    assert "Column-level impact" in result.output
+
+
+def test_ci_fail_on_any_gates_the_check(dbt_artifacts, base_artifacts, no_gh_env):
+    result = _run_impact(_ci_args(dbt_artifacts, base_artifacts, "--fail-on", "any"))
+    # The synthesized diff retypes/removes a widely-consumed column, so there is
+    # downstream impact -> the 'any' gate must fail the check.
+    assert result.exit_code == 1, result.output
+    assert "fail-on any" in result.output
+
+
+def test_ci_no_change_passes_gate(dbt_artifacts, no_gh_env):
+    result = _run_impact(
+        [
+            "--manifest",
+            str(dbt_artifacts["manifest_path"]),
+            "--catalog",
+            str(dbt_artifacts["catalog_path"]),
+            "--base-manifest",
+            str(dbt_artifacts["manifest_path"]),
+            "--base-catalog",
+            str(dbt_artifacts["catalog_path"]),
+            "--ci",
+            "--fail-on",
+            "critical",
+        ]
+    )
+    # No changes -> nothing to gate on, even a blocking policy passes.
+    assert result.exit_code == 0, result.output

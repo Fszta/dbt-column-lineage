@@ -49,6 +49,18 @@ jobs:
           draft: false
           prerelease: false
 
+      # Move the floating major tag (e.g. v0) to this release so consumers of the
+      # GitHub Action can pin `uses: Fszta/dbt-column-lineage@v0` and get updates
+      # within the major — the standard action-versioning convention.
+      - name: Update floating major tag
+        if: steps.changelog.outputs.skipped != 'true'
+        env:
+          VERSION: ${{ steps.changelog.outputs.version }}
+        run: |
+          MAJOR="v${VERSION%%.*}"
+          git tag -f "$MAJOR" "v${VERSION}"
+          git push origin -f "refs/tags/$MAJOR"
+
       - name: Setup Python
         if: steps.changelog.outputs.skipped != 'true'
         uses: actions/setup-python@v4

@@ -199,6 +199,34 @@ def cli(
     help="Output format for the impact report",
 )
 @click.option("--adapter", help="Override sqlglot dialect (e.g., tsql, snowflake, bigquery).")
+@click.option(
+    "--ci",
+    is_flag=True,
+    help="CI mode: post/update a sticky impact comment on the PR and apply the "
+    "--fail-on severity gate as an exit code.",
+)
+@click.option(
+    "--fail-on",
+    type=click.Choice(["none", "exposures", "critical", "any"]),
+    default="none",
+    help="Severity gate for --ci: fail (exit 1) when the impact reaches this "
+    "level. Defaults to 'none' (warn only, never block).",
+)
+@click.option(
+    "--github-token",
+    envvar="GITHUB_TOKEN",
+    help="GitHub token for posting the PR comment (defaults to $GITHUB_TOKEN).",
+)
+@click.option(
+    "--repo",
+    envvar="GITHUB_REPOSITORY",
+    help="owner/name of the repo (defaults to $GITHUB_REPOSITORY).",
+)
+@click.option(
+    "--pr-number",
+    type=int,
+    help="Pull request number (defaults to the GitHub Actions event payload).",
+)
 def impact(
     manifest: str,
     catalog: str,
@@ -207,11 +235,17 @@ def impact(
     git_base: Optional[str],
     format: str,
     adapter: Optional[str],
+    ci: bool,
+    fail_on: str,
+    github_token: Optional[str],
+    repo: Optional[str],
+    pr_number: Optional[int],
 ) -> None:
     """Diff-driven impact: assess the blast radius of a whole change (PR).
 
     Provide a base manifest/catalog for the reliable two-manifest diff, or a
-    --git-base ref for the git-diff fallback.
+    --git-base ref for the git-diff fallback. Add --ci to post the report as a
+    sticky PR comment and gate the check with --fail-on.
     """
     try:
         head_service = LineageService(Path(catalog), Path(manifest), adapter=adapter)
@@ -260,6 +294,57 @@ def impact(
     except Exception as e:
         click.echo(f"Error: {str(e)}", err=True)
         sys.exit(1)
+
+    # CI wiring is deliberately outside the try/except above: a failure to render
+    # the report is a hard error, but the CI gate deciding to fail the check
+    # (exit 1) is a normal outcome we don't want to mask as "Error: 1".
+    if ci:
+        _run_ci(report, fail_on, github_token, repo, pr_number)
+
+
+def _run_ci(
+    report: dict,
+    fail_on_value: str,
+    token: Optional[str],
+    repo: Optional[str],
+    pr_number: Optional[int],
+) -> None:
+    """Post the sticky PR comment (best-effort) and exit per the severity gate."""
+    from dbt_column_lineage.lineage.ci import (
+        FailOn,
+        gate_exit_code,
+        post_sticky_comment,
+        resolve_context,
+    )
+
+    body = render_changeset_markdown(report)
+    context = resolve_context(token, repo, pr_number)
+    if context is None:
+        click.echo(
+            "CI mode: no PR context resolved (need a GitHub token, repo and PR "
+            "number) — skipping the sticky comment.",
+            err=True,
+        )
+    else:
+        try:
+            outcome = post_sticky_comment(context, body)
+            click.echo(
+                f"CI mode: {outcome} impact comment on {context.repo}#{context.pr_number}.",
+                err=True,
+            )
+        except Exception as exc:
+            # A comment-post failure (network, permissions) shouldn't crash the
+            # gate — report it and still apply the severity policy.
+            click.echo(f"CI mode: failed to post PR comment: {exc}", err=True)
+
+    fail_on = FailOn(fail_on_value)
+    exit_code = gate_exit_code(report.get("summary", {}), fail_on)
+    if exit_code != 0:
+        click.echo(
+            f"CI gate '--fail-on {fail_on.value}' tripped — failing the check.",
+            err=True,
+        )
+    sys.exit(exit_code)
 
 
 def main() -> None:
