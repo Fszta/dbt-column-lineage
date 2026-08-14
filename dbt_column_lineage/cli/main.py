@@ -10,6 +10,8 @@ from dbt_column_lineage.lineage.changeset import (
     ColumnChange,
     build_changeset_report,
     build_git_changeset,
+    git_changed_models,
+    scope_changes_to_models,
 )
 from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay, JsonDisplay
 from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
@@ -192,6 +194,12 @@ def cli(
     "no base manifest is available. Reports touched models as logic changes.",
 )
 @click.option(
+    "--scope-git",
+    help="Restrict a two-manifest diff to models changed in `git diff <ref>...HEAD` "
+    "(e.g. origin/main). Drops changes on models the branch didn't touch — useful "
+    "when the base artifacts may be staler than the base ref.",
+)
+@click.option(
     "--format",
     "-f",
     type=click.Choice(["markdown", "json"]),
@@ -233,6 +241,7 @@ def impact(
     base_manifest: Optional[str],
     base_catalog: Optional[str],
     git_base: Optional[str],
+    scope_git: Optional[str],
     format: str,
     adapter: Optional[str],
     ci: bool,
@@ -253,6 +262,14 @@ def impact(
         base_service: Optional[LineageService] = None
         changes: List[ColumnChange]
 
+        if scope_git and not base_manifest:
+            click.echo(
+                "Error: --scope-git only applies to the two-manifest diff "
+                "(--base-manifest); the --git-base fallback is already file-scoped.",
+                err=True,
+            )
+            sys.exit(1)
+
         if base_manifest:
             resolved_base_catalog = base_catalog
             if not resolved_base_catalog:
@@ -272,6 +289,14 @@ def impact(
             )
             changes = ChangesetBuilder(base_service.registry, head_service.registry).build()
             source = "two-manifest"
+
+            if scope_git:
+                # Intersect the precise two-manifest changeset with the models the
+                # branch actually touched, so a stale base artifact can't leak
+                # already-merged changes into the report.
+                scoped_models = git_changed_models(head_service.registry, scope_git)
+                changes = scope_changes_to_models(changes, scoped_models)
+                source = f"two-manifest scoped to git-diff ({scope_git})"
         elif git_base:
             changes = build_git_changeset(head_service.registry, git_base)
             source = f"git-diff ({git_base})"
