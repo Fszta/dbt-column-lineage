@@ -104,6 +104,51 @@ blast-radius table). Use `--format json` for a machine-readable report — a
 superset of the single-column `impact` block plus a top-level `changeset` and a
 per-change `by_change` breakdown.
 
+### CI check + PR comment (`impact --ci`)
+
+`--ci` turns the report into a pull-request check: it posts a **sticky Markdown
+comment** (found-or-updated by a hidden marker, so re-runs edit one comment
+instead of spamming the thread) and applies a **severity gate** as the process
+exit code.
+
+```bash
+dbt-col-lineage impact --ci \
+    --manifest target/manifest.json --catalog target/catalog.json \
+    --base-manifest base/manifest.json --base-catalog base/catalog.json \
+    --fail-on exposures
+```
+
+- `--fail-on`: gate policy — `none` (default: warn only, never block),
+  `exposures` (fail when a business-facing exposure is affected), `critical`
+  (fail when a downstream column recomputes derived logic), or `any`.
+- The PR context (token, repo, PR number) is resolved from the standard GitHub
+  Actions environment (`GITHUB_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_EVENT_PATH`);
+  override with `--github-token` / `--repo` / `--pr-number`. When no context is
+  available the comment is skipped and only the gate runs.
+
+**GitHub Action.** A ready-to-use composite action ships in this repo. Pin the
+floating **major** tag to get updates within a major version (the usual
+convention, like `actions/checkout@v4`); the tool is currently `0.x`, so that
+tag is `@v0`:
+
+```yaml
+- uses: Fszta/dbt-column-lineage@v0
+  with:
+    manifest: artifacts/head/manifest.json
+    catalog: artifacts/head/catalog.json
+    base-manifest: artifacts/base/manifest.json
+    base-catalog: artifacts/base/catalog.json
+    fail-on: none # start non-blocking; flip to exposures|critical once trusted
+```
+
+For reproducible builds, pin an exact release instead — `@v0.8.0` (the same tag
+as the pip package). The action installs the source bundled at whichever ref you
+pin, so the CLI always matches it.
+
+The workflow needs `permissions: pull-requests: write` to post the comment. A
+complete example workflow (building base- and head-branch artifacts) lives at
+[`docs/examples/impact-pr-check.yml`](docs/examples/impact-pr-check.yml).
+
 ### Options
 
 - `--explore`: Starts the interactive web server for exploring lineage and impact analysis
@@ -112,6 +157,14 @@ per-change `by_change` breakdown.
 - `--port`, `-p`: Port for the interactive web server (default: `8000`)
 - `--adapter`: Override the SQL dialect used by the parser (sqlglot dialect name, e.g., `tsql`, `snowflake`, `bigquery`). When provided, this overrides the adapter detected from the dbt manifest.
 - `--format`, `-f`: Output format for `--select`: `text` (default), `dot`, or `json`.
+
+For the `impact` subcommand:
+
+- `--base-manifest` / `--base-catalog`: base-branch artifacts for the two-manifest diff.
+- `--git-base`: git ref to diff changed `.sql` files against (git-diff fallback).
+- `--ci`: post a sticky PR comment and apply the `--fail-on` severity gate as an exit code.
+- `--fail-on`: gate policy — `none` (default), `exposures`, `critical`, or `any`.
+- `--github-token` / `--repo` / `--pr-number`: override the GitHub context (defaults from the Actions env).
 
 ## Limitations
 - Doesn't support python models

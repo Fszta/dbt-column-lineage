@@ -1,0 +1,83 @@
+name: "dbt Column Lineage Impact"
+description: >-
+  Post a column-level blast-radius report as a sticky PR comment and optionally
+  gate the check on impact severity.
+author: "Fszta"
+branding:
+  icon: "git-branch"
+  color: "purple"
+
+inputs:
+  manifest:
+    description: "Path to the head (current) dbt manifest.json"
+    default: "target/manifest.json"
+  catalog:
+    description: "Path to the head (current) dbt catalog.json"
+    default: "target/catalog.json"
+  base-manifest:
+    description: "Path to the base (target-branch) manifest.json for the reliable two-manifest diff"
+    required: false
+    default: ""
+  base-catalog:
+    description: "Path to the base (target-branch) catalog.json (defaults to catalog.json next to base-manifest)"
+    required: false
+    default: ""
+  git-base:
+    description: "Fallback: git ref to diff changed .sql files against when no base manifest is available (e.g. origin/main)"
+    required: false
+    default: ""
+  fail-on:
+    description: "Severity gate: none | exposures | critical | any (default 'none' = warn only, never block)"
+    default: "none"
+  adapter:
+    description: "Override the sqlglot dialect (e.g. snowflake, bigquery, tsql)"
+    required: false
+    default: ""
+  github-token:
+    description: "Token used to post the sticky PR comment (needs pull-requests: write)"
+    default: ${{ github.token }}
+  python-version:
+    description: "Python version used to run the tool"
+    default: "3.11"
+  version:
+    description: >-
+      Override how dbt-col-lineage is installed. Empty (default) installs the
+      source bundled with this action ref, so the tool always matches the tag you
+      pin (e.g. @v0.8.0 runs the 0.8.0 code). Set to a PyPI version spec
+      (e.g. "0.8.0") to install from PyPI instead.
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install dbt-col-lineage
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          pip install "dbt-col-lineage==${{ inputs.version }}"
+        else
+          # $GITHUB_ACTION_PATH is this repo checked out at the pinned ref, so
+          # installing it means the CLI always matches the tag the caller pinned.
+          pip install "$GITHUB_ACTION_PATH"
+        fi
+
+    - name: Run column-level impact assessment
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        args=(impact --ci
+          --manifest "${{ inputs.manifest }}"
+          --catalog "${{ inputs.catalog }}"
+          --fail-on "${{ inputs.fail-on }}")
+        [ -n "${{ inputs.base-manifest }}" ] && args+=(--base-manifest "${{ inputs.base-manifest }}")
+        [ -n "${{ inputs.base-catalog }}" ] && args+=(--base-catalog "${{ inputs.base-catalog }}")
+        [ -n "${{ inputs.git-base }}" ] && args+=(--git-base "${{ inputs.git-base }}")
+        [ -n "${{ inputs.adapter }}" ] && args+=(--adapter "${{ inputs.adapter }}")
+        dbt-col-lineage "${args[@]}"
