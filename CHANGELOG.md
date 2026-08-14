@@ -1,3 +1,21 @@
+## [0.9.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.8.0...v0.9.0) (2026-08-14)
+
+
+### Features
+
+* **cli:** add machine-readable --format json for AI-first consumption ([9211c1f](https://github.com/Fszta/dbt-column-lineage/commit/9211c1facbbf49bf1e3fba06c05dc3b53f1e01b8))
+* **impact:** add diff-driven impact command ([b7eb165](https://github.com/Fszta/dbt-column-lineage/commit/b7eb165ca824527e4c4822efbb454bdb4c776314))
+* **impact:** CI mode with sticky PR comment and severity gate ([dd787af](https://github.com/Fszta/dbt-column-lineage/commit/dd787af998388fba0d7743147a86c3bb601a64c8))
+* **ui:** set initial state when no model is selected ([fc92a03](https://github.com/Fszta/dbt-column-lineage/commit/fc92a03088b2b765d7199824266d132ce19f5c82))
+
+
+### Bug Fixes
+
+* **catalog:** read schema/database/name from node metadata ([c2c9053](https://github.com/Fszta/dbt-column-lineage/commit/c2c9053476119f17e0816ee6c1a381a18b4f68ea))
+* **display:** handle exposures/sources sets in downstream output ([c2b8712](https://github.com/Fszta/dbt-column-lineage/commit/c2b8712c7d73cde856ca5dd909b8c6ebef8bb9da))
+* **manifest:** fall back to on-disk compiled SQL when manifest lacks compiled_code ([1a1af9a](https://github.com/Fszta/dbt-column-lineage/commit/1a1af9a3fed38bcfc28301e41de3c611860d4be8))
+* **parser:** resolve transitive CTE aliases to the base model ([0be42ea](https://github.com/Fszta/dbt-column-lineage/commit/0be42ea158a782c4c1e64bbe71df6104143a59b1))
+
 ## [0.8.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.7.0...v0.8.0) (2025-11-30)
 
 
