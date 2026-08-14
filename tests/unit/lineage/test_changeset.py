@@ -15,6 +15,7 @@ from dbt_column_lineage.lineage.changeset import (
     ChangesetBuilder,
     ColumnChange,
     build_changeset_report,
+    scope_changes_to_models,
 )
 from dbt_column_lineage.lineage.display.markdown import render_changeset_markdown
 from dbt_column_lineage.lineage.service import LineageService
@@ -295,6 +296,59 @@ def test_markdown_lists_exposures_first_and_blast_table():
     # exposures section appears before the columns table
     assert md.index("Affected exposures") < md.index("Affected columns")
     assert "`dm`" in md and "critical" in md
+
+
+# --- git scope filter ------------------------------------------------------
+
+
+@dataclass
+class _PathModel:
+    columns: Dict[str, _Col]
+    resource_path: Optional[str]
+
+
+class _PathRegistry:
+    def __init__(self, models: Dict[str, _PathModel]):
+        self._models = models
+
+    def get_models(self) -> Dict[str, _PathModel]:
+        return self._models
+
+
+def _registry_with_paths():
+    return _PathRegistry(
+        {
+            "orders": _PathModel({"id": _Col("int")}, "models/orders.sql"),
+            "customers": _PathModel({"id": _Col("int")}, "models/customers.sql"),
+        }
+    )
+
+
+def test_git_changed_models_maps_files_to_models(monkeypatch):
+    from dbt_column_lineage.lineage import changeset
+
+    monkeypatch.setattr(
+        changeset,
+        "_git_changed_sql_files",
+        lambda ref, repo_dir=None: ["models/orders.sql", "macros/helper.sql"],
+    )
+    changed = changeset.git_changed_models(_registry_with_paths(), "origin/main")
+    # orders maps to a model; the macro file has no model and is ignored.
+    assert changed == {"orders"}
+
+
+def test_scope_changes_to_models_filters():
+    changes = [
+        ColumnChange("orders", "id", ChangeKind.TYPE_CHANGED),
+        ColumnChange("customers", "id", ChangeKind.LOGIC_CHANGED),
+    ]
+    scoped = scope_changes_to_models(changes, {"orders"})
+    assert [(c.model, c.column) for c in scoped] == [("orders", "id")]
+
+
+def test_scope_changes_empty_when_no_overlap():
+    changes = [ColumnChange("customers", "id", ChangeKind.LOGIC_CHANGED)]
+    assert scope_changes_to_models(changes, {"orders"}) == []
 
 
 if __name__ == "__main__":

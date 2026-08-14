@@ -181,6 +181,47 @@ def test_ci_fail_on_any_gates_the_check(dbt_artifacts, base_artifacts, no_gh_env
     assert "fail-on any" in result.output
 
 
+def test_scope_git_requires_base_manifest(dbt_artifacts):
+    result = _run_impact(
+        [
+            "--manifest",
+            str(dbt_artifacts["manifest_path"]),
+            "--catalog",
+            str(dbt_artifacts["catalog_path"]),
+            "--scope-git",
+            "origin/main",
+        ]
+    )
+    assert result.exit_code == 1
+    assert "scope-git" in result.output
+
+
+def test_scope_git_filters_to_changed_models(dbt_artifacts, base_artifacts, monkeypatch):
+    # The two-manifest diff detects a change on stg_accounts, but we scope to a
+    # git diff that touched no matching model -> the changeset is emptied.
+    from dbt_column_lineage.lineage import changeset
+
+    monkeypatch.setattr(
+        changeset, "_git_changed_sql_files", lambda ref, repo_dir=None: ["macros/only.sql"]
+    )
+    result = _run_impact(
+        [
+            "--manifest",
+            str(dbt_artifacts["manifest_path"]),
+            "--catalog",
+            str(dbt_artifacts["catalog_path"]),
+            "--base-manifest",
+            base_artifacts["manifest"],
+            "--base-catalog",
+            base_artifacts["catalog"],
+            "--scope-git",
+            "origin/main",
+        ]
+    )
+    assert result.exit_code == 0, result.output
+    assert "No column changes detected" in result.output
+
+
 def test_ci_no_change_passes_gate(dbt_artifacts, no_gh_env):
     result = _run_impact(
         [

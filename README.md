@@ -162,6 +162,7 @@ For the `impact` subcommand:
 
 - `--base-manifest` / `--base-catalog`: base-branch artifacts for the two-manifest diff.
 - `--git-base`: git ref to diff changed `.sql` files against (git-diff fallback).
+- `--scope-git`: with a two-manifest diff, restrict the report to models changed in `git diff <ref>...HEAD` — drops changes on models the branch didn't touch (useful when the base artifacts may be staler than the base ref).
 - `--ci`: post a sticky PR comment and apply the `--fail-on` severity gate as an exit code.
 - `--fail-on`: gate policy — `none` (default), `exposures`, `critical`, or `any`.
 - `--github-token` / `--repo` / `--pr-number`: override the GitHub context (defaults from the Actions env).

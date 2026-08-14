@@ -1,0 +1,65 @@
+# Example PR check for a project whose prod artifacts (manifest + catalog) are
+# published to S3 WITHOUT compiled SQL — e.g. built by an external Airflow/MWAA
+# job you don't want to modify.
+#
+# Strategy (treat prod = main):
+#   - head (PR branch): `dbt docs generate` -> manifest + catalog + compiled.
+#   - base (prod):       manifest + catalog from S3, and compiled REPRODUCED by
+#                        recompiling origin/main in CI (compiled SQL is a pure
+#                        function of the code, so no need to publish it).
+#   - `scope-git: origin/main` restricts the report to models THIS branch changed,
+#                        so a stale S3 artifact can't leak already-merged changes.
+name: dbt column impact
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write # for AWS OIDC, if you use it
+  pull-requests: write # to post the sticky comment
+
+jobs:
+  impact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # scope-git needs history to diff against origin/main
+
+      # --- head (PR branch) artifacts ------------------------------------
+      - name: Build head artifacts
+        run: |
+          pip install dbt-core dbt-<your-adapter>
+          dbt deps
+          dbt docs generate # -> target/{manifest,catalog}.json + target/compiled/**
+
+      # --- base (prod) artifacts -----------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DBT_ARTIFACTS_ROLE }}
+          aws-region: eu-west-1
+
+      - name: Fetch prod manifest + catalog from S3
+        run: |
+          mkdir -p base/target
+          aws s3 cp s3://<your-bucket>/prod/manifest.json base/target/manifest.json
+          aws s3 cp s3://<your-bucket>/prod/catalog.json  base/target/catalog.json
+
+      - name: Reproduce prod compiled SQL (recompile origin/main)
+        run: |
+          git worktree add base-src origin/main
+          (cd base-src && dbt deps && dbt compile)
+          cp -r base-src/target/compiled base/target/compiled
+
+      # --- impact --------------------------------------------------------
+      - name: Column-level impact assessment
+        uses: Fszta/dbt-column-lineage@v0
+        with:
+          manifest: target/manifest.json
+          catalog: target/catalog.json
+          base-manifest: base/target/manifest.json
+          base-catalog: base/target/catalog.json
+          scope-git: origin/main # only report models this branch touched
+          fail-on: none # start non-blocking; flip to exposures|critical once trusted

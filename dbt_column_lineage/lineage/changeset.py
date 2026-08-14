@@ -15,7 +15,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from dbt_column_lineage.artifacts.registry import ModelRegistry
 from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
@@ -173,6 +173,34 @@ class ChangesetBuilder:
             return None
 
 
+def _path_to_model_map(head: ModelRegistry) -> Dict[str, str]:
+    """Map each model's ``resource_path`` (dbt ``original_file_path``) to its name."""
+    mapping: Dict[str, str] = {}
+    for model_name, model in head.get_models().items():
+        if model.resource_path:
+            mapping[_norm_path(model.resource_path)] = model_name
+    return mapping
+
+
+def git_changed_models(
+    head: ModelRegistry,
+    git_base: str,
+    repo_dir: Optional[str] = None,
+) -> Set[str]:
+    """Return the set of models whose ``.sql`` file changed against ``git_base``.
+
+    Files with no matching model (macros, tests, deleted files) are ignored, so
+    this reflects only *model* edits — the unit the scope filter cares about.
+    """
+    path_to_model = _path_to_model_map(head)
+    changed: Set[str] = set()
+    for changed_file in _git_changed_sql_files(git_base, repo_dir):
+        matched = path_to_model.get(_norm_path(changed_file))
+        if matched:
+            changed.add(matched)
+    return changed
+
+
 def build_git_changeset(
     head: ModelRegistry,
     git_base: str,
@@ -182,34 +210,32 @@ def build_git_changeset(
 
     When only one manifest is available we cannot diff columns, so every column
     of each touched model is reported as ``logic_changed`` — a coarse but honest
-    signal. Files are mapped to models via each model's ``resource_path``
-    (dbt's ``original_file_path``).
+    signal. Files are mapped to models via each model's ``resource_path``.
     """
-    changed_files = _git_changed_sql_files(git_base, repo_dir)
-    if not changed_files:
+    changed_models = git_changed_models(head, git_base, repo_dir)
+    if not changed_models:
         return []
 
-    # Map original_file_path -> model name for quick lookup.
-    path_to_model: Dict[str, str] = {}
     head_models = head.get_models()
-    for model_name, model in head_models.items():
-        if model.resource_path:
-            path_to_model[_norm_path(model.resource_path)] = model_name
-
     chosen: Dict[Tuple[str, str], ColumnChange] = {}
-    for changed in changed_files:
-        matched = path_to_model.get(_norm_path(changed))
-        if not matched:
-            # A changed file with no matching model (macro, test, deleted file, …).
-            continue
-        model_name = matched
+    for model_name in changed_models:
         model = head_models[model_name]
         for column in sorted(model.columns):
             chosen[(model_name, column)] = ColumnChange(
-                model_name, column, ChangeKind.LOGIC_CHANGED, detail=changed
+                model_name, column, ChangeKind.LOGIC_CHANGED, detail=model.resource_path
             )
 
     return sorted(chosen.values(), key=lambda c: (c.model, c.column))
+
+
+def scope_changes_to_models(changes: List[ColumnChange], models: Set[str]) -> List[ColumnChange]:
+    """Keep only changes whose model is in ``models``.
+
+    Used to intersect a precise two-manifest changeset with the set of models
+    the current branch actually touched (``git diff base...HEAD``), so a stale
+    base artifact can't leak already-merged changes into the report.
+    """
+    return [change for change in changes if change.model in models]
 
 
 def _norm_path(path: str) -> str:

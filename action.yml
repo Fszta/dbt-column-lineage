@@ -26,6 +26,10 @@ inputs:
     description: "Fallback: git ref to diff changed .sql files against when no base manifest is available (e.g. origin/main)"
     required: false
     default: ""
+  scope-git:
+    description: "With a two-manifest diff, restrict the report to models changed in `git diff <ref>...HEAD` (e.g. origin/main)"
+    required: false
+    default: ""
   fail-on:
     description: "Severity gate: none | exposures | critical | any (default 'none' = warn only, never block)"
     default: "none"
@@ -79,5 +83,6 @@ runs:
         [ -n "${{ inputs.base-manifest }}" ] && args+=(--base-manifest "${{ inputs.base-manifest }}")
         [ -n "${{ inputs.base-catalog }}" ] && args+=(--base-catalog "${{ inputs.base-catalog }}")
         [ -n "${{ inputs.git-base }}" ] && args+=(--git-base "${{ inputs.git-base }}")
+        [ -n "${{ inputs.scope-git }}" ] && args+=(--scope-git "${{ inputs.scope-git }}")
         [ -n "${{ inputs.adapter }}" ] && args+=(--adapter "${{ inputs.adapter }}")
         dbt-col-lineage "${args[@]}"
