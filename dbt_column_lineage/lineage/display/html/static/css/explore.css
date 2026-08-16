@@ -594,6 +594,32 @@
   gap: 12px;
 }
 
+/* Contextual header showing which model the column selector + Load act on */
+.selected-model-context {
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(196, 181, 253, 0.16) 0%, rgba(167, 139, 250, 0.10) 100%);
+  border: 1px solid rgba(167, 139, 250, 0.30);
+  border-radius: 10px;
+}
+
+.selected-model-context-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--slate-500);
+}
+
+.selected-model-context-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-700);
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-all;
+}
+
 .explore-panel-actions .column-selector label {
   display: flex;
   align-items: center;

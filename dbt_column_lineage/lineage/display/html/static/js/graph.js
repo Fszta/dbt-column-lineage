@@ -171,6 +171,15 @@ function filterGraphByVisibility(state, config) {
     }
 }
 
+// Re-fit the viewport to the new bounding box after an expand/collapse so
+// newly revealed nodes are brought on-screen. Delayed so the 300ms show/hide
+// transitions (and display:none on collapsed nodes) settle first.
+function refitAfterExpansion(state, config) {
+    if (state && state.svg && state.g && state.zoom && typeof resetView === 'function') {
+        setTimeout(() => resetView(state.svg, state.g, state.zoom, config), 350);
+    }
+}
+
 function updateExpandIcons(state) {
     d3.selectAll('.expand-icon-group').each(function() {
         const modelName = d3.select(this).attr('data-model-name');
@@ -564,6 +573,7 @@ function expandDownstreamInternal(modelName, state, config) {
         });
 
         updateExpandIcons(state);
+        refitAfterExpansion(state, config);
         state[expandingKey] = false;
     });
 }
@@ -743,6 +753,7 @@ function collapseDownstreamInternal(modelName, state, config) {
         });
 
         filterGraphByVisibility(state, config);
+        refitAfterExpansion(state, config);
         state[expandingKey] = false;
     });
 }
@@ -938,6 +949,7 @@ function expandUpstreamInternal(modelName, state, config) {
         });
 
         updateExpandIcons(state);
+        refitAfterExpansion(state, config);
         state[expandingKey] = false;
     });
 }
@@ -1029,6 +1041,7 @@ function collapseUpstreamInternal(modelName, state, config) {
         });
 
         filterGraphByVisibility(state, config);
+        refitAfterExpansion(state, config);
         state[expandingKey] = false;
     });
 }

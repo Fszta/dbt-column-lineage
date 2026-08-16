@@ -268,7 +268,9 @@ function drawModels(g, state, config, dragBehavior) {
     modelTitleText.each(function(d) {
         const self = d3.select(this);
         const originalText = self.attr('data-original-text');
-        if (originalText && originalText !== d.name) {
+        if (originalText) {
+            // Native SVG <title> fallback (zero-JS / a11y)
+            self.append('title').text(originalText);
             self
                 .style('pointer-events', 'all')
                 .style('cursor', 'help')
@@ -664,21 +666,14 @@ function drawColumns(nodes, state, config, onColumnClick) {
                 .attr('fill', col.isKey ? '#3b82f6' : '#94a3b8')
                 .attr('opacity', 0.7);
 
-            // --- Column Name Text ---
-            const columnNameText = columnGroup.append('text')
-                .attr('class', 'column-name')
-                .attr('x', 12)
-                .attr('y', (config.box.columnHeight - config.box.columnPadding) / 2)
-                .attr('dominant-baseline', 'middle')
-                .attr('font-size', '12px')
-                .attr('fill', '#334155')
-                .text(function() {
-                    const maxLength = 18;
-                    return col.name.length > maxLength ? col.name.substring(0, maxLength) + '...' : col.name;
-                })
-                .attr('data-original-text', col.name);
+            // --- Data Type Tag geometry (computed before the name so the name
+            //     can be pixel-truncated to the space actually left of the tag) ---
+            const nameX = 12;
+            const nameTagGap = 8;
+            // Default available width = up to the right padding when there is no tag
+            let nameAvailableWidth = config.box.width - (config.box.padding * 2) - nameX - nameTagGap;
+            let tagInfo = null;
 
-            // --- Data Type Tag (if exists) ---
             if (col.dataType) {
                 // Get short version of data type first
                 const shortType = col.dataType.toLowerCase()
@@ -704,6 +699,35 @@ function drawColumns(nodes, state, config, onColumnClick) {
 
                 // Calculate vertical center position
                 const yPosition = (config.box.columnHeight - config.box.columnPadding) / 2;
+
+                tagInfo = { shortType, tagWidth, xPosition, yPosition };
+                // Name may extend up to the tag's left edge, minus a small gap
+                nameAvailableWidth = xPosition - nameX - nameTagGap;
+            }
+
+            // --- Column Name Text (pixel-width truncation, matching model-title) ---
+            const columnNameText = columnGroup.append('text')
+                .attr('class', 'column-name')
+                .attr('x', nameX)
+                .attr('y', (config.box.columnHeight - config.box.columnPadding) / 2)
+                .attr('dominant-baseline', 'middle')
+                .attr('font-size', '12px')
+                .attr('fill', '#334155')
+                .text(col.name)
+                .attr('data-original-text', col.name);
+
+            columnNameText.each(function() {
+                const node = this;
+                let textStr = col.name;
+                while (textStr.length > 0 && node.getComputedTextLength() > nameAvailableWidth) {
+                    textStr = textStr.slice(0, -1);
+                    columnNameText.text(textStr + '...');
+                }
+            });
+
+            // --- Data Type Tag (drawn after the name) ---
+            if (tagInfo) {
+                const { shortType, tagWidth, xPosition, yPosition } = tagInfo;
 
                 const tagGroup = columnGroup.append('g')
                     .attr('class', 'column-type-tag')
