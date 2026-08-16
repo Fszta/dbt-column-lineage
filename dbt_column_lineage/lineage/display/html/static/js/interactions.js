@@ -66,10 +66,19 @@ function setupControlButtons(svg, g, zoom, state, config, edges) {
 
     document.getElementById('zoomIn').addEventListener('click', zoomIn);
     document.getElementById('zoomOut').addEventListener('click', zoomOut);
+    // Reset View only re-fits the CURRENT visible graph; it must NOT re-run
+    // layout (which would collapse expanded nodes).
     document.getElementById('resetView').addEventListener('click', () => {
-        updateLayout(state, config, edges);
-        setTimeout(() => resetView(svg, g, zoom, config), 600);
+        resetView(svg, g, zoom, config);
     });
+    // Re-layout button re-runs the layout (previously the Reset View behaviour).
+    const relayoutBtn = document.getElementById('relayout');
+    if (relayoutBtn) {
+        relayoutBtn.addEventListener('click', () => {
+            updateLayout(state, config, edges);
+            setTimeout(() => resetView(svg, g, zoom, config), 600);
+        });
+    }
 }
 
 function resetView(svg, g, zoom, config) {
@@ -85,12 +94,26 @@ function resetView(svg, g, zoom, config) {
                 .call(zoom.transform, d3.zoomIdentity.translate(0, 0).scale(1));
         }
 
+        // Reserve the footprint of the relationship summary card (a top-right
+        // overlay) so fitted nodes are not hidden behind it or under its
+        // pointer-capturing area.
+        let rightInset = 0;
+        const summaryCard = document.getElementById('relationshipSummaryCard');
+        if (summaryCard && summaryCard.style.display !== 'none' && summaryCard.offsetParent !== null) {
+            const cardRect = summaryCard.getBoundingClientRect();
+            if (cardRect.width > 0) {
+                rightInset = cardRect.width + 32; // card width + right margin + gap
+            }
+        }
+
+        const availWidth = Math.max(50, config.width - rightInset);
+
         const scale = Math.min(
-            config.width / graphBox.width,
+            availWidth / graphBox.width,
             config.height / graphBox.height
         ) * 0.9;
 
-        const translateX = (config.width - graphBox.width * scale) / 2 - graphBox.x * scale;
+        const translateX = (availWidth - graphBox.width * scale) / 2 - graphBox.x * scale;
         const translateY = (config.height - graphBox.height * scale) / 2 - graphBox.y * scale;
 
         // Validate scale and translation values

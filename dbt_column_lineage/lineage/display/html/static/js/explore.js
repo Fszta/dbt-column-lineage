@@ -177,6 +177,7 @@ const ExploreModule = (function() {
                         columnSelectWrapper.classList.add('disabled');
                         columnSelect.disabled = true;
                         loadLineageBtn.disabled = true;
+                        showSelectionContext(node);
                     });
                 } else {
                     nodeContent.classList.add('model');
@@ -202,6 +203,7 @@ const ExploreModule = (function() {
                         selectedModelData = node;
                         populateColumnSelector(node.columns);
                         document.getElementById('loadLineage').disabled = true;
+                        showSelectionContext(node);
                     });
                 }
             }
@@ -451,6 +453,73 @@ const ExploreModule = (function() {
         }
     }
 
+    // Surface the current selection next to the column selector + Load button so the
+    // model -> column -> Load flow is spatially obvious, and bring it into view.
+    function showSelectionContext(node) {
+        const ctx = document.getElementById('selectedModelContext');
+        const nameEl = document.getElementById('selectedModelContextName');
+        if (!ctx || !nameEl) return;
+        nameEl.textContent = node.model_name || node.display_name || node.name || '';
+        ctx.style.display = 'flex';
+        const actions = document.querySelector('.explore-panel-actions');
+        if (actions && actions.scrollIntoView) {
+            actions.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+
+    function cssEscape(value) {
+        return (window.CSS && CSS.escape) ? CSS.escape(value) : value;
+    }
+
+    // Restore a graph from ?model=&column= (shareable / refresh-safe deep link).
+    function hydrateFromUrl(modelTreeContainer) {
+        const params = new URLSearchParams(window.location.search);
+        const model = params.get('model');
+        const column = params.get('column');
+        if (!model || !column) return;
+
+        const label = modelTreeContainer.querySelector(
+            `.node-content.model .node-label[data-model-name="${cssEscape(model)}"]`);
+        if (!label) return;
+        const nodeContent = label.closest('.node-content');
+
+        // Expand ancestor folders so the selected node is visible.
+        let current = nodeContent.closest('li');
+        current = current ? current.parentElement : null;
+        while (current && current !== modelTreeContainer) {
+            if (current.tagName === 'LI' && current.classList.contains('tree-node-folder')) {
+                current.classList.add('expanded');
+                const ul = current.querySelector(':scope > ul');
+                if (ul) ul.classList.add('active');
+            }
+            current = current.parentElement;
+        }
+
+        // Reuse the existing click handler (sets selectedModelData + populates columns).
+        nodeContent.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        const columnSelect = document.getElementById('columnSelect');
+        if (!columnSelect || ![...columnSelect.options].some(o => o.value === column)) return;
+        columnSelect.value = column;
+        columnSelect.dispatchEvent(new Event('change'));
+
+        // Reflect the chosen column in the custom dropdown display.
+        const opt = document.querySelector(
+            `#columnSelectOptionsList .custom-select-option[data-value="${cssEscape(column)}"]`);
+        if (opt) {
+            const optionContent = opt.querySelector('.option-content');
+            const valueEl = document.querySelector('#columnSelectTrigger .custom-select-value');
+            if (optionContent && valueEl) {
+                valueEl.innerHTML = '';
+                valueEl.appendChild(optionContent.cloneNode(true));
+            }
+            opt.classList.add('selected');
+        }
+
+        const loadBtn = document.getElementById('loadLineage');
+        if (loadBtn && !loadBtn.disabled) loadBtn.click();
+    }
+
     function loadModels(modelTreeContainer) {
         fetch('/api/models')
             .then(response => response.json())
@@ -459,6 +528,7 @@ const ExploreModule = (function() {
                 allTreeData = treeData;
                 if (treeData && treeData.length > 0) {
                     renderTree(treeData, modelTreeContainer);
+                    hydrateFromUrl(modelTreeContainer);
                 } else {
                     modelTreeContainer.innerHTML = '<p>No models found.</p>';
                 }
@@ -523,6 +593,15 @@ const ExploreModule = (function() {
                             emptyState.style.display = 'none';
                         }
 
+                        // Encode the selection in the URL so the view is shareable /
+                        // survives a refresh (backward-compatible: no params => landing).
+                        try {
+                            const shareUrl = new URL(window.location.href);
+                            shareUrl.searchParams.set('model', selectedModelData.model_name);
+                            shareUrl.searchParams.set('column', column);
+                            window.history.replaceState(null, '', shareUrl);
+                        } catch (e) { /* ignore URL errors */ }
+
                         const newGraphInstance = initGraph(data);
                         if (graphInstanceRef) {
                             graphInstanceRef.current = newGraphInstance;
@@ -538,7 +617,15 @@ const ExploreModule = (function() {
                             if (relationshipSummaryCard && relationshipSummaryMetrics) {
                                 if (data.impact_summary && typeof data.impact_summary === 'object') {
                                     ImpactModule.displayRelationshipSummary(data.impact_summary, relationshipSummaryMetrics);
+                                    // Open by default; occlusion is prevented by reserving the card's
+                                    // footprint in the re-fit below, not by collapsing it.
+                                    relationshipSummaryCard.classList.remove('collapsed');
                                     relationshipSummaryCard.style.display = 'block';
+                                    // Re-fit now that the card occupies the top-right so its
+                                    // footprint is reserved and no node sits behind it.
+                                    if (window.graphState && window.graphConfig && typeof resetView === 'function') {
+                                        setTimeout(() => resetView(window.graphState.svg, window.graphState.g, window.graphState.zoom, window.graphConfig), 150);
+                                    }
                                 } else {
                                     relationshipSummaryCard.style.display = 'none';
                                 }
@@ -572,6 +659,7 @@ const ExploreModule = (function() {
             const relationshipSummaryMetrics = document.getElementById('relationshipSummaryMetrics');
             if (relationshipSummaryCard && relationshipSummaryMetrics) {
                 ImpactModule.displayRelationshipSummary(initialData.impact_summary, relationshipSummaryMetrics);
+                relationshipSummaryCard.classList.remove('collapsed');
                 relationshipSummaryCard.style.display = 'block';
             }
         }
