@@ -79,6 +79,12 @@ class LineageExplorer:
         async def get_graph_data() -> Dict[str, Any]:
             return self.data.model_dump()
 
+        @self.app.get("/api/coverage")
+        async def get_coverage() -> Dict[str, Any]:
+            if not self.lineage_service:
+                return {"error": "Lineage service not initialized"}
+            return self.lineage_service.get_coverage().model_dump()
+
         @self.app.get("/api/models")
         async def get_models() -> List[Dict[str, Any]]:
             if not self.lineage_service:
@@ -216,7 +222,11 @@ class LineageExplorer:
                 try:
                     impact_data = self.lineage_service.get_column_impact(model, column)
                     if impact_data and "summary" in impact_data:
-                        self.data.impact_summary = impact_data["summary"]
+                        summary = dict(impact_data["summary"])
+                        # Carry the confidence block alongside the summary metrics so the
+                        # relationship summary card can surface it next to the tiles.
+                        summary["confidence"] = impact_data.get("confidence")
+                        self.data.impact_summary = summary
                     else:
                         self.data.impact_summary = None
                 except Exception as e:

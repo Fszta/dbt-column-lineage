@@ -9,6 +9,25 @@ from typing import Any, Dict, List
 _SEVERITY_LABEL = {"critical": "🔴 critical", "low_impact": "🟢 low"}
 
 
+def _confidence_reasons(confidence: Dict[str, Any]) -> str:
+    """Render the bolded root-cause clause explaining why models were unanalyzable."""
+    not_in_catalog = confidence.get("not_in_catalog", 0)
+    parse_failed = confidence.get("parse_failed", 0)
+    if not_in_catalog and parse_failed:
+        return (
+            f" because **they haven't been built in the warehouse yet, or their SQL "
+            f"couldn't be parsed** ({not_in_catalog} not built, {parse_failed} unparseable)"
+        )
+    if parse_failed:
+        return " because **their SQL couldn't be parsed**"
+    if not_in_catalog:
+        return (
+            " because **they haven't been built in the warehouse yet** (so they're "
+            "absent from the catalog)"
+        )
+    return ""
+
+
 def render_changeset_markdown(report: Dict[str, Any]) -> str:
     """Render a changeset impact report (from ``build_changeset_report``) as Markdown."""
     changeset = report.get("changeset", {})
@@ -37,23 +56,24 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         lines.append(f"> ⚠️ **{critical}** downstream column(s) recompute derived logic.")
     lines.append("")
 
-    # Confidence: how much of the DAG-reachable downstream set we actually resolved.
+    # Confidence: whether any DAG-reachable downstream model was impossible to analyze.
     confidence = report.get("confidence")
     if confidence:
         level = confidence.get("level")
-        resolved = confidence.get("resolved_models", 0)
         reachable = confidence.get("reachable_models", 0)
         if level == "full":
             lines.append(
-                f"**Confidence:** full — every DAG-reachable downstream model "
-                f"({reachable}) was analyzable, so the {resolved} resolved model(s) "
-                f"are the complete impact, not a lower bound."
+                f"**Confidence:** full — every one of the {reachable} model(s) downstream "
+                f"of this column was analyzable, so the impact above is complete, not a "
+                f"lower bound."
             )
         else:
+            unanalyzable = confidence.get("unanalyzable_models", 0)
+            reasons = _confidence_reasons(confidence)
             lines.append(
-                f"**Confidence:** partial — resolved {resolved} of {reachable} "
-                f"DAG-reachable downstream model(s) at the column level; the rest are "
-                f"not in the catalog or could not be parsed, so counts are a lower bound."
+                f"**Confidence:** partial — the impact above is a **lower bound**: "
+                f"{unanalyzable} of {reachable} downstream model(s) could not be checked "
+                f"at the column level{reasons}."
             )
         lines.append("")
 

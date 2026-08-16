@@ -63,11 +63,24 @@ def test_json_impact_carries_confidence_block(dbt_artifacts):
     assert "impact" in payload
     confidence = payload["impact"]["confidence"]
 
-    assert set(confidence) == {"reachable_models", "resolved_models", "level"}
+    assert set(confidence) == {
+        "reachable_models",
+        "resolved_models",
+        "unanalyzable_models",
+        "not_in_catalog",
+        "parse_failed",
+        "not_in_catalog_models",
+        "parse_failed_models",
+        "level",
+    }
     # Everything reachable is in the catalog and parsed, so confidence is full even
     # though the column does not propagate to every downstream model.
     assert confidence["level"] == "full"
     assert confidence["resolved_models"] <= confidence["reachable_models"]
+    # Full confidence means no coverage gap: nothing reachable was unanalyzable.
+    assert confidence["unanalyzable_models"] == 0
+    assert confidence["not_in_catalog"] == 0
+    assert confidence["parse_failed"] == 0
 
 
 def test_text_prints_quiet_complete_footer(dbt_artifacts):

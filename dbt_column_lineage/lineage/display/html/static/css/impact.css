@@ -121,6 +121,10 @@
 }
 
 .impact-hero-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
     padding: 24px 24px 16px;
     border-bottom: 1px solid var(--border);
     background: linear-gradient(to bottom, var(--secondary), transparent);
@@ -128,6 +132,288 @@
 
 .impact-hero-content {
     flex: 1;
+    min-width: 0;
+}
+
+/* Confidence badge — can the impact list be trusted as complete? Partial confidence
+   uses RED (not the orange/amber reserved for transformations) so the two never clash. */
+.confidence-badge {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    flex-shrink: 0;
+    max-width: 340px;
+}
+
+.confidence-badge-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.confidence-badge-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+}
+
+.confidence-badge-icon svg {
+    width: 15px;
+    height: 15px;
+}
+
+.confidence-badge-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.confidence-badge-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+}
+
+.confidence-badge-detail {
+    font-size: 11px;
+    line-height: 1.4;
+    opacity: 0.92;
+}
+
+.confidence-badge-detail code {
+    font-family: var(--font-mono, monospace);
+    font-size: 10.5px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.confidence-full {
+    background: #f0fdf4;
+    border-color: #86efac;
+    color: #15803d;
+}
+
+.confidence-partial {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+/* "Why? Show the N model-level-only models" disclosure trigger. */
+.confidence-why-toggle {
+    align-self: flex-start;
+    margin-top: 2px;
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    color: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    opacity: 0.95;
+}
+
+.confidence-why-toggle:hover {
+    opacity: 1;
+}
+
+.confidence-why-toggle::before {
+    content: '▸ ';
+}
+
+.confidence-why-toggle.is-open::before {
+    content: '▾ ';
+}
+
+.confidence-why-panel {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.confidence-why-explain {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-dark);
+}
+
+.confidence-why-explain code {
+    font-family: var(--font-mono, monospace);
+    font-size: 10.5px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.confidence-why-list-heading {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-light);
+    margin-bottom: 4px;
+}
+
+.confidence-why-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 160px;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.confidence-why-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.confidence-why-list li:last-child {
+    border-bottom: none;
+}
+
+.confidence-why-model {
+    font-family: var(--font-mono, monospace);
+    color: var(--text-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.confidence-why-tag {
+    flex-shrink: 0;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-light);
+    background: rgba(0, 0, 0, 0.06);
+    padding: 1px 6px;
+    border-radius: 10px;
+}
+
+.confidence-why-more {
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: var(--text-light);
+    font-style: italic;
+}
+
+/* Remediation: the copy-pasteable dbt command that closes the coverage gap. Sits
+   outside the collapsible panel so it's visible without expanding the drill-down. */
+.confidence-why-fix {
+    margin: 8px 0 6px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.confidence-why-cmd {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.confidence-why-cmd code {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: #0f172a;
+    background: #0f172a0d;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.confidence-why-copy {
+    flex-shrink: 0;
+    font: inherit;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.confidence-why-copy:hover {
+    background: var(--column-bg);
+    border-color: var(--primary-light);
+}
+
+.confidence-why-copy.copied {
+    color: #15803d;
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+
+/* Compact variant when the badge lives inside the floating summary card grid. */
+.relationship-summary-metrics .confidence-badge {
+    grid-column: 1 / -1;
+    max-width: none;
+    margin-top: 2px;
+    padding: 8px 10px;
+}
+
+.relationship-summary-metrics .confidence-badge-label {
+    font-size: 11px;
+}
+
+/* Artifact-wide coverage statement, shown at the foot of the impact panel. Kept neutral
+   (informational) so RED stays reserved for the per-column confidence warning above. */
+.impact-coverage-footer {
+    padding: 16px 24px 24px;
+    background: var(--model-bg);
+}
+
+.coverage-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-light);
+    padding: 10px 12px;
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.coverage-line svg {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    margin-top: 1px;
+    color: var(--text-light);
+}
+
+.coverage-line-partial {
+    border-left: 3px solid #f87171;
 }
 
 .impact-hero-title {
@@ -143,6 +429,10 @@
     font-size: 13px;
     color: var(--text-light);
     font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 .impact-hero-subtitle code {
@@ -1520,7 +1810,9 @@
     transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1),
                 padding 0.25s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.2s ease;
-    max-height: 300px;
+    /* Roomy enough that expanding the confidence "why" drill-down (with its own
+       scrolling model list) is not clipped by the card. */
+    max-height: 70vh;
     opacity: 1;
 }
 

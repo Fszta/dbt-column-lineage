@@ -616,7 +616,7 @@ const ExploreModule = (function() {
 
                             if (relationshipSummaryCard && relationshipSummaryMetrics) {
                                 if (data.impact_summary && typeof data.impact_summary === 'object') {
-                                    ImpactModule.displayRelationshipSummary(data.impact_summary, relationshipSummaryMetrics);
+                                    ImpactModule.displayRelationshipSummary(data.impact_summary, relationshipSummaryMetrics, selectedModelData.model_name);
                                     // Open by default; occlusion is prevented by reserving the card's
                                     // footprint in the re-fit below, not by collapsing it.
                                     relationshipSummaryCard.classList.remove('collapsed');
@@ -658,7 +658,7 @@ const ExploreModule = (function() {
             const relationshipSummaryCard = document.getElementById('relationshipSummaryCard');
             const relationshipSummaryMetrics = document.getElementById('relationshipSummaryMetrics');
             if (relationshipSummaryCard && relationshipSummaryMetrics) {
-                ImpactModule.displayRelationshipSummary(initialData.impact_summary, relationshipSummaryMetrics);
+                ImpactModule.displayRelationshipSummary(initialData.impact_summary, relationshipSummaryMetrics, initialData.column_info && initialData.column_info.model);
                 relationshipSummaryCard.classList.remove('collapsed');
                 relationshipSummaryCard.style.display = 'block';
             }
