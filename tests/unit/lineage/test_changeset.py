@@ -298,6 +298,53 @@ def test_markdown_lists_exposures_first_and_blast_table():
     assert "`dm`" in md and "critical" in md
 
 
+def test_markdown_renders_partial_confidence_and_coverage_warning():
+    aggregated = _impact([{"name": "dm"}], [], [])
+    aggregated["by_change"] = []
+    # Confidence + coverage are attached by the service/CLI, not build_changeset_report.
+    aggregated["confidence"] = {
+        "reachable_models": 187,
+        "resolved_models": 1,
+        "level": "partial",
+    }
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.TYPE_CHANGED)], aggregated
+    )
+    report["coverage"] = {
+        "models_in_manifest": 1217,
+        "parsed_ok": 176,
+        "not_in_catalog_count": 1031,
+        "parse_failed": 0,
+        "skipped_no_sql": 0,
+        "complete": False,
+    }
+    md = render_changeset_markdown(report)
+
+    assert "Confidence:" in md and "partial" in md
+    assert "1 of 187" in md
+    assert "lower bound" in md
+    assert "Coverage is partial" in md
+
+
+def test_markdown_full_confidence_is_quiet_without_coverage_warning():
+    aggregated = _impact([{"name": "dm"}], [], [])
+    aggregated["by_change"] = []
+    aggregated["confidence"] = {
+        "reachable_models": 5,
+        "resolved_models": 5,
+        "level": "full",
+    }
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.TYPE_CHANGED)], aggregated
+    )
+    report["coverage"] = {"complete": True}
+    md = render_changeset_markdown(report)
+
+    assert "Confidence:" in md and "full" in md
+    # A complete project must not emit the scary partial-coverage note.
+    assert "Coverage is partial" not in md
+
+
 # --- git scope filter ------------------------------------------------------
 
 

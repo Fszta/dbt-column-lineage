@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Set, Optional, Any, Tuple, Union, TYPE_CHECKING
+from typing import Dict, List, Literal, Set, Optional, Any, Tuple, Union, TYPE_CHECKING
 from dataclasses import dataclass, field
 import logging
 
@@ -7,7 +7,7 @@ from dbt_column_lineage.artifacts.registry import ModelRegistry
 
 if TYPE_CHECKING:
     from dbt_column_lineage.lineage.changeset import ColumnChange
-from dbt_column_lineage.models.schema import ColumnLineage
+from dbt_column_lineage.models.schema import ColumnLineage, Coverage, ImpactConfidence
 from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
 
 logger = logging.getLogger(__name__)
@@ -95,6 +95,36 @@ class LineageService:
             str(catalog_path), str(manifest_path), adapter_override=adapter
         )
         self.registry.load()
+        self._coverage: Coverage = self.registry.get_coverage()
+
+    def get_coverage(self) -> Coverage:
+        """Return coverage for the loaded artifacts."""
+        return self._coverage
+
+    def _dag_reachable_models(self, model_name: str) -> Set[str]:
+        """Transitive downstream models of model_name in the manifest DAG."""
+        downstream_map = self.registry.get_manifest_downstream()
+        start = model_name.lower()
+        reachable: Set[str] = set()
+        queue = [start]
+        while queue:
+            current = queue.pop()
+            for child in downstream_map.get(current, set()):
+                if child != start and child not in reachable:
+                    reachable.add(child)
+                    queue.append(child)
+        return reachable
+
+    def _impact_confidence(self, reachable: Set[str], resolved_models: int) -> Dict[str, Any]:
+        """Confidence block: "full" when every reachable model was analyzable, else "partial"."""
+        analyzable = set(self.registry.get_models().keys()) - self.registry.get_unparsed_models()
+        unanalyzable_reachable = reachable - analyzable
+        level: Literal["full", "partial"] = "full" if not unanalyzable_reachable else "partial"
+        return ImpactConfidence(
+            reachable_models=len(reachable),
+            resolved_models=resolved_models,
+            level=level,
+        ).model_dump()
 
     def get_model_info(self, selector: LineageSelector) -> Dict[str, Any]:
         """Get model information based on selector."""
@@ -538,6 +568,9 @@ class LineageService:
                             f"Failed to process exposure {exposure_name} in impact analysis: {e}"
                         )
 
+            reachable = self._dag_reachable_models(model_name)
+            confidence = self._impact_confidence(reachable, len(affected_models))
+
             return {
                 "summary": {
                     "affected_models": len(affected_models),
@@ -549,6 +582,7 @@ class LineageService:
                 "affected_models": list(affected_models.values()),
                 "affected_columns": affected_columns,
                 "affected_exposures": affected_exposures,
+                "confidence": confidence,
             }
 
         except Exception as e:
@@ -621,6 +655,14 @@ class LineageService:
         critical_count = sum(1 for c in deduped_columns if c["severity"] == "critical")
         low_impact_count = len(deduped_columns) - critical_count
 
+        # Guarded so a stub service without a real registry omits confidence rather than erroring.
+        confidence: Optional[Dict[str, Any]] = None
+        if getattr(self, "registry", None) is not None:
+            reachable: Set[str] = set()
+            for change in changes:
+                reachable |= self._dag_reachable_models(change.model)
+            confidence = self._impact_confidence(reachable, len(affected_models))
+
         return {
             "summary": {
                 "affected_models": len(affected_models),
@@ -634,4 +676,5 @@ class LineageService:
             "affected_columns": deduped_columns,
             "affected_exposures": [affected_exposures[name] for name in sorted(affected_exposures)],
             "by_change": by_change,
+            "confidence": confidence,
         }

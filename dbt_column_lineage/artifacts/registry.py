@@ -1,5 +1,5 @@
-from typing import Dict, Optional
-from dataclasses import dataclass
+from typing import Dict, List, Optional
+from dataclasses import dataclass, field
 import logging
 
 from dbt_column_lineage.artifacts.catalog import CatalogReader
@@ -9,6 +9,7 @@ from dbt_column_lineage.models.schema import (
     SQLParseResult,
     ColumnLineage,
     Exposure,
+    Coverage,
 )
 from dbt_column_lineage.artifacts.exceptions import (
     ModelNotFoundError,
@@ -18,6 +19,24 @@ from dbt_column_lineage.artifacts.exceptions import (
 from dbt_column_lineage.parser import SQLColumnParser
 
 logger = logging.getLogger(__name__)
+
+
+# Resource types that can carry column lineage; coverage is measured against these.
+_MODEL_LIKE_RESOURCE_TYPES = frozenset({"model", "snapshot", "seed"})
+
+# Cap on the failed/skipped name lists surfaced in Coverage.
+_COVERAGE_NAME_CAP = 25
+
+
+@dataclass
+class ParseStats:
+    """Column-lineage parse outcome tallies."""
+
+    parsed_ok: int = 0
+    parse_failed: int = 0
+    skipped_no_sql: int = 0
+    failed_model_names: List[str] = field(default_factory=list)
+    skipped_model_names: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -42,6 +61,7 @@ class ModelRegistry:
         self._sql_parser: Optional[SQLColumnParser] = None
         self._dialect: Optional[str] = None
         self._adapter_override: Optional[str] = adapter_override
+        self._parse_stats: ParseStats = ParseStats()
 
     @property
     def is_loaded(self) -> bool:
@@ -155,6 +175,14 @@ class ModelRegistry:
                     f"Failed to process lineage for model {model_name}: {type(e).__name__}: {str(e)}"
                 )
                 continue
+
+        self._parse_stats = ParseStats(
+            parsed_ok=successful_parses,
+            parse_failed=failed_parses,
+            skipped_no_sql=skipped_models,
+            failed_model_names=failed_model_names,
+            skipped_model_names=skipped_model_names,
+        )
 
         logger.info(
             f"SQL parsing summary: {successful_parses} successful, "
@@ -275,6 +303,54 @@ class ModelRegistry:
         if exposure is None:
             raise ValueError(f"Exposure '{exposure_name}' not found")
         return exposure
+
+    def _count_manifest_models(self) -> int:
+        """Count model-like nodes (model/snapshot/seed) declared in the manifest."""
+        count = 0
+        for node in self._manifest_reader.manifest.get("nodes", {}).values():
+            if node.get("resource_type") in _MODEL_LIKE_RESOURCE_TYPES:
+                count += 1
+        return count
+
+    def get_coverage(self) -> Coverage:
+        """Report how completely the loaded artifacts cover the project."""
+        if not self.is_loaded:
+            raise RegistryNotLoadedError("Registry must be loaded before accessing coverage")
+
+        models_in_manifest = self._count_manifest_models()
+        models_in_catalog = sum(
+            1
+            for model in self._state.models.values()
+            if model.resource_type in _MODEL_LIKE_RESOURCE_TYPES
+        )
+        not_in_catalog_count = max(models_in_manifest - models_in_catalog, 0)
+
+        stats = self._parse_stats
+        complete = (
+            not_in_catalog_count == 0 and stats.parse_failed == 0 and stats.skipped_no_sql == 0
+        )
+
+        return Coverage(
+            models_in_manifest=models_in_manifest,
+            models_in_catalog=models_in_catalog,
+            parsed_ok=stats.parsed_ok,
+            parse_failed=stats.parse_failed,
+            skipped_no_sql=stats.skipped_no_sql,
+            not_in_catalog_count=not_in_catalog_count,
+            failed_models=sorted(stats.failed_model_names)[:_COVERAGE_NAME_CAP],
+            skipped_models=sorted(stats.skipped_model_names)[:_COVERAGE_NAME_CAP],
+            complete=complete,
+        )
+
+    def get_unparsed_models(self) -> set:
+        """Names of catalog models whose SQL failed to parse or was missing."""
+        return set(self._parse_stats.failed_model_names) | set(
+            self._parse_stats.skipped_model_names
+        )
+
+    def get_manifest_downstream(self) -> Dict[str, set]:
+        """Manifest-level downstream child map, covering every model (not just catalog ones)."""
+        return self._manifest_reader.get_model_downstream()
 
     def _check_loaded(self) -> None:
         """Verify registry is loaded before operations"""
