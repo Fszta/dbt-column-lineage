@@ -5,6 +5,157 @@ const ImpactModule = (function() {
         return div.innerHTML;
     }
 
+    // Coverage is a property of the loaded artifacts (not of a single column), so
+    // fetch it once and memoize the promise for every panel that wants to show it.
+    let coveragePromise = null;
+    function fetchCoverage() {
+        if (!coveragePromise) {
+            coveragePromise = fetch('/api/coverage')
+                .then(response => response.ok ? response.json() : null)
+                .then(data => (data && !data.error) ? data : null)
+                .catch(() => null);
+        }
+        return coveragePromise;
+    }
+
+    // Confidence answers: "can I trust this impact list is complete?" We lead with the
+    // consequence (complete vs. lower bound), then explain WHY — how many reachable
+    // downstream models we couldn't analyze and, crucially, the root cause: a model is
+    // absent from the catalog because it hasn't been built in the warehouse yet (the
+    // catalog only records built relations). The cause is bolded so it stands out.
+    function confidenceReasonHtml(confidence) {
+        const notInCatalog = confidence.not_in_catalog || 0;
+        const parseFailed = confidence.parse_failed || 0;
+        if (notInCatalog && parseFailed) {
+            return `<strong>they haven't been built in the warehouse yet, or their SQL couldn't be parsed</strong> `
+                + `(${notInCatalog} not built, ${parseFailed} unparseable)`;
+        }
+        if (parseFailed) {
+            return `<strong>their SQL couldn't be parsed</strong>`;
+        }
+        return `<strong>they haven't been built in the warehouse yet</strong>, so they're absent from the catalog`;
+    }
+
+    // Drill-down panel: explains the catalog → column-lineage mechanism, lists the models
+    // we could only trace at the model level, and shows how to close the gap.
+    function confidenceWhyPanelHtml(confidence, sourceModel) {
+        const notBuilt = confidence.not_in_catalog_models || [];
+        const unparseable = confidence.parse_failed_models || [];
+        const items = notBuilt
+            .map(m => ({ name: m, tag: 'not built' }))
+            .concat(unparseable.map(m => ({ name: m, tag: 'unparseable' })));
+        if (!items.length) {
+            return '';
+        }
+        const total = confidence.unanalyzable_models || items.length;
+        const more = Math.max(0, total - items.length);
+        const listHtml = items.map(it =>
+            `<li><span class="confidence-why-model">${escapeHtml(it.name)}</span>`
+            + `<span class="confidence-why-tag">${it.tag}</span></li>`
+        ).join('');
+
+        // Remediation: only the not-in-catalog case is fixed by building — parse failures
+        // are a different problem, so only surface the command when there's something to build.
+        let fixHtml = '';
+        if (notBuilt.length && sourceModel) {
+            const cmd = `dbt run --select ${sourceModel}+ --empty && dbt docs generate`;
+            fixHtml = `
+                <div class="confidence-why-fix">
+                    <div class="confidence-why-list-heading">How to close this gap</div>
+                    <p class="confidence-why-explain">
+                        Build the downstream models so they land in the catalog, then refresh it.
+                        <code>--empty</code> creates the table structure without loading data — fast and cheap:
+                    </p>
+                    <div class="confidence-why-cmd">
+                        <code>${escapeHtml(cmd)}</code>
+                        <button type="button" class="confidence-why-copy" data-copy="${escapeHtml(cmd)}">Copy</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <button type="button" class="confidence-why-toggle" aria-expanded="false">
+                Why? Show the ${total} model-level-only model${total !== 1 ? 's' : ''}
+            </button>
+            ${fixHtml}
+            <div class="confidence-why-panel" hidden>
+                <p class="confidence-why-explain">
+                    Column-level lineage is traced from each model's columns in
+                    <code>catalog.json</code>, which only records tables actually built in the
+                    warehouse. Models not yet built fall back to <strong>model-level</strong>
+                    lineage from the manifest DAG — we know they sit downstream, but not whether
+                    <em>this column</em> flows into them.
+                </p>
+                <div class="confidence-why-list-heading">Traced at model level only:</div>
+                <ul class="confidence-why-list">${listHtml}</ul>
+                ${more > 0 ? `<div class="confidence-why-more">+${more} more not shown</div>` : ''}
+            </div>
+        `;
+    }
+
+    function confidenceBadgeHtml(confidence, sourceModel) {
+        if (!confidence || !confidence.level) {
+            return '';
+        }
+        const reachable = confidence.reachable_models || 0;
+        const isFull = confidence.level === 'full';
+        const ofModel = sourceModel ? ` of <code>${escapeHtml(sourceModel)}</code>` : '';
+
+        let label, detailHtml, whyHtml = '';
+        if (isFull) {
+            label = 'Complete impact';
+            detailHtml = reachable === 0
+                ? `No models sit downstream${ofModel}.`
+                : `Every one of the ${reachable} model${reachable !== 1 ? 's' : ''} downstream${ofModel} could be analyzed, so nothing is missing below.`;
+        } else {
+            const unanalyzable = confidence.unanalyzable_models || 0;
+            label = 'Lower bound — impact may be larger';
+            detailHtml = `${unanalyzable} of ${reachable} model${reachable !== 1 ? 's' : ''} downstream${ofModel} couldn't be checked because ${confidenceReasonHtml(confidence)}.`;
+            whyHtml = confidenceWhyPanelHtml(confidence, sourceModel);
+        }
+
+        const icon = isFull
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+        return `
+            <div class="confidence-badge confidence-${isFull ? 'full' : 'partial'}">
+                <div class="confidence-badge-row">
+                    <span class="confidence-badge-icon">${icon}</span>
+                    <div class="confidence-badge-text">
+                        <span class="confidence-badge-label">${label}</span>
+                        <span class="confidence-badge-detail">${detailHtml}</span>
+                        ${whyHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // One-line coverage statement, mirroring format_coverage_line() in the CLI.
+    function coverageLineHtml(coverage) {
+        if (!coverage) {
+            return '';
+        }
+        const manifest = coverage.models_in_manifest || 0;
+        const catalog = coverage.models_in_catalog || 0;
+        let text;
+        if (coverage.complete) {
+            text = `Coverage: ${catalog}/${manifest} models, complete.`;
+        } else {
+            text = `Coverage: analyzed ${coverage.parsed_ok || 0}/${manifest} models `
+                + `(${catalog} in catalog; ${coverage.not_in_catalog_count || 0} not in catalog, `
+                + `${coverage.parse_failed || 0} parse-failed, ${coverage.skipped_no_sql || 0} no compiled SQL). `
+                + `Impact counts are a lower bound.`;
+        }
+        return `
+            <div class="coverage-line ${coverage.complete ? '' : 'coverage-line-partial'}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span>${escapeHtml(text)}</span>
+            </div>
+        `;
+    }
+
     function displayImpactAnalysis(data, modelName, columnName) {
         const impactContent = document.getElementById('impactAnalysisContent');
         const summary = data.summary || {};
@@ -34,6 +185,7 @@ const ImpactModule = (function() {
                         <h2 class="impact-hero-title">Impact Summary</h2>
                         <p class="impact-hero-subtitle">Column: <code>${modelName}.${columnName}</code></p>
                     </div>
+                    ${confidenceBadgeHtml(data.confidence, modelName)}
                 </div>
                 <div class="impact-hero-metrics">
                     <div class="hero-metric ${criticalColumns.length > 0 ? 'hero-metric-critical' : ''}">
@@ -348,6 +500,18 @@ const ImpactModule = (function() {
 
         impactContent.innerHTML = html;
 
+        // Coverage is artifact-wide; append it once the (memoized) fetch resolves so it
+        // never blocks rendering the impact analysis itself.
+        fetchCoverage().then(coverage => {
+            const line = coverageLineHtml(coverage);
+            if (line && impactContent.querySelector('.impact-hero')) {
+                const footer = document.createElement('div');
+                footer.className = 'impact-coverage-footer';
+                footer.innerHTML = line;
+                impactContent.appendChild(footer);
+            }
+        });
+
         const toggleButtons = impactContent.querySelectorAll('[data-toggle-section]');
         toggleButtons.forEach(button => {
             button.addEventListener('click', function() {
@@ -392,7 +556,7 @@ const ImpactModule = (function() {
         });
     }
 
-    function displayRelationshipSummary(summary, container) {
+    function displayRelationshipSummary(summary, container, sourceModel) {
         if (!summary || typeof summary !== 'object') {
             return;
         }
@@ -452,6 +616,7 @@ const ImpactModule = (function() {
                     <div class="summary-metric-label">Related Exposures</div>
                 </div>
             </div>
+            ${confidenceBadgeHtml(summary.confidence, sourceModel)}
         `;
     }
 
@@ -575,9 +740,47 @@ const ImpactModule = (function() {
         });
     }
 
+    // Expand/collapse the "why couldn't these be checked" drill-down. Delegated on
+    // document because the badge is injected into two different containers (the floating
+    // summary card and the impact panel).
+    function setupConfidenceWhyToggle() {
+        document.addEventListener('click', function(e) {
+            const copyBtn = e.target.closest('.confidence-why-copy');
+            if (copyBtn) {
+                const cmd = copyBtn.getAttribute('data-copy') || '';
+                const done = () => {
+                    const prev = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied!';
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn.textContent = prev;
+                        copyBtn.classList.remove('copied');
+                    }, 1500);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(cmd).then(done).catch(() => {});
+                }
+                return;
+            }
+            const toggle = e.target.closest('.confidence-why-toggle');
+            if (!toggle) return;
+            const panel = toggle.parentElement.querySelector('.confidence-why-panel');
+            if (!panel) return;
+            const willShow = panel.hasAttribute('hidden');
+            if (willShow) {
+                panel.removeAttribute('hidden');
+            } else {
+                panel.setAttribute('hidden', '');
+            }
+            toggle.setAttribute('aria-expanded', String(willShow));
+            toggle.classList.toggle('is-open', willShow);
+        });
+    }
+
     function init() {
         setupImpactPanel();
         setupCardCloseButtons();
+        setupConfidenceWhyToggle();
     }
 
     return {

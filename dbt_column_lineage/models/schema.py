@@ -80,4 +80,14 @@ class Coverage(BaseModel):
 class ImpactConfidence(BaseModel):
     reachable_models: int
     resolved_models: int
+    # The coverage gap: reachable downstream models we could NOT analyze at the
+    # column level, split by reason. This — not resolved-vs-reachable — is what makes
+    # the impact a lower bound (many reachable models simply don't use the column).
+    unanalyzable_models: int = 0
+    not_in_catalog: int = 0
+    parse_failed: int = 0
+    # Sample of the actual unanalyzable model names, for UI/agent drill-down. Capped;
+    # the *_models integer counts above remain the source of truth for totals.
+    not_in_catalog_models: List[str] = Field(default_factory=list)
+    parse_failed_models: List[str] = Field(default_factory=list)
     level: Literal["full", "partial"]

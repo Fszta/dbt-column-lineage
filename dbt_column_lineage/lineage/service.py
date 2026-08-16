@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 # downstream node is reached by several changed columns.
 _SEVERITY_RANK: Dict[str, int] = {"critical": 2, "low_impact": 1}
 
+# Cap on the number of unanalyzable model names carried in the confidence block, so a
+# huge coverage gap doesn't bloat the impact payload. Totals stay in the integer counts.
+_IMPACT_CONFIDENCE_NAME_CAP = 100
+
 
 @dataclass
 class LineageSelector:
@@ -116,13 +120,29 @@ class LineageService:
         return reachable
 
     def _impact_confidence(self, reachable: Set[str], resolved_models: int) -> Dict[str, Any]:
-        """Confidence block: "full" when every reachable model was analyzable, else "partial"."""
-        analyzable = set(self.registry.get_models().keys()) - self.registry.get_unparsed_models()
-        unanalyzable_reachable = reachable - analyzable
+        """Confidence block: "full" when every reachable model was analyzable, else "partial".
+
+        The honest signal is the *coverage gap* — reachable downstream models we could
+        not analyze at the column level, split by reason (absent from the catalog vs.
+        SQL that failed to parse). That gap is what makes the impact a lower bound; the
+        resolved-vs-reachable ratio is misleading because most reachable models simply
+        do not reference this column.
+        """
+        all_model_keys = set(self.registry.get_models().keys())
+        unparsed = self.registry.get_unparsed_models()
+        not_in_catalog = reachable - all_model_keys
+        parse_failed = reachable & unparsed
+        unanalyzable_reachable = not_in_catalog | parse_failed
         level: Literal["full", "partial"] = "full" if not unanalyzable_reachable else "partial"
+        cap = _IMPACT_CONFIDENCE_NAME_CAP
         return ImpactConfidence(
             reachable_models=len(reachable),
             resolved_models=resolved_models,
+            unanalyzable_models=len(unanalyzable_reachable),
+            not_in_catalog=len(not_in_catalog),
+            parse_failed=len(parse_failed),
+            not_in_catalog_models=sorted(not_in_catalog)[:cap],
+            parse_failed_models=sorted(parse_failed)[:cap],
             level=level,
         ).model_dump()
 

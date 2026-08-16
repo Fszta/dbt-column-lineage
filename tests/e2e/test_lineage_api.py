@@ -328,6 +328,46 @@ def test_snapshot_api_support(dbt_artifacts: Dict[str, Any], server_port: int) -
             pytest.skip(f"Could not test snapshot lineage endpoint: {e}")
 
 
+def test_coverage_endpoint(dbt_artifacts: Dict[str, Any], server_port: int) -> None:
+    """Verify /api/coverage exposes the artifact coverage block to the explorer UI."""
+    catalog_path = Path(dbt_artifacts["catalog_path"])
+    manifest_path = Path(dbt_artifacts["manifest_path"])
+
+    with lineage_server(catalog_path, manifest_path, server_port) as port:
+        response = requests.get(f"http://127.0.0.1:{port}/api/coverage", timeout=10)
+        response.raise_for_status()
+        coverage = response.json()
+
+        for field in (
+            "models_in_manifest",
+            "models_in_catalog",
+            "parsed_ok",
+            "complete",
+        ):
+            assert field in coverage, f"Coverage missing '{field}': {coverage}"
+        assert isinstance(coverage["complete"], bool)
+        assert coverage["models_in_manifest"] >= coverage["models_in_catalog"]
+
+
+def test_lineage_response_includes_confidence(
+    dbt_artifacts: Dict[str, Any], server_port: int
+) -> None:
+    """Verify /api/lineage carries the impact confidence block in impact_summary."""
+    catalog_path = Path(dbt_artifacts["catalog_path"])
+    manifest_path = Path(dbt_artifacts["manifest_path"])
+
+    with lineage_server(catalog_path, manifest_path, server_port) as port:
+        response_data = _get_lineage_response(port, TEST_MODEL, TEST_COLUMN)
+
+        summary = response_data.get("impact_summary")
+        assert summary is not None, "Expected impact_summary in lineage response"
+        confidence = summary.get("confidence")
+        assert confidence is not None, f"Expected confidence in impact_summary: {summary}"
+        assert confidence.get("level") in ("full", "partial")
+        assert "reachable_models" in confidence
+        assert "resolved_models" in confidence
+
+
 def test_upstream_lineage_returns_full_chain(
     dbt_artifacts: Dict[str, Any], server_port: int
 ) -> None:

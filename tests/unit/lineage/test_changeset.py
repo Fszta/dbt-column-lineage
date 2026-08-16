@@ -305,6 +305,9 @@ def test_markdown_renders_partial_confidence_and_coverage_warning():
     aggregated["confidence"] = {
         "reachable_models": 187,
         "resolved_models": 1,
+        "unanalyzable_models": 186,
+        "not_in_catalog": 186,
+        "parse_failed": 0,
         "level": "partial",
     }
     report = build_changeset_report(
@@ -321,7 +324,8 @@ def test_markdown_renders_partial_confidence_and_coverage_warning():
     md = render_changeset_markdown(report)
 
     assert "Confidence:" in md and "partial" in md
-    assert "1 of 187" in md
+    assert "186 of 187" in md
+    assert "haven't been built in the warehouse yet" in md
     assert "lower bound" in md
     assert "Coverage is partial" in md
 
