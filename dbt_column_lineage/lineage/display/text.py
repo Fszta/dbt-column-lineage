@@ -1,7 +1,7 @@
 from typing import Dict, Set, Union
 import click
-from dbt_column_lineage.models.schema import Column, ColumnLineage
-from .base import LineageStaticDisplay
+from dbt_column_lineage.models.schema import Column, ColumnLineage, Coverage
+from .base import LineageStaticDisplay, format_coverage_line
 
 
 class TextDisplay(LineageStaticDisplay):
@@ -63,6 +63,10 @@ class TextDisplay(LineageStaticDisplay):
                 click.echo(f"  Model {model_name}:")
                 for col_name, lineage in columns.items():
                     click.echo(f"    {col_name}")
+
+    def display_coverage(self, coverage: Coverage) -> None:
+        click.echo("")
+        click.echo(format_coverage_line(coverage))
 
     def save(self) -> None:
         """No-op for text display as output is immediate."""

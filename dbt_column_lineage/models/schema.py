@@ -63,3 +63,21 @@ class Model(BaseModel):
 class SQLParseResult(BaseModel):
     column_lineage: Dict[str, List[ColumnLineage]]
     star_sources: Set[str] = Field(default_factory=set)
+
+
+class Coverage(BaseModel):
+    models_in_manifest: int
+    models_in_catalog: int
+    parsed_ok: int
+    parse_failed: int
+    skipped_no_sql: int
+    not_in_catalog_count: int
+    failed_models: List[str] = Field(default_factory=list)
+    skipped_models: List[str] = Field(default_factory=list)
+    complete: bool
+
+
+class ImpactConfidence(BaseModel):
+    reachable_models: int
+    resolved_models: int
+    level: Literal["full", "partial"]

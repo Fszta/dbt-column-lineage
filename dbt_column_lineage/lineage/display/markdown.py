@@ -37,6 +37,38 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         lines.append(f"> ⚠️ **{critical}** downstream column(s) recompute derived logic.")
     lines.append("")
 
+    # Confidence: how much of the DAG-reachable downstream set we actually resolved.
+    confidence = report.get("confidence")
+    if confidence:
+        level = confidence.get("level")
+        resolved = confidence.get("resolved_models", 0)
+        reachable = confidence.get("reachable_models", 0)
+        if level == "full":
+            lines.append(
+                f"**Confidence:** full — every DAG-reachable downstream model "
+                f"({reachable}) was analyzable, so the {resolved} resolved model(s) "
+                f"are the complete impact, not a lower bound."
+            )
+        else:
+            lines.append(
+                f"**Confidence:** partial — resolved {resolved} of {reachable} "
+                f"DAG-reachable downstream model(s) at the column level; the rest are "
+                f"not in the catalog or could not be parsed, so counts are a lower bound."
+            )
+        lines.append("")
+
+    # Coverage: how much of the project the loaded artifacts cover.
+    coverage = report.get("coverage")
+    if coverage and not coverage.get("complete", False):
+        lines.append(
+            f"> ℹ️ Coverage is partial: analyzed {coverage.get('parsed_ok', 0)}/"
+            f"{coverage.get('models_in_manifest', 0)} models "
+            f"({coverage.get('not_in_catalog_count', 0)} not in catalog, "
+            f"{coverage.get('parse_failed', 0)} parse-failed, "
+            f"{coverage.get('skipped_no_sql', 0)} no compiled SQL)."
+        )
+        lines.append("")
+
     # Change breakdown.
     by_kind = changeset.get("by_kind", {})
     if by_kind:

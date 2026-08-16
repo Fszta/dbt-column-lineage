@@ -124,6 +124,8 @@ def cli(
                     )
                     display.display_downstream(downstream_refs)
 
+                display.display_coverage(service.get_coverage())
+
                 if format == "json" and isinstance(display, JsonDisplay):
                     # Impact analysis is the flagship capability; include it whenever
                     # downstream lineage was requested so the JSON is self-contained.
@@ -310,6 +312,7 @@ def impact(
 
         aggregated = head_service.get_changeset_impact(changes, base_service=base_service)
         report = build_changeset_report(source, changes, aggregated)
+        report["coverage"] = head_service.get_coverage().model_dump()
 
         if format == "json":
             click.echo(json.dumps(report, indent=2, sort_keys=False))

@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, Set, Union
 
 import click
 
-from dbt_column_lineage.models.schema import Column, ColumnLineage
+from dbt_column_lineage.models.schema import Column, ColumnLineage, Coverage
 from .base import LineageStaticDisplay
 
 # Keys in a lineage refs dict that hold plain string sets rather than
@@ -68,9 +68,7 @@ class JsonDisplay(LineageStaticDisplay):
         self._result["data_type"] = column.data_type
         self._result["description"] = column.description
 
-    def display_upstream(
-        self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]
-    ) -> None:
+    def display_upstream(self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]) -> None:
         self._result["upstream"] = serialize_refs(refs)
 
     def display_downstream(
@@ -82,6 +80,10 @@ class JsonDisplay(LineageStaticDisplay):
         """Attach impact-analysis results to the JSON document."""
         if impact is not None:
             self._result["impact"] = impact
+
+    def display_coverage(self, coverage: Coverage) -> None:
+        """Attach the top-level coverage block (strictly additive)."""
+        self._result["coverage"] = coverage.model_dump()
 
     def save(self) -> None:
         click.echo(json.dumps(self._result, indent=2, sort_keys=False))
