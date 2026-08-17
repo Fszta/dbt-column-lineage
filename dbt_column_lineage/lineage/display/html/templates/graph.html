@@ -9,6 +9,17 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/explore.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/impact.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/model-details.css') }}">
+    <script>
+        // Apply saved theme before first paint (no flash, correct graph colors on first render)
+        (function () {
+            try {
+                var t = localStorage.getItem('dbtcl-theme');
+                if (t === 'dark' || t === 'light') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body>
     <div class="container">
@@ -25,10 +36,19 @@
                         <line x1="10" y1="14" x2="21" y2="3"></line>
                     </svg>
                 </a>
+                <button id="themeToggle" class="theme-toggle-btn" type="button" title="Toggle light / dark theme" aria-label="Toggle theme">
+                    <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+                    <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                </button>
             </div>
             {% if explore_mode %}
             <div class="explore-panel">
-                <h3>Explore Lineage</h3>
+                <h3>
+                    <span class="explore-brand-mark">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+                    </span>
+                    Explore lineage
+                </h3>
                 <div class="search-bar-container" id="searchBarContainer">
                     <input type="text" id="modelSearchInput" placeholder="Search models...">
                     <button type="button" class="search-clear-btn" id="searchClearBtn" title="Clear search">
@@ -105,8 +125,13 @@
                         <path d="M12 12L21 7.5M12 12L3 7.5M12 12V21"/>
                     </svg>
                 </div>
-                <h3>Select a model to explore</h3>
-                <p>Choose a model from the tree on the left, then select a column to view its lineage</p>
+                <h3>What breaks if you change a column?</h3>
+                <p>Pick a model from the tree, choose a column, and load its lineage to trace the blast radius.</p>
+                <div class="empty-state-hint">
+                    <span><code>+model.col</code> upstream</span>
+                    <span><code>model.col+</code> downstream</span>
+                    <span><code>model.col</code> both</span>
+                </div>
             </div>
             <div id="relationshipSummaryCard" class="relationship-summary-card" style="display: none;">
                 <div class="relationship-summary-header" id="toggleRelationshipSummary">
@@ -168,6 +193,23 @@
             const initialData = {{ data | tojson }};
             const isExploreMode = {% if explore_mode %}true{% else %}false{% endif %};
             window.app.init(initialData, isExploreMode);
+
+            // Theme toggle
+            const toggle = document.getElementById('themeToggle');
+            if (toggle) {
+                const currentTheme = function () {
+                    return document.documentElement.getAttribute('data-theme') || 'light';
+                };
+                toggle.addEventListener('click', function () {
+                    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    try { localStorage.setItem('dbtcl-theme', next); } catch (e) {}
+                    // Keep the D3 graph palette in sync for subsequent interactions
+                    if (window.graphConfig && typeof resolveGraphColors === 'function') {
+                        window.graphConfig.colors = resolveGraphColors();
+                    }
+                });
+            }
         });
     </script>
 </body>
