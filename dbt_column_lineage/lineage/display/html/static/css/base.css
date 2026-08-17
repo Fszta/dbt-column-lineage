@@ -1,43 +1,126 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
 
 :root {
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', monospace;
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
 
-  --slate-50: #f8fafc;
-  --slate-100: #f1f5f9;
-  --slate-200: #e2e8f0;
-  --slate-300: #cbd5e1;
-  --slate-400: #94a3b8;
+  /* Cool neutral ramp (light) */
+  --slate-50: #f7f9fc;
+  --slate-100: #eef2f8;
+  --slate-200: #e1e7f0;
+  --slate-300: #cbd4e1;
+  --slate-400: #94a1b8;
   --slate-500: #64748b;
   --slate-600: #475569;
   --slate-700: #334155;
   --slate-800: #1e293b;
   --slate-900: #0f172a;
 
+  /* Warm spark — kept deliberately so the palette never reads grey */
   --accent: #f59e0b;
   --accent-light: #fbbf24;
   --accent-dark: #d97706;
 
-  --primary: #0891b2;
-  --primary-light: #22d3ee;
-  --primary-dark: #0e7490;
+  /* Single accent — the one interactive/brand hue (electric indigo, Linear-style) */
+  --primary: #5E6AD2;
+  --primary-light: #8A94EC;
+  --primary-dark: #454FB0;
+  --primary-strong: #4F5AC4;
 
+  /* Colorful semantics (retained) */
   --success: #10b981;
   --warning: #f59e0b;
   --error: #ef4444;
   --info: #3b82f6;
+  --violet: #8b5cf6;
 
+  /* Semantic surface / text / border tokens (theme-aware) */
+  --bg: var(--slate-50);
+  --surface: #ffffff;
+  --surface-2: var(--slate-50);
+  --surface-hover: var(--slate-100);
+  --border: var(--slate-200);
+  --border-strong: var(--slate-300);
+  --text: var(--slate-800);
+  --text-secondary: var(--slate-600);
+  --text-muted: var(--slate-500);
+
+  --ring: rgba(94, 106, 210, 0.35);
+  --ring-soft: rgba(94, 106, 210, 0.15);
+  --dot-color: rgba(100, 116, 139, 0.22);
+
+  /* legacy aliases still referenced across the codebase */
   --primary-legacy: var(--primary);
   --secondary: var(--slate-50);
-  --text-dark: var(--slate-800);
-  --text-light: var(--slate-500);
-  --border: var(--slate-200);
+  --text-dark: var(--text);
+  --text-light: var(--text-muted);
   --shadow: rgba(15, 23, 42, 0.08);
-  --model-bg: #ffffff;
-  --column-bg: var(--slate-50);
+  --model-bg: var(--surface);
+  --column-bg: var(--surface-2);
   --edge-color: var(--slate-400);
-  --edge-highlight: var(--accent);
+  --edge-highlight: #5E6AD2;
+  --col-selected: rgba(94, 106, 210, 0.16);
+  --col-related: rgba(94, 106, 210, 0.07);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  color-scheme: light;
+}
+
+/* ============ DARK THEME (opt-in via toggle) ============
+   Remap the neutral ramp + semantic tokens; because the app is
+   built almost entirely on these tokens, the whole surface flips. */
+:root[data-theme="dark"] {
+  --slate-50: #10151f;
+  --slate-100: #171e2b;
+  --slate-200: #263041;
+  --slate-300: #313d4f;
+  --slate-400: #566173;
+  --slate-500: #8b96a8;
+  --slate-600: #aab4c4;
+  --slate-700: #c6cfdb;
+  --slate-800: #e5eaf2;
+  --slate-900: #f2f6fb;
+
+  --accent: #fbbf24;
+  --accent-light: #fcd34d;
+  --accent-dark: #f59e0b;
+
+  --primary: #8A94EC;
+  --primary-light: #AAB2F5;
+  --primary-dark: #6E78E0;
+  --primary-strong: #5E6AD2;
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #60a5fa;
+  --violet: #a78bfa;
+
+  --bg: #0b0f17;
+  --surface: #161d2b;
+  --surface-2: #10151f;
+  --surface-hover: #1c2534;
+  --border: #263041;
+  --border-strong: #313d4f;
+  --text: var(--slate-800);
+  --text-secondary: var(--slate-600);
+  --text-muted: var(--slate-500);
+
+  --ring: rgba(138, 148, 236, 0.40);
+  --ring-soft: rgba(138, 148, 236, 0.18);
+  --dot-color: rgba(255, 255, 255, 0.05);
+
+  --shadow: rgba(0, 0, 0, 0.5);
+  --edge-color: var(--slate-400);
+  --edge-highlight: #8A94EC;
+  --col-selected: rgba(138, 148, 236, 0.22);
+  --col-related: rgba(138, 148, 236, 0.12);
+
+  color-scheme: dark;
 }
 
 html, body {
@@ -46,8 +129,8 @@ html, body {
     width: 100%;
     height: 100%;
   font-family: var(--font-sans);
-  background-color: var(--slate-50);
-    color: var(--text-dark);
+  background-color: var(--bg);
+    color: var(--text);
     display: flex;
     height: 100vh;
   overflow: hidden;
@@ -55,6 +138,7 @@ html, body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .mono {
@@ -62,8 +146,8 @@ html, body {
 }
 
 .error-message {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: color-mix(in srgb, var(--error) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
   border-left: 3px solid var(--error);
   border-radius: 4px;
   color: var(--error);
