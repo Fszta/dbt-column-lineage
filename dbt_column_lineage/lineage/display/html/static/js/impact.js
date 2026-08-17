@@ -167,26 +167,10 @@ const ImpactModule = (function() {
         const lowImpactColumns = affectedColumns.filter(col => col.severity === 'low_impact');
 
         let html = `
-            <div class="impact-intro">
-                <div class="impact-intro-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
-                        <circle cx="12" cy="12" r="5"></circle>
-                    </svg>
-                </div>
-                <div class="impact-intro-text">
-                    <strong>Understanding the impact:</strong> This analysis shows what will be affected if you modify the logic of <code>${modelName}.${columnName}</code>.
-                    Review the transformed columns below as they may need updates when the source column changes.
-                </div>
-            </div>
             <div class="impact-hero">
-                <div class="impact-hero-header">
-                    <div class="impact-hero-content">
-                        <h2 class="impact-hero-title">Impact Summary</h2>
-                        <p class="impact-hero-subtitle">Column: <code>${modelName}.${columnName}</code></p>
-                    </div>
-                    ${confidenceBadgeHtml(data.confidence, modelName)}
-                </div>
+                <h2 class="impact-question">What breaks if you change <code>${escapeHtml(columnName)}</code>?</h2>
+                <p class="impact-question-sub">in <code>${escapeHtml(modelName)}</code></p>
+                ${confidenceBadgeHtml(data.confidence, modelName)}
                 <div class="impact-hero-metrics">
                     <div class="hero-metric ${criticalColumns.length > 0 ? 'hero-metric-critical' : ''}">
                         <div class="hero-metric-icon">

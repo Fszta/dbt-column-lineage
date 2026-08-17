@@ -329,46 +329,57 @@ function highlightLineage(columnId, state, config) {
     relatedColumns.forEach(id => {
         const columnElement = d3.select(`.column-group[data-id="${id}"]`);
         if (!columnElement.empty()) {
-            columnElement
-                .classed('highlighted', true)
-                .select('.column-background')
+            const isSelected = id === columnId;
+            columnElement.classed('highlighted', true);
+            columnElement.select('.column-background')
                 .transition().duration(200)
-                .attr('fill', id === columnId ? config.colors.selectedColumn : config.colors.relatedColumn);
+                .attr('fill', isSelected ? config.colors.selectedColumn : config.colors.relatedColumn);
+            // Thermal rail: the shared left indicator carries the accent current
+            columnElement.select('.column-indicator')
+                .transition().duration(200)
+                .attr('fill', config.colors.edgeHighlight)
+                .attr('opacity', isSelected ? 1 : 0.55);
         }
     });
 
-    // Make all lineage edges lighter but still visible (keep exposure edges visible)
+    // Context edges recede so the traced path reads as the one live current
     d3.selectAll('.edge.lineage').transition().duration(200)
         .style('stroke', config.colors.edgeDimmed)
         .style('stroke-width', 1)
-        .style('stroke-opacity', 0.5)
+        .style('stroke-opacity', 0.32)
         .attr('marker-end', 'url(#arrowhead)');
 
     // Keep exposure edges visible with their purple color
     d3.selectAll('.edge.exposure').transition().duration(200)
-        .style('stroke', '#a855f7')
+        .style('stroke', 'var(--violet)')
         .style('stroke-width', 2)
         .style('stroke-opacity', 0.7)
         .attr('marker-end', 'url(#arrowhead)');
 
-    // Highlight relevant edges (both upstream and downstream)
+    // Highlight relevant edges (both upstream and downstream) — the live current
     d3.selectAll('.edge').filter(d => {
         return relatedColumns.has(d.source) && relatedColumns.has(d.target);
     })
     .transition().duration(200)
     .style('stroke', config.colors.edgeHighlight)
-    .style('stroke-width', 2)
+    .style('stroke-width', 2.5)
     .style('stroke-opacity', 1)
     .attr('marker-end', 'url(#arrowhead-highlighted)');
 }
 
 function resetHighlights(state, config) {
-    // Reset column highlighting
-    d3.selectAll('.column-group.highlighted')
-        .classed('highlighted', false)
-        .select('.column-background')
-        .transition().duration(200)
-        .attr('fill', 'transparent');
+    // Reset column highlighting (and restore the thermal rail to its base color)
+    d3.selectAll('.column-group.highlighted').each(function() {
+        const grp = d3.select(this);
+        grp.select('.column-background')
+            .transition().duration(200)
+            .attr('fill', 'transparent');
+        const rail = grp.select('.column-indicator');
+        rail.transition().duration(200)
+            .attr('fill', rail.attr('data-basefill') || '#94a3b8')
+            .attr('opacity', 0.7);
+        grp.classed('highlighted', false);
+    });
 
     // Reset lineage edge highlighting
     d3.selectAll('.edge.lineage').transition().duration(200)
@@ -379,7 +390,7 @@ function resetHighlights(state, config) {
 
     // Restore exposure edge color
     d3.selectAll('.edge.exposure').transition().duration(200)
-        .style('stroke', '#a855f7')
+        .style('stroke', 'var(--violet)')
         .style('stroke-width', 2)
         .style('stroke-opacity', 1)
         .attr('marker-end', 'url(#arrowhead)');

@@ -17,8 +17,9 @@
     min-width: 400px;
     max-width: 90vw;
     height: 100vh;
-    background: white;
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -12px 0 32px var(--shadow);
     z-index: 1000;
     display: block;
     overflow: hidden;
@@ -53,9 +54,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: 14px 20px;
     border-bottom: 1px solid var(--border);
-    background: var(--secondary);
+    background: var(--surface);
     position: relative;
     z-index: 1;
 }
@@ -65,17 +66,16 @@
 }
 
 .impact-panel-header h3 {
-    margin: 0 0 4px 0;
-    font-size: 18px;
+    margin: 0;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--text-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
 }
 
 .header-subtitle {
-    margin: 0;
-    font-size: 13px;
-    color: var(--text-light);
-    font-style: italic;
+    display: none;
 }
 
 .close-button {
@@ -104,7 +104,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    padding-top: 73px;
+    padding-top: 47px;
     overflow-y: auto;
     overflow-x: hidden;
     background: var(--column-bg);
@@ -113,11 +113,42 @@
 
 .impact-hero {
     background: var(--model-bg);
-    padding: 0;
+    padding: 24px 24px 20px;
     margin-bottom: 0;
     flex-shrink: 0;
     border-radius: 0;
     border-bottom: 1px solid var(--border);
+}
+
+.impact-question {
+    margin: 0 0 4px 0;
+    font-family: var(--font-serif);
+    font-size: 25px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--text);
+}
+
+.impact-question code {
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    color: var(--primary);
+    background: var(--ring-soft);
+    padding: 1px 7px;
+    border-radius: 5px;
+}
+
+.impact-question-sub {
+    margin: 0 0 14px 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.impact-question-sub code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 .impact-hero-header {
@@ -139,11 +170,12 @@
    uses RED (not the orange/amber reserved for transformations) so the two never clash. */
 .confidence-badge {
     display: block;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-radius: 8px;
     border: 1px solid transparent;
     flex-shrink: 0;
-    max-width: 340px;
+    max-width: 100%;
+    margin-bottom: 2px;
 }
 
 .confidence-badge-row {
@@ -195,15 +227,15 @@
 }
 
 .confidence-full {
-    background: #f0fdf4;
-    border-color: #86efac;
-    color: #15803d;
+    background: color-mix(in srgb, var(--success) 12%, var(--surface));
+    border-color: color-mix(in srgb, var(--success) 45%, transparent);
+    color: color-mix(in srgb, var(--success) 68%, var(--text));
 }
 
 .confidence-partial {
-    background: #fef2f2;
-    border-color: #fca5a5;
-    color: #b91c1c;
+    background: color-mix(in srgb, var(--error) 12%, var(--surface));
+    border-color: color-mix(in srgb, var(--error) 45%, transparent);
+    color: color-mix(in srgb, var(--error) 72%, var(--text));
 }
 
 /* "Why? Show the N model-level-only models" disclosure trigger. */
@@ -273,7 +305,7 @@
     overflow-y: auto;
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.6);
+    background: var(--surface-2);
 }
 
 .confidence-why-list li {
@@ -448,72 +480,65 @@
 .impact-hero-metrics {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 0;
-    padding: 16px 24px 24px;
+    gap: 10px;
+    padding: 4px 0 0;
 }
 
 .hero-metric {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background: var(--secondary);
-    border-right: 1px solid var(--border);
-    transition: all 0.2s;
-}
-
-.hero-metric:last-child {
-    border-right: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: border-color 0.15s, background 0.15s;
 }
 
 .hero-metric:hover {
-    background: var(--column-bg);
+    border-color: var(--border-strong);
 }
 
 .hero-metric-critical {
-    background: #fff4e6;
-    border-left: 3px solid var(--accent);
-}
-
-.hero-metric-critical:hover {
-    background: #ffe8cc;
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .hero-metric-icon {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--model-bg);
-    border-radius: 10px;
-    box-shadow: 0 1px 3px var(--shadow);
-    border: 1px solid var(--border);
-    color: var(--primary);
+    background: var(--surface-2);
+    border-radius: 7px;
+    color: var(--text-muted);
 }
 
 .hero-metric-icon svg {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
 }
 
 .hero-metric-critical .hero-metric-icon {
-    background: #fff4e6;
-    border-color: var(--accent);
-    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent-dark);
 }
 
 .hero-metric-models .hero-metric-icon {
+    background: var(--ring-soft);
     color: var(--primary);
 }
 
 .hero-metric-exposures .hero-metric-icon {
-    color: #9333ea;
+    background: color-mix(in srgb, var(--violet) 15%, transparent);
+    color: var(--violet);
 }
 
 .hero-metric-pass-through .hero-metric-icon {
-    color: #16a34a;
+    background: color-mix(in srgb, var(--success) 15%, transparent);
+    color: color-mix(in srgb, var(--success) 70%, var(--text));
 }
 
 .hero-metric-content {
@@ -522,12 +547,13 @@
 }
 
 .hero-metric-value {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
     line-height: 1;
     margin-bottom: 4px;
-    color: var(--text-dark);
+    color: var(--text);
     letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
 }
 
 .hero-metric-critical .hero-metric-value {
@@ -589,7 +615,7 @@
 }
 
 .impact-intro-text code {
-    background: white;
+    background: var(--surface);
     padding: 2px 6px;
     border-radius: 3px;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -724,7 +750,7 @@
 }
 
 .section-icon-badge.critical-badge {
-    background: #fff4e6;
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
     border-color: var(--accent);
     color: var(--accent);
 }
@@ -736,9 +762,9 @@
 }
 
 .section-icon-badge.exposure-badge {
-    background: #faf5ff;
-    border-color: #c084fc;
-    color: #9333ea;
+    background: color-mix(in srgb, var(--violet) 10%, var(--surface));
+    border-color: color-mix(in srgb, var(--violet) 55%, transparent);
+    color: var(--violet);
 }
 
 .section-title {
@@ -782,7 +808,7 @@
 }
 
 .impact-section.exposure-section h4 {
-    color: #9333ea;
+    color: var(--violet);
 }
 
 .section-icon {
@@ -838,7 +864,7 @@
 
 .model-group-header {
     padding: 12px 16px;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    background: var(--surface-2);
     border-bottom: 1px solid var(--border);
     cursor: pointer;
     transition: all 0.2s;
@@ -846,7 +872,7 @@
 }
 
 .model-group-header:hover {
-    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    background: var(--surface-hover);
 }
 
 .model-group-title {
@@ -928,7 +954,7 @@
 
 .model-card-critical {
     border-left: 4px solid var(--accent);
-    background: #fff4e6;
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 
 .model-card-mart {
@@ -1268,7 +1294,7 @@
 .sql-expression {
     margin-top: 8px;
     padding: 8px;
-    background: white;
+    background: var(--surface);
     border-radius: 4px;
     border: 1px solid var(--border);
     font-size: 11px;
@@ -1310,7 +1336,7 @@
 .exposure-type {
     font-size: 11px;
     padding: 2px 8px;
-    background: #a78bfa;
+    background: var(--violet);
     color: white;
     border-radius: 12px;
     text-transform: uppercase;
@@ -1345,7 +1371,7 @@
 .exposure-card {
     background: var(--model-bg);
     border: 1px solid var(--border);
-    border-left: 3px solid #9333ea;
+    border-left: 3px solid var(--violet);
     border-radius: 10px;
     padding: 14px;
     transition: all 0.2s;
@@ -1414,7 +1440,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: #9333ea;
+    color: var(--violet);
     text-decoration: none;
     font-size: 12px;
     font-weight: 600;
@@ -1443,9 +1469,7 @@
     position: absolute;
     bottom: 16px;
     left: 16px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: var(--surface);
     border-radius: 10px;
     box-shadow:
         0 4px 16px rgba(0, 0, 0, 0.08),
@@ -1479,7 +1503,7 @@
 
 .impact-card-button-compact {
     padding: 6px 12px;
-    background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
+    background: var(--primary-strong);
     color: white;
     border: none;
     border-radius: 6px;
@@ -1492,7 +1516,7 @@
 }
 
 .impact-card-button-compact:hover {
-    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+    background: var(--primary-dark);
     transform: translateY(-1px);
 }
 
@@ -1535,7 +1559,7 @@
     align-items: flex-start;
     justify-content: space-between;
     padding: 12px 14px;
-    background: linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.6) 100%);
+    background: var(--surface-2);
     border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
@@ -1637,7 +1661,7 @@
 .impact-card-button {
     width: 100%;
     padding: 12px 16px;
-    background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
+    background: var(--primary-strong);
     color: white;
     border: none;
     border-radius: 10px;
@@ -1647,7 +1671,7 @@
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow:
-        0 4px 12px rgba(167, 139, 250, 0.3),
+        0 4px 12px var(--ring-soft),
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
     position: relative;
     overflow: hidden;
@@ -1660,14 +1684,14 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+    background: transparent;
     transition: left 0.5s ease;
 }
 
 .impact-card-button:hover {
-    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+    background: var(--primary-dark);
     box-shadow:
-        0 6px 16px rgba(167, 139, 250, 0.4),
+        0 6px 16px var(--ring-soft),
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
     transform: translateY(-1px);
 }
@@ -1678,7 +1702,7 @@
 
 .impact-card-button:active {
     transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
+    box-shadow: 0 2px 8px var(--ring-soft);
 }
 
 .impact-card-button:disabled {
@@ -1712,9 +1736,7 @@
     right: 16px;
     width: 380px;
     max-width: calc(100% - 32px);
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: var(--surface);
     border-radius: 16px;
     box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.08),
@@ -1731,7 +1753,7 @@
     align-items: flex-start;
     justify-content: space-between;
     padding: 12px 14px;
-    background: linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.6) 100%);
+    background: var(--surface-2);
     border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
@@ -1853,39 +1875,39 @@
 }
 
 .summary-metric-critical {
-    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    background: color-mix(in srgb, var(--warning) 12%, var(--surface));
     border-left-color: #f59e0b;
 }
 
 .summary-metric-critical:hover {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    background: color-mix(in srgb, var(--warning) 22%, var(--surface));
 }
 
 .summary-metric-pass-through {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    background: color-mix(in srgb, var(--success) 12%, var(--surface));
     border-left-color: #10b981;
 }
 
 .summary-metric-pass-through:hover {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    background: color-mix(in srgb, var(--success) 22%, var(--surface));
 }
 
 .summary-metric-models {
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    background: color-mix(in srgb, var(--info) 12%, var(--surface));
     border-left-color: #3b82f6;
 }
 
 .summary-metric-models:hover {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    background: color-mix(in srgb, var(--info) 22%, var(--surface));
 }
 
 .summary-metric-exposures {
-    background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
-    border-left-color: #8b5cf6;
+    background: color-mix(in srgb, var(--violet) 12%, var(--surface));
+    border-left-color: var(--violet);
 }
 
 .summary-metric-exposures:hover {
-    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    background: color-mix(in srgb, var(--violet) 22%, var(--surface));
 }
 
 .summary-metric-icon {
@@ -1926,7 +1948,7 @@
 }
 
 .summary-metric-exposures .summary-metric-value {
-    color: #7c3aed;
+    color: var(--violet);
 }
 
 .summary-metric-label {

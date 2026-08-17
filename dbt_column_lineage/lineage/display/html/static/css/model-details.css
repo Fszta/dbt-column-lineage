@@ -4,15 +4,12 @@
     right: 20px;
     width: 320px;
     max-width: calc(100vw - 360px);
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: var(--surface);
     border-radius: 12px;
     box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.12),
-        0 2px 8px rgba(0, 0, 0, 0.06),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-    border: 1px solid rgba(148, 163, 184, 0.2);
+        0 12px 32px var(--shadow),
+        0 2px 8px var(--shadow);
+    border: 1px solid var(--border);
     z-index: 150;
     overflow: hidden;
     animation: slideInFromRight 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -63,28 +60,28 @@
 }
 
 .model-details-icon.model-type-model {
-    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-    color: #0891b2;
+    background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+    color: color-mix(in srgb, var(--primary) 82%, var(--text));
 }
 
 .model-details-icon.model-type-source {
-    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-    color: #059669;
+    background: color-mix(in srgb, var(--success) 14%, var(--surface));
+    color: color-mix(in srgb, var(--success) 78%, var(--text));
 }
 
 .model-details-icon.model-type-seed {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-    color: #16a34a;
+    background: color-mix(in srgb, #22c55e 14%, var(--surface));
+    color: color-mix(in srgb, #22c55e 78%, var(--text));
 }
 
 .model-details-icon.model-type-snapshot {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    color: #d97706;
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    color: color-mix(in srgb, var(--accent-dark) 82%, var(--text));
 }
 
 .model-details-icon.model-type-exposure {
-    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
-    color: #9333ea;
+    background: color-mix(in srgb, var(--violet) 14%, var(--surface));
+    color: var(--violet);
 }
 
 .model-details-title-text {
@@ -116,23 +113,23 @@
 }
 
 .model-details-type.type-model {
-    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-    color: #0369a1;
+    background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+    color: color-mix(in srgb, var(--primary) 82%, var(--text));
 }
 
 .model-details-type.type-source {
-    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-    color: #047857;
+    background: color-mix(in srgb, var(--success) 14%, var(--surface));
+    color: color-mix(in srgb, var(--success) 78%, var(--text));
 }
 
 .model-details-type.type-seed {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-    color: #15803d;
+    background: color-mix(in srgb, #22c55e 14%, var(--surface));
+    color: color-mix(in srgb, #22c55e 78%, var(--text));
 }
 
 .model-details-type.type-snapshot {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    color: #b45309;
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    color: color-mix(in srgb, var(--accent-dark) 82%, var(--text));
 }
 
 .model-details-close {
@@ -198,7 +195,7 @@
     display: inline-flex;
     align-items: center;
     padding: 4px 10px;
-    background: linear-gradient(135deg, var(--slate-100) 0%, var(--slate-50) 100%);
+    background: var(--surface-2);
     border: 1px solid var(--slate-200);
     border-radius: 12px;
     font-size: 12px;
@@ -209,7 +206,7 @@
 }
 
 .model-tag:hover {
-    background: linear-gradient(135deg, var(--slate-200) 0%, var(--slate-100) 100%);
+    background: var(--surface-hover);
     border-color: var(--slate-300);
 }
 
