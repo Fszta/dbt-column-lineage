@@ -171,13 +171,13 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('height', d => d.height)
         .attr('rx', 6)
         .attr('ry', 6)
-        .style('fill', 'white')
+        .style('fill', 'var(--surface)')
         .style('stroke', d => {
             const modelType = d.type || 'model';
             if (modelType === 'snapshot') return '#f59e0b';
             if (modelType === 'source') return '#14b8a6';
             if (modelType === 'seed') return '#22c55e';
-            return '#0891b2';  // Teal for regular models
+            return 'var(--primary)';
         })
         .style('stroke-width', 1.5);
 
@@ -194,10 +194,10 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('rx', 5)
         .style('fill', d => {
             const modelType = d.type || 'model';
-            if (modelType === 'source') return '#ecfdf5';
-            if (modelType === 'seed') return '#f0fdf4';
-            if (modelType === 'snapshot') return '#fef3c7';
-            return '#f0f9ff';  // Light cyan for models
+            if (modelType === 'source') return 'color-mix(in srgb, var(--success) 14%, var(--surface))';
+            if (modelType === 'seed') return 'color-mix(in srgb, #22c55e 14%, var(--surface))';
+            if (modelType === 'snapshot') return 'color-mix(in srgb, var(--accent) 16%, var(--surface))';
+            return 'color-mix(in srgb, var(--primary) 16%, var(--surface))';  // cool tint for models
         })
         .style('stroke', 'none');
 
@@ -220,22 +220,35 @@ function drawModels(g, state, config, dragBehavior) {
             if (modelType === 'source') return '#0d9488';
             if (modelType === 'seed') return '#10b981';
             if (modelType === 'snapshot') return '#f59e0b';
-            return '#0891b2';
+            return 'var(--primary)';
         })
         .attr('stroke-width', '2')
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
 
+    // Model kind eyebrow (MODEL / SOURCE / SEED / SNAPSHOT)
+    foregroundGroup.append('text')
+        .attr('class', 'model-eyebrow')
+        .attr('x', 66)
+        .attr('y', config.box.titleHeight / 2 - 6)
+        .style('fill', 'var(--text-muted)')
+        .style('font-family', 'var(--font-sans)')
+        .style('font-size', '8.5px')
+        .style('font-weight', '600')
+        .style('letter-spacing', '0.09em')
+        .style('pointer-events', 'none')
+        .text(d => (d.type || 'model').toUpperCase());
+
     // Model title text (shifted right for upstream expand icon)
     const modelTitleText = foregroundGroup.append('text')
         .attr('class', 'model-title')
         .attr('x', 66)
-        .attr('y', config.box.titleHeight / 2 + 5)
+        .attr('y', config.box.titleHeight / 2 + 10)
         .style('fill', d => {
             const modelType = d.type || 'model';
-            if (modelType === 'snapshot') return '#b45309';
-            if (modelType === 'source') return '#0f766e';
-            return '#1e293b';
+            if (modelType === 'snapshot') return 'color-mix(in srgb, var(--accent-dark) 55%, var(--text))';
+            if (modelType === 'source') return 'color-mix(in srgb, var(--success) 55%, var(--text))';
+            return 'var(--text)';
         })
         .style('cursor', 'pointer')
         .text(d => d.name)
@@ -655,7 +668,7 @@ function drawColumns(nodes, state, config, onColumnClick) {
                     });
             }
 
-            // --- Left Color Indicator ---
+            // --- Left Color Indicator (doubles as the thermal rail on select) ---
             columnGroup.append('rect')
                 .attr('class', 'column-indicator')
                 .attr('x', 2)
@@ -663,6 +676,7 @@ function drawColumns(nodes, state, config, onColumnClick) {
                 .attr('width', 3)
                 .attr('height', config.box.columnHeight - config.box.columnPadding - 4)
                 .attr('rx', 1.5)
+                .attr('data-basefill', col.isKey ? '#3b82f6' : '#94a3b8')
                 .attr('fill', col.isKey ? '#3b82f6' : '#94a3b8')
                 .attr('opacity', 0.7);
 
@@ -828,8 +842,8 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('height', d => d.height)
         .attr('rx', 8)
         .attr('ry', 8)
-        .style('fill', 'white')
-        .style('stroke', '#a78bfa')
+        .style('fill', 'var(--surface)')
+        .style('stroke', 'var(--violet)')
         .style('stroke-width', 2);
 
     const foregroundGroup = exposureGroups.append('g')
@@ -842,7 +856,7 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('x', 1)
         .attr('y', 1)
         .attr('rx', 7)
-        .style('fill', '#f3e8ff')
+        .style('fill', 'color-mix(in srgb, var(--violet) 12%, var(--surface))')
         .style('stroke', 'none');
 
     foregroundGroup.append('svg')
@@ -855,15 +869,27 @@ function drawExposures(g, state, config, dragBehavior) {
         .append('path')
         .attr('d', getModelIcon('exposure'))
         .attr('fill', 'none')
-        .attr('stroke', '#9333ea')
+        .attr('stroke', 'var(--violet)')
         .attr('stroke-width', '2')
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
 
+    foregroundGroup.append('text')
+        .attr('class', 'exposure-eyebrow')
+        .attr('x', 44)
+        .attr('y', config.box.titleHeight / 2 - 6)
+        .style('fill', 'color-mix(in srgb, var(--violet) 60%, var(--text-muted))')
+        .style('font-family', 'var(--font-sans)')
+        .style('font-size', '8.5px')
+        .style('font-weight', '600')
+        .style('letter-spacing', '0.09em')
+        .style('pointer-events', 'none')
+        .text('EXPOSURE');
+
     const exposureTitleText = foregroundGroup.append('text')
         .attr('class', 'exposure-title')
         .attr('x', 44)
-        .attr('y', config.box.titleHeight / 2 + 5)
+        .attr('y', config.box.titleHeight / 2 + 10)
         .text(d => d.name)
         .each(function(d) {
             const maxWidth = config.box.width - 56;
@@ -960,7 +986,7 @@ function drawExposures(g, state, config, dragBehavior) {
                 .attr('transform', `translate(${xPosition}, 0)`)
                 .style('pointer-events', 'none');
 
-            const exposureTypeColor = '#ec4899';
+            const exposureTypeColor = 'var(--violet)';
             tagGroup.append('rect')
                 .attr('rx', 4)
                 .attr('ry', 4)
@@ -1107,7 +1133,7 @@ function drawEdges(g, data, state, config) {
         .attr('marker-end', 'url(#arrowhead)')
         .attr('data-source', d => d.source)
         .attr('data-target', d => d.target)
-        .style('stroke', '#a855f7')
+        .style('stroke', 'var(--violet)')
         .style('stroke-width', 2)
         .style('stroke-dasharray', '8,4')
         .style('fill', 'none')
