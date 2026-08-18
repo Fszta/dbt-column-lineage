@@ -67,9 +67,9 @@ def test_json_impact_carries_confidence_block(dbt_artifacts):
         "reachable_models",
         "resolved_models",
         "unanalyzable_models",
-        "not_in_catalog",
+        "no_column_info",
         "parse_failed",
-        "not_in_catalog_models",
+        "no_column_info_models",
         "parse_failed_models",
         "level",
     }
@@ -79,7 +79,7 @@ def test_json_impact_carries_confidence_block(dbt_artifacts):
     assert confidence["resolved_models"] <= confidence["reachable_models"]
     # Full confidence means no coverage gap: nothing reachable was unanalyzable.
     assert confidence["unanalyzable_models"] == 0
-    assert confidence["not_in_catalog"] == 0
+    assert confidence["no_column_info"] == 0
     assert confidence["parse_failed"] == 0
 
 

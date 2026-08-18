@@ -84,10 +84,14 @@ class ImpactConfidence(BaseModel):
     # column level, split by reason. This — not resolved-vs-reachable — is what makes
     # the impact a lower bound (many reachable models simply don't use the column).
     unanalyzable_models: int = 0
-    not_in_catalog: int = 0
+    # Reachable models with no column information available: absent from the catalog
+    # AND with no parseable compiled SQL (e.g. a non-table relation such as a semantic
+    # view, a python model, or a relation dbt has not built/compiled). A model that is
+    # merely absent from the catalog but has parseable SQL is analyzable and NOT counted.
+    no_column_info: int = 0
     parse_failed: int = 0
     # Sample of the actual unanalyzable model names, for UI/agent drill-down. Capped;
     # the *_models integer counts above remain the source of truth for totals.
-    not_in_catalog_models: List[str] = Field(default_factory=list)
+    no_column_info_models: List[str] = Field(default_factory=list)
     parse_failed_models: List[str] = Field(default_factory=list)
     level: Literal["full", "partial"]

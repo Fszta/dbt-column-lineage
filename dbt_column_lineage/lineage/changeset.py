@@ -112,7 +112,10 @@ class ChangesetBuilder:
             head_model = head_models.get(model_name)
 
             if base_model is not None and head_model is None:
-                # Whole model removed: every column it exposed is now gone.
+                # Whole model removed: every column it exposed is now gone. Because the
+                # universe is manifest-seeded, ``head_model is None`` means the model is
+                # absent from the *head manifest* — a genuine deletion — not merely absent
+                # from the head catalog (a built-but-uncatalogued model is still present).
                 for column in sorted(base_model.columns):
                     record(ColumnChange(model_name, column, ChangeKind.REMOVED))
                 continue
@@ -124,37 +127,60 @@ class ChangesetBuilder:
                 continue
 
             assert base_model is not None and head_model is not None
-            base_cols = base_model.columns
-            head_cols = head_model.columns
 
-            for column in sorted(set(base_cols) | set(head_cols)):
-                in_base = column in base_cols
-                in_head = column in head_cols
-                if in_head and not in_base:
-                    record(ColumnChange(model_name, column, ChangeKind.ADDED))
-                elif in_base and not in_head:
-                    record(ColumnChange(model_name, column, ChangeKind.REMOVED))
-                else:
-                    base_type = (base_cols[column].data_type or "").lower()
-                    head_type = (head_cols[column].data_type or "").lower()
-                    if base_type != head_type:
-                        record(
-                            ColumnChange(
-                                model_name,
-                                column,
-                                ChangeKind.TYPE_CHANGED,
-                                detail=f"{base_cols[column].data_type} -> {head_cols[column].data_type}",
+            # Structural column diffs (added/removed/type_changed) are only trustworthy
+            # when BOTH sides are backed by a real catalog. For a catalog-missing model
+            # the column set is recovered from parsing compiled SQL (best-effort, no data
+            # types), so diffing it would emit phantom add/remove/type churn. In that case
+            # we rely solely on the compiled-SQL diff below (logic_changed).
+            if self._both_catalog_backed(model_name):
+                base_cols = base_model.columns
+                head_cols = head_model.columns
+
+                for column in sorted(set(base_cols) | set(head_cols)):
+                    in_base = column in base_cols
+                    in_head = column in head_cols
+                    if in_head and not in_base:
+                        record(ColumnChange(model_name, column, ChangeKind.ADDED))
+                    elif in_base and not in_head:
+                        record(ColumnChange(model_name, column, ChangeKind.REMOVED))
+                    else:
+                        base_type = (base_cols[column].data_type or "").lower()
+                        head_type = (head_cols[column].data_type or "").lower()
+                        # Only a real type change counts; an unknown type on either side
+                        # (empty string) is not evidence of a change.
+                        if base_type and head_type and base_type != head_type:
+                            record(
+                                ColumnChange(
+                                    model_name,
+                                    column,
+                                    ChangeKind.TYPE_CHANGED,
+                                    detail=f"{base_cols[column].data_type} -> {head_cols[column].data_type}",
+                                )
                             )
-                        )
 
             # Logic change: compiled SQL differs. Any output column of the model
             # may now be produced differently, so flag them all (dedup keeps the
             # higher-severity kind where a column was also added/removed/retyped).
+            # Use head_model.columns directly — head_cols above is only bound inside the
+            # catalog-backed branch, so referencing it here would leak a previous
+            # iteration's columns for a catalog-missing model.
             if self._logic_changed(model_name):
-                for column in sorted(head_cols):
+                for column in sorted(head_model.columns):
                     record(ColumnChange(model_name, column, ChangeKind.LOGIC_CHANGED))
 
         return sorted(chosen.values(), key=lambda c: (c.model, c.column, c.kind.value))
+
+    def _both_catalog_backed(self, model_name: str) -> bool:
+        """True when the model has a real catalog entry in BOTH base and head.
+
+        Structural column diffs are only authoritative when column names and data types
+        come from the catalog on both sides; otherwise we fall back to the compiled-SQL
+        (logic) diff to avoid phantom add/remove/type changes from parser-derived columns.
+        """
+        return self.base.is_catalog_backed(model_name) and self.head.is_catalog_backed(
+            model_name
+        )
 
     def _logic_changed(self, model_name: str) -> bool:
         base_sql = _normalize_sql(self._safe_compiled_sql(self.base, model_name))

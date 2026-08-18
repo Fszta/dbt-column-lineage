@@ -6,6 +6,7 @@ from dbt_column_lineage.artifacts.catalog import CatalogReader
 from dbt_column_lineage.artifacts.manifest import ManifestReader
 from dbt_column_lineage.models.schema import (
     Model,
+    Column,
     SQLParseResult,
     ColumnLineage,
     Exposure,
@@ -62,20 +63,80 @@ class ModelRegistry:
         self._dialect: Optional[str] = None
         self._adapter_override: Optional[str] = adapter_override
         self._parse_stats: ParseStats = ParseStats()
+        # Names of model-like nodes that have a real catalog entry (data types known).
+        # A manifest node absent from this set is "catalog-missing": still analyzable via
+        # its compiled SQL, but with unknown column types.
+        self._catalog_backed_model_names: set = set()
 
     @property
     def is_loaded(self) -> bool:
         return self._state.is_loaded
 
     def _initialize_models(self) -> Dict[str, Model]:
-        """Initialize base model information from catalog."""
+        """Initialize the model universe from the *manifest*, enriched by the catalog.
+
+        The manifest is the source of truth for which models exist: it lists every
+        node dbt knows about, regardless of whether the relation has been built in
+        the warehouse. The catalog is only an *enrichment* source that supplies real
+        column names and data types for relations that were built and profiled.
+
+        Seeding from the catalog alone (the previous behaviour) made every model
+        absent from ``catalog.json`` invisible — a common case under a deferred /
+        partial CI build (``dbt docs generate --defer`` after building only the
+        ``state:modified+`` cone) and for non-table relations such as semantic views.
+        Those models were then silently dropped from impact and, in the two-manifest
+        diff, misreported as removed. Here we register every manifest model-like node;
+        columns for catalog-missing nodes are recovered later from their compiled SQL
+        (see :meth:`_apply_column_lineage`).
+        """
         try:
-            models = self._catalog_reader.get_models_nodes()
-            if not models:
-                raise RegistryError("No models found in catalog")
-            return models
+            catalog_models = self._catalog_reader.get_models_nodes()
         except Exception as e:
             raise RegistryError(f"Failed to initialize models: {e}")
+
+        models: Dict[str, Model] = {}
+        catalog_backed: set = set()
+
+        # 1) Seed the universe from manifest model-like nodes (model/snapshot/seed).
+        for node_id, node in self._manifest_reader.manifest.get("nodes", {}).items():
+            if node.get("resource_type") not in _MODEL_LIKE_RESOURCE_TYPES:
+                continue
+            name = (node.get("name") or node_id.split(".")[-1]).lower()
+            if name in models:
+                continue
+
+            catalog_model = catalog_models.get(name)
+            if (
+                catalog_model is not None
+                and catalog_model.resource_type in _MODEL_LIKE_RESOURCE_TYPES
+            ):
+                # Built & profiled: reuse the catalog Model (real column types).
+                models[name] = catalog_model
+                catalog_backed.add(name)
+            else:
+                # Present in the manifest but absent from the catalog. Register it now;
+                # its output columns are derived from compiled SQL during lineage parsing.
+                models[name] = Model(
+                    name=name,
+                    schema=node.get("schema") or "main",
+                    database=node.get("database") or "main",
+                    columns={},
+                    resource_type=node.get("resource_type"),
+                    unique_id=node_id,
+                    metadata={"catalog_missing": True},
+                )
+
+        # 2) Add sources (catalog-only inputs, not manifest ``nodes``) so upstream
+        #    references still resolve.
+        for name, model in catalog_models.items():
+            if model.resource_type == "source" and name not in models:
+                models[name] = model
+
+        self._catalog_backed_model_names = catalog_backed
+
+        if not models:
+            raise RegistryError("No models found in manifest or catalog")
+        return models
 
     def _apply_dependencies(self, models: Dict[str, Model]) -> None:
         """Apply upstream and downstream dependencies to models."""
@@ -201,10 +262,26 @@ class ModelRegistry:
             logger.error(f"Failed to process star references: {e}", exc_info=True)
 
     def _apply_column_lineage(self, model: Model, parse_result: SQLParseResult) -> None:
-        """Apply parsed lineage to model columns."""
+        """Apply parsed lineage to model columns.
+
+        For a catalog-missing model (present in the manifest but absent from the
+        catalog) we have no authoritative column list, so we materialise its output
+        columns from the parsed final ``SELECT``. Data types are left ``None`` — the
+        column is known and traversable, its type merely unknown. Catalog-backed
+        models keep the catalog as the authority and only receive lineage on columns
+        that already exist there.
+        """
+        catalog_missing = bool(model.metadata and model.metadata.get("catalog_missing"))
         for col_name, lineage in parse_result.column_lineage.items():
-            if col_name in model.columns:
-                model.columns[col_name].lineage = lineage
+            if col_name not in model.columns:
+                if not catalog_missing:
+                    continue
+                model.columns[col_name] = Column(
+                    name=col_name,
+                    model_name=model.name,
+                    data_type=None,
+                )
+            model.columns[col_name].lineage = lineage
 
         if parse_result.star_sources:
             model.metadata = model.metadata or {}
@@ -318,11 +395,10 @@ class ModelRegistry:
             raise RegistryNotLoadedError("Registry must be loaded before accessing coverage")
 
         models_in_manifest = self._count_manifest_models()
-        models_in_catalog = sum(
-            1
-            for model in self._state.models.values()
-            if model.resource_type in _MODEL_LIKE_RESOURCE_TYPES
-        )
+        # The universe is now manifest-seeded, so counting every model-like node in the
+        # registry would always equal the manifest count. Coverage is about *catalog*
+        # completeness, so count only the nodes actually backed by a catalog entry.
+        models_in_catalog = len(self._catalog_backed_model_names)
         not_in_catalog_count = max(models_in_manifest - models_in_catalog, 0)
 
         stats = self._parse_stats
@@ -347,6 +423,14 @@ class ModelRegistry:
         return set(self._parse_stats.failed_model_names) | set(
             self._parse_stats.skipped_model_names
         )
+
+    def get_parse_failed_models(self) -> set:
+        """Names of models whose compiled SQL was present but failed to parse."""
+        return set(self._parse_stats.failed_model_names)
+
+    def is_catalog_backed(self, model_name: str) -> bool:
+        """Whether a model has a real catalog entry (known column types)."""
+        return model_name.lower() in self._catalog_backed_model_names
 
     def get_manifest_downstream(self) -> Dict[str, set]:
         """Manifest-level downstream child map, covering every model (not just catalog ones)."""
