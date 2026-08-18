@@ -122,7 +122,9 @@ def test_impact_two_manifest_markdown_default(dbt_artifacts, base_artifacts):
     )
     assert result.exit_code == 0, result.output
     assert "Column-level impact" in result.output
-    assert "Affected columns" in result.output
+    # New criticality-first layout: a downstream headline instead of a flat "Affected
+    # columns" table (columns are split into 🔴 recomputes-logic and 🟢 pass-through).
+    assert "downstream" in result.output
 
 
 def test_impact_identical_manifests_report_no_change(dbt_artifacts):

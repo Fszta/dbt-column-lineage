@@ -357,7 +357,90 @@ class SQLColumnParser:
                 lineage = self._expression_analyzer.analyze(expr, context)
                 columns[target_col] = lineage
 
-        return SQLParseResult(column_lineage=columns, star_sources=star_sources)
+        predicate_lineage = self._extract_predicate_lineage(
+            parsed,
+            cte_to_model,
+            cte_sources,
+            cte_transformation_types,
+            cte_sql_expressions,
+            cte_base_tables,
+        )
+
+        return SQLParseResult(
+            column_lineage=columns,
+            star_sources=star_sources,
+            predicate_sources=set(predicate_lineage.keys()),
+            predicate_lineage=predicate_lineage,
+        )
+
+    def _extract_predicate_lineage(
+        self,
+        parsed: Any,
+        cte_to_model: Optional[Dict[str, str]],
+        cte_sources: Dict[str, Dict[str, str]],
+        cte_transformation_types: Dict[str, Dict[str, str]],
+        cte_sql_expressions: Dict[str, Dict[str, Optional[str]]],
+        cte_base_tables: Dict[str, Set[str]],
+    ) -> Dict[str, str]:
+        """Resolve upstream columns referenced only in predicate clauses, with the condition.
+
+        Column-value lineage is built from the projected ``SELECT`` list, so a column a
+        model *filters or joins on* but never projects (e.g. ``where status = 'flagged'``
+        driving a ``count(*)``) is invisible to it — yet changing that column's logic
+        changes this model's row-set, and therefore its output. We walk the ``WHERE`` /
+        ``JOIN ON`` / ``HAVING`` / ``QUALIFY`` conditions of every (sub)select and resolve
+        each column reference through the same CTE/alias machinery used for projections, so
+        a predicate on a CTE that wraps an upstream model resolves to that model's column.
+        The returned map is ``upstream_column -> predicate condition text`` (the "why").
+        """
+        conditions_by_source: Dict[str, Set[str]] = {}
+
+        for select in parsed.find_all(exp.Select):
+            context = ParserContext(
+                aliases=get_table_aliases(select),
+                table_context=get_table_context(select),
+                cte_sources=cte_sources,
+                cte_to_model=cte_to_model,
+                cte_transformation_types=cte_transformation_types,
+                cte_sql_expressions=cte_sql_expressions,
+                cte_base_tables=cte_base_tables,
+                column_definitions={},
+            )
+
+            conditions: List[Any] = []
+            for key in ("where", "having", "qualify"):
+                wrapper = select.args.get(key)
+                if wrapper is not None:
+                    # WHERE/HAVING/QUALIFY wrap the boolean condition in `.this`.
+                    conditions.append(getattr(wrapper, "this", wrapper))
+            for join in select.args.get("joins", []) or []:
+                on_condition = join.args.get("on")
+                if on_condition is not None:
+                    conditions.append(on_condition)
+
+            for condition in conditions:
+                try:
+                    condition_text = strip_sql_comments(condition.sql(dialect=self.dialect))
+                except Exception:
+                    condition_text = ""
+                for column_ref in condition.find_all(exp.Column):
+                    if self._star_handler.is_star_expression(column_ref):
+                        continue
+                    try:
+                        for lineage in self._expression_analyzer.analyze(column_ref, context):
+                            for source in lineage.source_columns or set():
+                                conditions_by_source.setdefault(source, set())
+                                if condition_text:
+                                    conditions_by_source[source].add(condition_text)
+                    except Exception:
+                        # A predicate we can't resolve is skipped rather than failing the
+                        # whole parse — predicate lineage is best-effort.
+                        continue
+
+        return {
+            source: " ; ".join(sorted(conditions))
+            for source, conditions in conditions_by_source.items()
+        }
 
     def _extract_cte_model_mappings(self, sql: str) -> Dict[str, str]:
         """Extract mappings from CTE names to model names (legacy method using regex)."""

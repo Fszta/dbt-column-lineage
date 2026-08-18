@@ -5,8 +5,8 @@ aggregation, report assembly and Markdown rendering — with lightweight stubs, 
 they run without dbt artifacts on disk.
 """
 
-from dataclasses import dataclass
-from typing import Dict, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set
 
 import pytest
 
@@ -32,6 +32,23 @@ class _Col:
 @dataclass
 class _Model:
     columns: Dict[str, _Col]
+
+
+@dataclass
+class _Lin:
+    """Stand-in for ColumnLineage (the per-column derivation signature source)."""
+
+    source_columns: Set[str]
+    transformation_type: str
+    sql_expression: str
+
+
+@dataclass
+class _LinCol:
+    """A column that also carries parsed per-column lineage, enabling a precise diff."""
+
+    data_type: Optional[str] = None
+    lineage: List[_Lin] = field(default_factory=list)
 
 
 class _FakeRegistry:
@@ -162,6 +179,56 @@ def test_builder_ignores_cosmetic_sql_changes():
         compiled={"m": "select    1 as a\n-- new comment"},
     )
     assert ChangesetBuilder(base, head).build() == []
+
+
+def test_builder_logic_change_is_per_column_when_lineage_is_available():
+    # base: a, b, c are all plain pass-throughs of an upstream column.
+    base = _FakeRegistry(
+        {
+            "m": _Model(
+                {
+                    "a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")]),
+                    "b": _LinCol("text", [_Lin({"up.b"}, "direct", "up.b")]),
+                    "c": _LinCol("text", [_Lin({"up.c"}, "direct", "up.c")]),
+                }
+            )
+        },
+        compiled={"m": "select up.a as a, up.b as b, up.c as c from up"},
+    )
+    # head: only `a`'s derivation changed (now a coalesce); b and c are untouched.
+    head = _FakeRegistry(
+        {
+            "m": _Model(
+                {
+                    "a": _LinCol("text", [_Lin({"up.a", "up.z"}, "derived", "coalesce(up.a, up.z)")]),
+                    "b": _LinCol("text", [_Lin({"up.b"}, "direct", "up.b")]),
+                    "c": _LinCol("text", [_Lin({"up.c"}, "direct", "up.c")]),
+                }
+            )
+        },
+        compiled={"m": "select coalesce(up.a, up.z) as a, up.b as b, up.c as c from up"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    # Precisely `a` — NOT the whole model. This is what stops an edit to one column from
+    # flooding downstream with every unrelated pass-through.
+    assert logic == {"a"}, logic
+
+
+def test_builder_logic_change_flags_all_columns_when_lineage_missing():
+    # No per-column lineage on the stub columns -> can't diff precisely, so fall back to
+    # the conservative model-level behaviour (flag every output column).
+    base = _FakeRegistry(
+        {"m": _Model({"a": _Col("text"), "b": _Col("text")})},
+        compiled={"m": "select 1 as a, 2 as b"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"a": _Col("text"), "b": _Col("text")})},
+        compiled={"m": "select 9 as a, 8 as b"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    assert logic == {"a", "b"}, logic
 
 
 # --- get_changeset_impact (severity-aware aggregation) ---------------------
@@ -304,9 +371,12 @@ def test_markdown_lists_exposures_first_and_blast_table():
 
     assert "Affected exposures" in md
     assert "Finance Dashboard" in md
-    # exposures section appears before the columns table
-    assert md.index("Affected exposures") < md.index("Affected columns")
-    assert "`dm`" in md and "critical" in md
+    # criticality-first: the review section (derived + row-set) comes before exposures.
+    assert "Review — downstream output changes" in md
+    assert md.index("Review — downstream output changes") < md.index("Affected exposures")
+    assert "`dm`" in md and "`dc`" in md and "derived" in md
+    # the derived expression is reachable behind the fold, not cluttering the scannable list
+    assert "Show expressions" in md and "sum(x)" in md
 
 
 def test_markdown_renders_partial_confidence_and_coverage_warning():
@@ -341,7 +411,7 @@ def test_markdown_renders_partial_confidence_and_coverage_warning():
     assert "no column-level information" in md
     assert "haven't been built in the warehouse yet" not in md
     assert "lower bound" in md
-    assert "Coverage is partial" in md
+    assert "Coverage:" in md and "176/1217" in md
 
 
 def test_markdown_full_confidence_is_quiet_without_coverage_warning():
@@ -361,6 +431,59 @@ def test_markdown_full_confidence_is_quiet_without_coverage_warning():
     assert "Confidence:" in md and "full" in md
     # A complete project must not emit the scary partial-coverage note.
     assert "Coverage is partial" not in md
+
+
+def test_markdown_folds_passthrough_columns_and_omits_empty_critical_section():
+    columns = [
+        {
+            "model": "dm",
+            "column": "c1",
+            "severity": "low_impact",
+            "transformation_type": "direct",
+            "sql_expression": "dm.c1",
+        }
+    ]
+    aggregated = _impact([{"name": "dm"}], columns, [])
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
+    )
+    md = render_changeset_markdown(report)
+
+    # Pass-throughs are low-risk: folded into a <details>, not shown as a wall of rows.
+    assert "Pass-through references" in md
+    assert "<details>" in md and "`c1`" in md
+    # With no derived or row-set impact, the review section is omitted entirely.
+    assert "Review — downstream output changes" not in md
+
+
+def test_markdown_renders_filter_section_for_row_set_impact():
+    columns = [
+        {
+            "model": "orders_flag_rate",
+            "column": "(row-set)",
+            "severity": "filter",
+            "transformation_type": "filter",
+            "sql_expression": "order_status = 'flagged'",
+        }
+    ]
+    aggregated = _impact([{"name": "orders_flag_rate"}], columns, [])
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest",
+        [ColumnChange("orders", "order_status", ChangeKind.LOGIC_CHANGED)],
+        aggregated,
+    )
+    md = render_changeset_markdown(report)
+
+    # Filter/join-only consumers appear in the merged review section, tagged as row-set,
+    # with the predicate condition available in the fold.
+    assert "Review — downstream output changes" in md
+    assert "`orders_flag_rate`" in md
+    assert "row-set · filtered/joined" in md
+    assert "order_status = 'flagged'" in md
+    # A row-set impact is not a pass-through.
+    assert "Pass-through references" not in md
 
 
 # --- git scope filter ------------------------------------------------------

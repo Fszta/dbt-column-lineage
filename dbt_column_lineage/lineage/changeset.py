@@ -159,14 +159,14 @@ class ChangesetBuilder:
                                 )
                             )
 
-            # Logic change: compiled SQL differs. Any output column of the model
-            # may now be produced differently, so flag them all (dedup keeps the
-            # higher-severity kind where a column was also added/removed/retyped).
-            # Use head_model.columns directly — head_cols above is only bound inside the
-            # catalog-backed branch, so referencing it here would leak a previous
-            # iteration's columns for a catalog-missing model.
+            # Logic change: the model's compiled SQL differs. Rather than flag EVERY output
+            # column — which floods the downstream blast radius with unrelated pass-throughs
+            # (editing one column must not implicate every other column of the model) — diff each output
+            # column's derivation between base and head and flag ONLY the columns that actually
+            # changed. Falls back to flagging all columns when neither side exposes per-column
+            # lineage (nothing to diff precisely).
             if self._logic_changed(model_name):
-                for column in sorted(head_model.columns):
+                for column in sorted(self._logic_changed_columns(base_model, head_model)):
                     record(ColumnChange(model_name, column, ChangeKind.LOGIC_CHANGED))
 
         return sorted(chosen.values(), key=lambda c: (c.model, c.column, c.kind.value))
@@ -188,6 +188,56 @@ class ChangesetBuilder:
         if not base_sql or not head_sql:
             return False
         return base_sql != head_sql
+
+    def _logic_changed_columns(self, base_model, head_model) -> Set[str]:
+        """Which output columns actually changed derivation between base and head.
+
+        The model's compiled SQL differs, but usually only a few columns are responsible.
+        We compare each column's per-column lineage signature (transformation type +
+        normalized expression + source columns) so downstream tracing follows only the
+        columns whose *value* changed — not every pass-through the model happens to expose.
+
+        Conservative fallbacks preserve correctness where a precise diff isn't possible:
+        - if NEITHER side has any parsed per-column lineage, flag all head columns;
+        - a column parsed on exactly one side (its signature appeared or disappeared) is
+          treated as changed.
+        """
+        base_sigs = self._column_signatures(base_model)
+        head_sigs = self._column_signatures(head_model)
+        if not base_sigs and not head_sigs:
+            return set(head_model.columns)
+
+        changed: Set[str] = set()
+        for column in head_model.columns:
+            base_sig = base_sigs.get(column)
+            head_sig = head_sigs.get(column)
+            if base_sig is None and head_sig is None:
+                # Neither side parsed this column (e.g. a literal constant with no lineage);
+                # there's nothing to diff, so don't treat it as changed.
+                continue
+            if base_sig != head_sig:
+                changed.add(column)
+        return changed
+
+    @staticmethod
+    def _column_signatures(model) -> Dict[str, Tuple]:
+        """Per-column derivation signature: {column -> sorted lineage fingerprint}.
+
+        Columns with no parsed lineage are omitted (no signature), so the caller can tell
+        "parsed, unchanged" apart from "not parsed".
+        """
+        signatures: Dict[str, Tuple] = {}
+        for column_name, column in model.columns.items():
+            lineage = getattr(column, "lineage", None) or []
+            if not lineage:
+                continue
+            parts = []
+            for entry in lineage:
+                expression = _normalize_sql(getattr(entry, "sql_expression", None)) or ""
+                sources = ",".join(sorted(entry.source_columns or []))
+                parts.append((entry.transformation_type or "", expression, sources))
+            signatures[column_name] = tuple(sorted(parts))
+        return signatures
 
     @staticmethod
     def _safe_compiled_sql(registry: ModelRegistry, model_name: str) -> Optional[str]:
