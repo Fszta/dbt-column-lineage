@@ -7,19 +7,19 @@ is the norm under a deferred / partial CI build (``dbt docs generate --defer`` a
 building just the ``state:modified+`` cone) and for non-table relations such as
 semantic views.
 
-The real analytics run exercised TWO distinct shapes that the fix must both get right,
-mirrored faithfully below:
+A deferred-CI run exercises TWO distinct shapes that the fix must both get right,
+mirrored below:
 
-Shape 1 — filter/join-only consumer (the real ``int_risk_kpis_breach_rate``): reads
-``accounts`` but uses its columns ONLY in ``WHERE`` / join / aggregate predicates and
-projects NO ``accounts`` column value to its output (outputs are ``count(*)``-based
-ratios plus ``reporting_month`` sourced from ``account_holders``). Under column-
-propagation lineage it must remain EXCLUDED from the accounts blast radius — reporting
-it would be an Issue-B over-report. This test guards that the fix did not start over-
-reporting it.
+Shape 1 — filter/join-only consumer (``orders_flag_rate``): reads
+``orders`` but uses its columns ONLY in ``WHERE`` / join / aggregate predicates and
+projects NO ``orders`` column value to its output (outputs are ``count(*)``-based
+ratios plus ``reporting_month`` sourced from ``customers``). It carries no derived
+*value* from the change, but a change to ``order_status``'s logic shifts which rows it
+keeps — so it is surfaced as a distinct ``filter`` (row-set) impact, not as a derived
+column and not silently dropped.
 
-Shape 2 — projecting, genuinely catalog-absent consumer (e.g. ``int_capital_deposit_otif``
-or ``identifications_and_onboardings_semantic_view``): projects an ``accounts`` column
+Shape 2 — projecting, genuinely catalog-absent consumer (e.g. ``orders_fulfilment_flags``
+or ``orders_semantic_view``): projects an ``orders`` column
 value to its output AND is absent from the head catalog (deferred / not-built, so it is
 manifest-only). Before the fix it was dropped, mislabeled "not built", and reported as
 ``removed``; after the fix it is reported as affected, ``removed`` is false, and it does
@@ -86,60 +86,60 @@ def _write(tmp_path, tag, catalog_nodes, manifest_nodes):
 
 # --- the analytics scenario ------------------------------------------------
 
-_ACCOUNTS_COLUMNS = [
-    "account_holder_id",
-    "account_status",
-    "last_suspended_at",
-    "account_closing_at",
-    "account_closed_at",
-    "account_internal_closing_reason_type",
+_ORDERS_COLUMNS = [
+    "customer_id",
+    "order_status",
+    "last_flagged_at",
+    "order_cancel_requested_at",
+    "order_cancelled_at",
+    "order_cancel_reason",
 ]
 
-# accounts: a mart whose compiled SQL changes (a pure logic edit to account_status).
-_ACCOUNTS_BASE = (
+# orders: a mart whose compiled SQL changes (a pure logic edit to order_status).
+_ORDERS_BASE = (
     "select "
-    "dim.account_holder_id as account_holder_id, "
-    "dim.account_status as account_status, "
-    "dim.last_suspended_at as last_suspended_at, "
-    "dim.account_closing_at as account_closing_at, "
-    "dim.account_closed_at as account_closed_at, "
-    "dim.account_internal_closing_reason_type as account_internal_closing_reason_type "
-    "from {db}.{schema}.dim_accounts as dim"
+    "dim.customer_id as customer_id, "
+    "dim.order_status as order_status, "
+    "dim.last_flagged_at as last_flagged_at, "
+    "dim.order_cancel_requested_at as order_cancel_requested_at, "
+    "dim.order_cancelled_at as order_cancelled_at, "
+    "dim.order_cancel_reason as order_cancel_reason "
+    "from {db}.{schema}.dim_orders as dim"
 )
-_ACCOUNTS_HEAD = (
+_ORDERS_HEAD = (
     "select "
-    "dim.account_holder_id as account_holder_id, "
-    "coalesce(dim.account_status, dim.fallback_status) as account_status, "
-    "dim.last_suspended_at as last_suspended_at, "
-    "dim.account_closing_at as account_closing_at, "
-    "dim.account_closed_at as account_closed_at, "
-    "dim.account_internal_closing_reason_type as account_internal_closing_reason_type "
-    "from {db}.{schema}.dim_accounts as dim"
+    "dim.customer_id as customer_id, "
+    "coalesce(dim.order_status, dim.fallback_status) as order_status, "
+    "dim.last_flagged_at as last_flagged_at, "
+    "dim.order_cancel_requested_at as order_cancel_requested_at, "
+    "dim.order_cancelled_at as order_cancelled_at, "
+    "dim.order_cancel_reason as order_cancel_reason "
+    "from {db}.{schema}.dim_orders as dim"
 )
 
-# Shape 1: int_risk_kpis_breach_rate. accounts columns appear ONLY in the WHERE of the
-# `suspended` CTE; the projected outputs are reporting_month (from account_holders) and
-# two count(*)-based ratios. No accounts column VALUE reaches an output column.
-_BREACH_RATE = (
+# Shape 1: orders_flag_rate. orders columns appear ONLY in the WHERE of the
+# `suspended` CTE; the projected outputs are reporting_month (from customers) and
+# two count(*)-based ratios. No orders column VALUE reaches an output column.
+_FLAG_RATE = (
     "with "
-    "account_holders as (select * from {db}.{schema}.account_holders), "
-    "accounts as (select * from {db}.{schema}.accounts), "
+    "customers as (select * from {db}.{schema}.customers), "
+    "orders as (select * from {db}.{schema}.orders), "
     "suspended as ("
     "  select "
-    "    date_trunc('month', account_holders.first_verified_at) as reporting_month, "
+    "    date_trunc('month', customers.first_seen_at) as reporting_month, "
     "    count(*) as breached_count "
-    "  from account_holders "
-    "  inner join accounts on accounts.account_holder_id = account_holders.account_holder_id "
-    "  where accounts.account_status = 'Suspended' "
-    "     or (accounts.account_status in ('Closing', 'Closed') "
-    "         and accounts.account_internal_closing_reason_type in ('fraud')) "
+    "  from customers "
+    "  inner join orders on orders.customer_id = customers.customer_id "
+    "  where orders.order_status = 'Flagged' "
+    "     or (orders.order_status in ('Cancelling', 'Cancelled') "
+    "         and orders.order_cancel_reason in ('fraud')) "
     "  group by 1"
     "), "
     "cohort as ("
     "  select "
-    "    date_trunc('month', account_holders.first_verified_at) as reporting_month, "
+    "    date_trunc('month', customers.first_seen_at) as reporting_month, "
     "    count(*) as total_count "
-    "  from account_holders "
+    "  from customers "
     "  group by 1"
     "), "
     "final as ("
@@ -153,77 +153,87 @@ _BREACH_RATE = (
     "select * from final"
 )
 
-# Shape 2: int_capital_deposit_otif. Projects accounts.account_holder_id to its output.
-_OTIF = (
+# Shape 2: orders_fulfilment_flags. Projects orders columns — including the CHANGED
+# one (order_status) — so it is genuinely affected under per-column precision.
+_FULFILMENT = (
     "with "
-    "accounts as (select * from {db}.{schema}.accounts), "
+    "orders as (select * from {db}.{schema}.orders), "
     "final as ("
-    "  select accounts.account_holder_id as account_holder_id, true as is_otif from accounts"
+    "  select "
+    "    orders.customer_id as customer_id, "
+    "    orders.order_status as order_status, "
+    "    true as is_otif "
+    "  from orders"
     ") "
     "select * from final"
 )
 
-# A real semantic_view that projects accounts columns (compiled to a SELECT here).
+# A real semantic_view that projects the changed orders column (compiled to a SELECT).
 _SEMANTIC_VIEW = (
     "with "
-    "accounts as (select * from {db}.{schema}.accounts), "
-    "final as (select accounts.account_holder_id as account_holder_id from accounts) "
+    "orders as (select * from {db}.{schema}.orders), "
+    "final as ("
+    "  select "
+    "    orders.customer_id as customer_id, "
+    "    orders.order_status as order_status "
+    "  from orders"
+    ") "
     "select * from final"
 )
 
 
-def _manifest_nodes(env, accounts_sql, *, otif_in_manifest=True):
+def _manifest_nodes(env, orders_sql, *, otif_in_manifest=True):
     """Build the manifest node set for one environment ('QA' head or 'PRD' base)."""
     db = "ANALYTICS_QA" if env == "QA" else "ANALYTICS_PRD"
-    prefix = "MR_758_validate" if env == "QA" else "PRD"
+    prefix = "MR_PR_validate" if env == "QA" else "PRD"
 
     def sch(layer):
         return f"{prefix}_{layer}"
 
     nodes = {
-        "model.p.dim_accounts": _manifest_node(
-            "dim_accounts", compiled="select 1 as account_status", schema=sch("star"), database=db
+        "model.p.dim_orders": _manifest_node(
+            "dim_orders", compiled="select 1 as order_status", schema=sch("star"), database=db
         ),
-        "model.p.account_holders": _manifest_node(
-            "account_holders",
-            compiled="select 1 as account_holder_id, current_date as first_verified_at",
+        "model.p.customers": _manifest_node(
+            "customers",
+            compiled="select 1 as customer_id, current_date as first_seen_at",
             schema=sch("star"),
             database=db,
         ),
-        "model.p.accounts": _manifest_node(
-            "accounts",
-            compiled=accounts_sql.format(db=db, schema=sch("marts")),
-            depends_on=["dim_accounts"],
+        "model.p.orders": _manifest_node(
+            "orders",
+            compiled=orders_sql.format(db=db, schema=sch("marts")),
+            depends_on=["dim_orders"],
             schema=sch("marts"),
             database=db,
         ),
-        "model.p.int_risk_kpis_breach_rate": _manifest_node(
-            "int_risk_kpis_breach_rate",
+        "model.p.orders_flag_rate": _manifest_node(
+            "orders_flag_rate",
             # neutral relation refs -> identical text both envs, so it is never flagged
-            # by its OWN logic diff; the only way it could surface is the accounts fan-out.
-            compiled=_BREACH_RATE.format(db="analytics", schema="marts"),
-            depends_on=["accounts", "account_holders"],
+            # by its OWN logic diff; the only way it could surface is the orders fan-out.
+            compiled=_FLAG_RATE.format(db="analytics", schema="marts"),
+            depends_on=["orders", "customers"],
             schema=sch("metrics"),
             database=db,
         ),
-        "model.p.int_capital_deposit_otif": _manifest_node(
-            "int_capital_deposit_otif",
-            compiled=_OTIF.format(db=db, schema=sch("marts")),
-            depends_on=["accounts"],
+        "model.p.orders_fulfilment_flags": _manifest_node(
+            "orders_fulfilment_flags",
+            compiled=_FULFILMENT.format(db=db, schema=sch("marts")),
+            depends_on=["orders"],
             schema=sch("intermediate"),
             database=db,
         ),
-        "model.p.identifications_and_onboardings_semantic_view": _manifest_node(
-            "identifications_and_onboardings_semantic_view",
+        "model.p.orders_semantic_view": _manifest_node(
+            "orders_semantic_view",
             compiled=_SEMANTIC_VIEW.format(db=db, schema=sch("marts")),
-            depends_on=["accounts"],
+            depends_on=["orders"],
             schema=sch("marts"),
             database=db,
             materialized="semantic_view",
         ),
     }
     if not otif_in_manifest:
-        del nodes["model.p.int_capital_deposit_otif"]
+        del nodes["model.p.orders_fulfilment_flags"]
     return nodes
 
 
@@ -231,33 +241,36 @@ def _catalog_nodes(env, *, include_absent):
     """Catalog for one environment. When include_absent is False, the two projecting
     consumers (otif + semantic view) are omitted, modelling a deferred/partial build
     where they were NOT written to the catalog even though they are in the manifest."""
-    prefix = "MR_758_validate" if env == "QA" else "PRD"
+    prefix = "MR_PR_validate" if env == "QA" else "PRD"
     db = "ANALYTICS_QA" if env == "QA" else "ANALYTICS_PRD"
 
     def sch(layer):
         return f"{prefix}_{layer}"
 
     nodes = {
-        "model.p.dim_accounts": _catalog_node("dim_accounts", ["account_status"], sch("star"), db),
-        "model.p.account_holders": _catalog_node(
-            "account_holders", ["account_holder_id", "first_verified_at"], sch("star"), db
+        "model.p.dim_orders": _catalog_node("dim_orders", ["order_status"], sch("star"), db),
+        "model.p.customers": _catalog_node(
+            "customers", ["customer_id", "first_seen_at"], sch("star"), db
         ),
-        "model.p.accounts": _catalog_node("accounts", _ACCOUNTS_COLUMNS, sch("marts"), db),
+        "model.p.orders": _catalog_node("orders", _ORDERS_COLUMNS, sch("marts"), db),
         # breach_rate is in the built modified+ cone, so it IS catalogued in both envs.
-        "model.p.int_risk_kpis_breach_rate": _catalog_node(
-            "int_risk_kpis_breach_rate",
+        "model.p.orders_flag_rate": _catalog_node(
+            "orders_flag_rate",
             ["reporting_month", "m0_breach_rate", "m3_breach_rate"],
             sch("metrics"),
             db,
         ),
     }
     if include_absent:
-        nodes["model.p.int_capital_deposit_otif"] = _catalog_node(
-            "int_capital_deposit_otif", ["account_holder_id", "is_otif"], sch("intermediate"), db
+        nodes["model.p.orders_fulfilment_flags"] = _catalog_node(
+            "orders_fulfilment_flags",
+            ["customer_id", "order_status", "is_otif"],
+            sch("intermediate"),
+            db,
         )
-        nodes["model.p.identifications_and_onboardings_semantic_view"] = _catalog_node(
-            "identifications_and_onboardings_semantic_view",
-            ["account_holder_id"],
+        nodes["model.p.orders_semantic_view"] = _catalog_node(
+            "orders_semantic_view",
+            ["customer_id", "order_status"],
             sch("marts"),
             db,
         )
@@ -267,18 +280,18 @@ def _catalog_nodes(env, *, include_absent):
 def _base(tmp_path):
     """Base (prod) service: everything built & catalogued in ANALYTICS_PRD.PRD_*."""
     cat, man = _write(
-        tmp_path, "base", _catalog_nodes("PRD", include_absent=True), _manifest_nodes("PRD", _ACCOUNTS_BASE)
+        tmp_path, "base", _catalog_nodes("PRD", include_absent=True), _manifest_nodes("PRD", _ORDERS_BASE)
     )
     return LineageService(cat, man, adapter="snowflake")
 
 
 def _head(tmp_path):
-    """Head (QA) service: accounts + breach_rate built & catalogued in
-    ANALYTICS_QA.MR_758_validate_*; otif + semantic view are manifest-only (deferred /
+    """Head (QA) service: orders + breach_rate built & catalogued in
+    ANALYTICS_QA.MR_PR_validate_*; otif + semantic view are manifest-only (deferred /
     not built, so absent from the head catalog). Same unique_ids as base, divergent
     database + schema — exercising the multi-schema / multi-database divergence."""
     cat, man = _write(
-        tmp_path, "head", _catalog_nodes("QA", include_absent=False), _manifest_nodes("QA", _ACCOUNTS_HEAD)
+        tmp_path, "head", _catalog_nodes("QA", include_absent=False), _manifest_nodes("QA", _ORDERS_HEAD)
     )
     return LineageService(cat, man, adapter="snowflake")
 
@@ -291,38 +304,41 @@ def _changeset_impact(tmp_path):
     return base, head, changes, agg
 
 
-# --- Shape 1: filter/join-only consumer must stay EXCLUDED ------------------
+# --- Shape 1: filter/join-only consumer is a ROW-SET impact ----------------
 
 
-def test_shape1_filter_join_only_consumer_stays_excluded(tmp_path):
+def test_shape1_filter_join_only_consumer_is_flagged_as_row_set_impact(tmp_path):
     base, head, changes, agg = _changeset_impact(tmp_path)
 
     # breach_rate is catalog-backed (it was in the built cone) and fully analyzable.
-    assert head.registry.is_catalog_backed("int_risk_kpis_breach_rate") is True
-    breach = head.registry.get_model("int_risk_kpis_breach_rate")
-    # No output column of breach_rate carries any accounts.* value.
+    assert head.registry.is_catalog_backed("orders_flag_rate") is True
+    breach = head.registry.get_model("orders_flag_rate")
+    # No output column of breach_rate carries any orders.* VALUE — its dependency on
+    # order_status is purely a predicate (WHERE), so it must not be a *derived* impact...
     all_sources = {
         src
         for col in breach.columns.values()
         for lineage in (col.lineage or [])
         for src in lineage.source_columns
     }
-    assert not any(s.startswith("accounts.") for s in all_sources), all_sources
+    assert not any(s.startswith("orders.") for s in all_sources), all_sources
 
-    # It must NOT appear as a downstream consumer of any accounts column.
-    for column in ("account_status", "last_suspended_at", "account_internal_closing_reason_type"):
-        impact = head.get_column_impact("accounts", column)
-        assert "int_risk_kpis_breach_rate" not in {m["name"] for m in impact["affected_models"]}
+    # ...but it IS a row-set impact: a change to order_status shifts which rows it keeps,
+    # so it surfaces as a 'filter'-severity dependent (not derived, not pass-through).
+    impact = head.get_column_impact("orders", "order_status")
+    assert "orders_flag_rate" in {m["name"] for m in impact["affected_models"]}
+    breach_cols = [c for c in impact["affected_columns"] if c["model"] == "orders_flag_rate"]
+    assert breach_cols and all(c["severity"] == "filter" for c in breach_cols), breach_cols
 
-    # ... nor in the aggregated blast radius, and not misclassified as removed.
-    assert "int_risk_kpis_breach_rate" not in {m["name"] for m in agg["affected_models"]}
+    # And it rides through to the aggregated changeset blast radius, still not "removed".
+    assert "orders_flag_rate" in {m["name"] for m in agg["affected_models"]}
     assert not any(
-        c.model == "int_risk_kpis_breach_rate" and c.kind == ChangeKind.REMOVED for c in changes
+        c.model == "orders_flag_rate" and c.kind == ChangeKind.REMOVED for c in changes
     )
     # Being analyzable, it does not inflate the unanalyzable/confidence buckets.
     conf = agg["confidence"]
-    assert "int_risk_kpis_breach_rate" not in conf["no_column_info_models"]
-    assert "int_risk_kpis_breach_rate" not in conf["parse_failed_models"]
+    assert "orders_flag_rate" not in conf["no_column_info_models"]
+    assert "orders_flag_rate" not in conf["parse_failed_models"]
 
 
 # --- Shape 2: projecting, catalog-absent consumer must be INCLUDED ----------
@@ -333,40 +349,40 @@ def test_shape2_projecting_catalog_absent_consumer_is_included(tmp_path):
 
     # otif is manifest-only in head (absent from the head catalog), across a divergent
     # database + schema from base — matched by unique_id/name all the same.
-    assert head.registry.is_catalog_backed("int_capital_deposit_otif") is False
-    otif = head.registry.get_model("int_capital_deposit_otif")
-    assert otif.database == "ANALYTICS_QA" and otif.schema_name == "MR_758_validate_intermediate"
-    assert base.registry.get_model("int_capital_deposit_otif").database == "ANALYTICS_PRD"
-    # Columns recovered from compiled SQL; account_holder_id traces to accounts.
-    assert otif.columns["account_holder_id"].lineage[0].source_columns == {
-        "accounts.account_holder_id"
+    assert head.registry.is_catalog_backed("orders_fulfilment_flags") is False
+    otif = head.registry.get_model("orders_fulfilment_flags")
+    assert otif.database == "ANALYTICS_QA" and otif.schema_name == "MR_PR_validate_intermediate"
+    assert base.registry.get_model("orders_fulfilment_flags").database == "ANALYTICS_PRD"
+    # Columns recovered from compiled SQL; customer_id traces to orders.
+    assert otif.columns["customer_id"].lineage[0].source_columns == {
+        "orders.customer_id"
     }
 
     affected = {m["name"] for m in agg["affected_models"]}
-    assert "int_capital_deposit_otif" in affected
-    assert ("int_capital_deposit_otif", "account_holder_id") in {
+    assert "orders_fulfilment_flags" in affected
+    # Affected via the CHANGED column (order_status), recovered from compiled SQL.
+    assert ("orders_fulfilment_flags", "order_status") in {
         (c["model"], c["column"]) for c in agg["affected_columns"]
     }
     # Not misclassified as removed just because it left the head catalog.
     assert not any(
-        c.model == "int_capital_deposit_otif" and c.kind == ChangeKind.REMOVED for c in changes
+        c.model == "orders_fulfilment_flags" and c.kind == ChangeKind.REMOVED for c in changes
     )
     # It is analyzable via parsed SQL, so it does not land in any unanalyzable bucket.
     conf = agg["confidence"]
-    assert "int_capital_deposit_otif" not in conf["no_column_info_models"]
-    assert "int_capital_deposit_otif" not in conf["parse_failed_models"]
+    assert "orders_fulfilment_flags" not in conf["no_column_info_models"]
+    assert "orders_fulfilment_flags" not in conf["parse_failed_models"]
 
 
-def test_shape2_semantic_view_projecting_accounts_is_included(tmp_path):
+def test_shape2_semantic_view_projecting_orders_is_included(tmp_path):
     """A ``materialized: semantic_view`` relation that is absent from the catalog but
-    whose compiled SQL projects an accounts column is recovered and reported — the
-    coordinator's cited ``identifications_and_onboardings_semantic_view`` analogue."""
+    whose compiled SQL projects an orders column is recovered and reported."""
     base, head, changes, agg = _changeset_impact(tmp_path)
 
-    sv = "identifications_and_onboardings_semantic_view"
+    sv = "orders_semantic_view"
     assert head.registry.is_catalog_backed(sv) is False
     assert sv in {m["name"] for m in agg["affected_models"]}
-    assert (sv, "account_holder_id") in {
+    assert (sv, "order_status") in {
         (c["model"], c["column"]) for c in agg["affected_columns"]
     }
     assert not any(c.model == sv and c.kind == ChangeKind.REMOVED for c in changes)
