@@ -7,15 +7,26 @@ is the norm under a deferred / partial CI build (``dbt docs generate --defer`` a
 building just the ``state:modified+`` cone) and for non-table relations such as
 semantic views.
 
-These tests pin the corrected behaviour end to end:
+The real analytics run exercised TWO distinct shapes that the fix must both get right,
+mirrored faithfully below:
 
-- a built-but-uncatalogued downstream that projects an upstream column IS reported as
-  affected (not dropped, not ``removed``, not counted as "not built");
-- a model absent from the catalog but present in the manifest is seeded and analyzed
-  via its compiled SQL (its column types merely unknown);
-- a genuinely unanalyzable model (no catalog columns AND no parseable SQL — e.g. a
-  semantic view) is honestly labelled, never claimed to be "not built";
-- a model truly absent from the head *manifest* is still reported as removed.
+Shape 1 — filter/join-only consumer (the real ``int_risk_kpis_breach_rate``): reads
+``accounts`` but uses its columns ONLY in ``WHERE`` / join / aggregate predicates and
+projects NO ``accounts`` column value to its output (outputs are ``count(*)``-based
+ratios plus ``reporting_month`` sourced from ``account_holders``). Under column-
+propagation lineage it must remain EXCLUDED from the accounts blast radius — reporting
+it would be an Issue-B over-report. This test guards that the fix did not start over-
+reporting it.
+
+Shape 2 — projecting, genuinely catalog-absent consumer (e.g. ``int_capital_deposit_otif``
+or ``identifications_and_onboardings_semantic_view``): projects an ``accounts`` column
+value to its output AND is absent from the head catalog (deferred / not-built, so it is
+manifest-only). Before the fix it was dropped, mislabeled "not built", and reported as
+``removed``; after the fix it is reported as affected, ``removed`` is false, and it does
+not pollute the unanalyzable bucket.
+
+A genuinely unanalyzable relation (no catalog columns AND no parseable compiled SQL) is
+honestly labelled ("no column-level information", never "not built").
 """
 
 import json
@@ -37,7 +48,15 @@ def _catalog_node(name, columns, schema="s", database="d"):
     }
 
 
-def _manifest_node(name, compiled=None, depends_on=None, schema="s", database="d", language="sql"):
+def _manifest_node(
+    name,
+    compiled=None,
+    depends_on=None,
+    schema="s",
+    database="d",
+    language="sql",
+    materialized="table",
+):
     node = {
         "name": name,
         "unique_id": f"model.p.{name}",
@@ -45,6 +64,7 @@ def _manifest_node(name, compiled=None, depends_on=None, schema="s", database="d
         "language": language,
         "schema": schema,
         "database": database,
+        "config": {"materialized": materialized},
         "depends_on": {"nodes": [f"model.p.{d}" for d in (depends_on or [])]},
     }
     if compiled is not None:
@@ -55,131 +75,301 @@ def _manifest_node(name, compiled=None, depends_on=None, schema="s", database="d
 def _write(tmp_path, tag, catalog_nodes, manifest_nodes):
     catalog_path = tmp_path / f"{tag}_catalog.json"
     manifest_path = tmp_path / f"{tag}_manifest.json"
-    catalog_path.write_text(json.dumps({"metadata": {"adapter_type": "snowflake"}, "nodes": catalog_nodes}))
+    catalog_path.write_text(
+        json.dumps({"metadata": {"adapter_type": "snowflake"}, "nodes": catalog_nodes})
+    )
     manifest_path.write_text(
         json.dumps({"metadata": {"adapter_type": "snowflake"}, "nodes": manifest_nodes})
     )
     return str(catalog_path), str(manifest_path)
 
 
-# accounts: a mart whose compiled SQL changes (logic edit) between base and head.
+# --- the analytics scenario ------------------------------------------------
+
+_ACCOUNTS_COLUMNS = [
+    "account_holder_id",
+    "account_status",
+    "last_suspended_at",
+    "account_closing_at",
+    "account_closed_at",
+    "account_internal_closing_reason_type",
+]
+
+# accounts: a mart whose compiled SQL changes (a pure logic edit to account_status).
 _ACCOUNTS_BASE = (
-    "select dim.account_status as account_status, "
+    "select "
     "dim.account_holder_id as account_holder_id, "
-    "dim.first_verified_at as first_verified_at from d.s.dim_accounts as dim"
+    "dim.account_status as account_status, "
+    "dim.last_suspended_at as last_suspended_at, "
+    "dim.account_closing_at as account_closing_at, "
+    "dim.account_closed_at as account_closed_at, "
+    "dim.account_internal_closing_reason_type as account_internal_closing_reason_type "
+    "from {db}.{schema}.dim_accounts as dim"
 )
 _ACCOUNTS_HEAD = (
-    "select coalesce(dim.account_status, dim.fallback_status) as account_status, "
+    "select "
     "dim.account_holder_id as account_holder_id, "
-    "dim.first_verified_at as first_verified_at from d.s.dim_accounts as dim"
+    "coalesce(dim.account_status, dim.fallback_status) as account_status, "
+    "dim.last_suspended_at as last_suspended_at, "
+    "dim.account_closing_at as account_closing_at, "
+    "dim.account_closed_at as account_closed_at, "
+    "dim.account_internal_closing_reason_type as account_internal_closing_reason_type "
+    "from {db}.{schema}.dim_accounts as dim"
 )
 
-# int_breach: a DIRECT consumer that projects an accounts-derived column. Its OWN
-# compiled SQL is identical base vs head, so it is only ever flagged via the accounts
-# fan-out — exactly the case the old catalog-only universe dropped when int was absent
-# from the head catalog.
-_INT_BREACH = (
-    "with accounts as (select * from d.s.accounts), "
-    "final as (select min(accounts.first_verified_at) as reporting_month from accounts) "
+# Shape 1: int_risk_kpis_breach_rate. accounts columns appear ONLY in the WHERE of the
+# `suspended` CTE; the projected outputs are reporting_month (from account_holders) and
+# two count(*)-based ratios. No accounts column VALUE reaches an output column.
+_BREACH_RATE = (
+    "with "
+    "account_holders as (select * from {db}.{schema}.account_holders), "
+    "accounts as (select * from {db}.{schema}.accounts), "
+    "suspended as ("
+    "  select "
+    "    date_trunc('month', account_holders.first_verified_at) as reporting_month, "
+    "    count(*) as breached_count "
+    "  from account_holders "
+    "  inner join accounts on accounts.account_holder_id = account_holders.account_holder_id "
+    "  where accounts.account_status = 'Suspended' "
+    "     or (accounts.account_status in ('Closing', 'Closed') "
+    "         and accounts.account_internal_closing_reason_type in ('fraud')) "
+    "  group by 1"
+    "), "
+    "cohort as ("
+    "  select "
+    "    date_trunc('month', account_holders.first_verified_at) as reporting_month, "
+    "    count(*) as total_count "
+    "  from account_holders "
+    "  group by 1"
+    "), "
+    "final as ("
+    "  select "
+    "    cohort.reporting_month as reporting_month, "
+    "    suspended.breached_count / nullif(cohort.total_count, 0) as m0_breach_rate, "
+    "    suspended.breached_count / nullif(cohort.total_count, 0) as m3_breach_rate "
+    "  from cohort "
+    "  left join suspended on cohort.reporting_month = suspended.reporting_month"
+    ") "
+    "select * from final"
+)
+
+# Shape 2: int_capital_deposit_otif. Projects accounts.account_holder_id to its output.
+_OTIF = (
+    "with "
+    "accounts as (select * from {db}.{schema}.accounts), "
+    "final as ("
+    "  select accounts.account_holder_id as account_holder_id, true as is_otif from accounts"
+    ") "
+    "select * from final"
+)
+
+# A real semantic_view that projects accounts columns (compiled to a SELECT here).
+_SEMANTIC_VIEW = (
+    "with "
+    "accounts as (select * from {db}.{schema}.accounts), "
+    "final as (select accounts.account_holder_id as account_holder_id from accounts) "
     "select * from final"
 )
 
 
-def _accounts_manifest(compiled):
-    return {
-        "model.p.dim_accounts": _manifest_node("dim_accounts", compiled="select 1 as account_status"),
-        "model.p.accounts": _manifest_node("accounts", compiled=compiled, depends_on=["dim_accounts"]),
-        "model.p.int_breach": _manifest_node("int_breach", compiled=_INT_BREACH, depends_on=["accounts"]),
-    }
+def _manifest_nodes(env, accounts_sql, *, otif_in_manifest=True):
+    """Build the manifest node set for one environment ('QA' head or 'PRD' base)."""
+    db = "ANALYTICS_QA" if env == "QA" else "ANALYTICS_PRD"
+    prefix = "MR_758_validate" if env == "QA" else "PRD"
 
+    def sch(layer):
+        return f"{prefix}_{layer}"
 
-def _base_registry(tmp_path):
-    catalog = {
-        "model.p.dim_accounts": _catalog_node("dim_accounts", ["account_status"]),
-        "model.p.accounts": _catalog_node(
-            "accounts", ["account_status", "account_holder_id", "first_verified_at"]
+    nodes = {
+        "model.p.dim_accounts": _manifest_node(
+            "dim_accounts", compiled="select 1 as account_status", schema=sch("star"), database=db
         ),
-        "model.p.int_breach": _catalog_node("int_breach", ["reporting_month"]),
-    }
-    cat, man = _write(tmp_path, "base", catalog, _accounts_manifest(_ACCOUNTS_BASE))
-    return LineageService(cat, man, adapter="snowflake")
-
-
-def _head_registry(tmp_path, int_in_catalog):
-    catalog = {
-        "model.p.dim_accounts": _catalog_node("dim_accounts", ["account_status"]),
-        "model.p.accounts": _catalog_node(
-            "accounts", ["account_status", "account_holder_id", "first_verified_at"]
+        "model.p.account_holders": _manifest_node(
+            "account_holders",
+            compiled="select 1 as account_holder_id, current_date as first_verified_at",
+            schema=sch("star"),
+            database=db,
+        ),
+        "model.p.accounts": _manifest_node(
+            "accounts",
+            compiled=accounts_sql.format(db=db, schema=sch("marts")),
+            depends_on=["dim_accounts"],
+            schema=sch("marts"),
+            database=db,
+        ),
+        "model.p.int_risk_kpis_breach_rate": _manifest_node(
+            "int_risk_kpis_breach_rate",
+            # neutral relation refs -> identical text both envs, so it is never flagged
+            # by its OWN logic diff; the only way it could surface is the accounts fan-out.
+            compiled=_BREACH_RATE.format(db="analytics", schema="marts"),
+            depends_on=["accounts", "account_holders"],
+            schema=sch("metrics"),
+            database=db,
+        ),
+        "model.p.int_capital_deposit_otif": _manifest_node(
+            "int_capital_deposit_otif",
+            compiled=_OTIF.format(db=db, schema=sch("marts")),
+            depends_on=["accounts"],
+            schema=sch("intermediate"),
+            database=db,
+        ),
+        "model.p.identifications_and_onboardings_semantic_view": _manifest_node(
+            "identifications_and_onboardings_semantic_view",
+            compiled=_SEMANTIC_VIEW.format(db=db, schema=sch("marts")),
+            depends_on=["accounts"],
+            schema=sch("marts"),
+            database=db,
+            materialized="semantic_view",
         ),
     }
-    if int_in_catalog:
-        catalog["model.p.int_breach"] = _catalog_node("int_breach", ["reporting_month"])
-    cat, man = _write(tmp_path, "head", catalog, _accounts_manifest(_ACCOUNTS_HEAD))
-    return LineageService(cat, man, adapter="snowflake")
+    if not otif_in_manifest:
+        del nodes["model.p.int_capital_deposit_otif"]
+    return nodes
 
 
-# --- Issue A: built-but-uncatalogued downstream is reported, not dropped ----
+def _catalog_nodes(env, *, include_absent):
+    """Catalog for one environment. When include_absent is False, the two projecting
+    consumers (otif + semantic view) are omitted, modelling a deferred/partial build
+    where they were NOT written to the catalog even though they are in the manifest."""
+    prefix = "MR_758_validate" if env == "QA" else "PRD"
+    db = "ANALYTICS_QA" if env == "QA" else "ANALYTICS_PRD"
+
+    def sch(layer):
+        return f"{prefix}_{layer}"
+
+    nodes = {
+        "model.p.dim_accounts": _catalog_node("dim_accounts", ["account_status"], sch("star"), db),
+        "model.p.account_holders": _catalog_node(
+            "account_holders", ["account_holder_id", "first_verified_at"], sch("star"), db
+        ),
+        "model.p.accounts": _catalog_node("accounts", _ACCOUNTS_COLUMNS, sch("marts"), db),
+        # breach_rate is in the built modified+ cone, so it IS catalogued in both envs.
+        "model.p.int_risk_kpis_breach_rate": _catalog_node(
+            "int_risk_kpis_breach_rate",
+            ["reporting_month", "m0_breach_rate", "m3_breach_rate"],
+            sch("metrics"),
+            db,
+        ),
+    }
+    if include_absent:
+        nodes["model.p.int_capital_deposit_otif"] = _catalog_node(
+            "int_capital_deposit_otif", ["account_holder_id", "is_otif"], sch("intermediate"), db
+        )
+        nodes["model.p.identifications_and_onboardings_semantic_view"] = _catalog_node(
+            "identifications_and_onboardings_semantic_view",
+            ["account_holder_id"],
+            sch("marts"),
+            db,
+        )
+    return nodes
 
 
-def test_uncatalogued_downstream_projecting_upstream_column_is_reported(tmp_path):
-    """The disputed case: int_breach is built (in head manifest) but absent from the
-    head catalog. It projects an accounts-derived column, so a logic change on accounts
-    must surface it as affected — NOT drop it, NOT flag it removed, NOT call it unbuilt."""
-    base = _base_registry(tmp_path)
-    head = _head_registry(tmp_path, int_in_catalog=False)
-
-    # int_breach is manifest-seeded with columns recovered from its compiled SQL.
-    int_model = head.registry.get_model("int_breach")
-    assert list(int_model.columns) == ["reporting_month"]
-    assert head.registry.is_catalog_backed("int_breach") is False
-    assert head.registry.is_catalog_backed("accounts") is True
-
-    changes = ChangesetBuilder(base.registry, head.registry).build()
-    # Not misclassified as a deletion just because it left the head catalog.
-    assert not any(
-        c.model == "int_breach" and c.kind == ChangeKind.REMOVED for c in changes
+def _base(tmp_path):
+    """Base (prod) service: everything built & catalogued in ANALYTICS_PRD.PRD_*."""
+    cat, man = _write(
+        tmp_path, "base", _catalog_nodes("PRD", include_absent=True), _manifest_nodes("PRD", _ACCOUNTS_BASE)
     )
-    # accounts logic changed -> all its columns flagged.
-    assert {c.column for c in changes if c.model == "accounts"} == {
-        "account_status",
-        "account_holder_id",
-        "first_verified_at",
+    return LineageService(cat, man, adapter="snowflake")
+
+
+def _head(tmp_path):
+    """Head (QA) service: accounts + breach_rate built & catalogued in
+    ANALYTICS_QA.MR_758_validate_*; otif + semantic view are manifest-only (deferred /
+    not built, so absent from the head catalog). Same unique_ids as base, divergent
+    database + schema — exercising the multi-schema / multi-database divergence."""
+    cat, man = _write(
+        tmp_path, "head", _catalog_nodes("QA", include_absent=False), _manifest_nodes("QA", _ACCOUNTS_HEAD)
+    )
+    return LineageService(cat, man, adapter="snowflake")
+
+
+def _changeset_impact(tmp_path):
+    base = _base(tmp_path)
+    head = _head(tmp_path)
+    changes = ChangesetBuilder(base.registry, head.registry).build()
+    agg = head.get_changeset_impact(changes, base_service=base)
+    return base, head, changes, agg
+
+
+# --- Shape 1: filter/join-only consumer must stay EXCLUDED ------------------
+
+
+def test_shape1_filter_join_only_consumer_stays_excluded(tmp_path):
+    base, head, changes, agg = _changeset_impact(tmp_path)
+
+    # breach_rate is catalog-backed (it was in the built cone) and fully analyzable.
+    assert head.registry.is_catalog_backed("int_risk_kpis_breach_rate") is True
+    breach = head.registry.get_model("int_risk_kpis_breach_rate")
+    # No output column of breach_rate carries any accounts.* value.
+    all_sources = {
+        src
+        for col in breach.columns.values()
+        for lineage in (col.lineage or [])
+        for src in lineage.source_columns
+    }
+    assert not any(s.startswith("accounts.") for s in all_sources), all_sources
+
+    # It must NOT appear as a downstream consumer of any accounts column.
+    for column in ("account_status", "last_suspended_at", "account_internal_closing_reason_type"):
+        impact = head.get_column_impact("accounts", column)
+        assert "int_risk_kpis_breach_rate" not in {m["name"] for m in impact["affected_models"]}
+
+    # ... nor in the aggregated blast radius, and not misclassified as removed.
+    assert "int_risk_kpis_breach_rate" not in {m["name"] for m in agg["affected_models"]}
+    assert not any(
+        c.model == "int_risk_kpis_breach_rate" and c.kind == ChangeKind.REMOVED for c in changes
+    )
+    # Being analyzable, it does not inflate the unanalyzable/confidence buckets.
+    conf = agg["confidence"]
+    assert "int_risk_kpis_breach_rate" not in conf["no_column_info_models"]
+    assert "int_risk_kpis_breach_rate" not in conf["parse_failed_models"]
+
+
+# --- Shape 2: projecting, catalog-absent consumer must be INCLUDED ----------
+
+
+def test_shape2_projecting_catalog_absent_consumer_is_included(tmp_path):
+    base, head, changes, agg = _changeset_impact(tmp_path)
+
+    # otif is manifest-only in head (absent from the head catalog), across a divergent
+    # database + schema from base — matched by unique_id/name all the same.
+    assert head.registry.is_catalog_backed("int_capital_deposit_otif") is False
+    otif = head.registry.get_model("int_capital_deposit_otif")
+    assert otif.database == "ANALYTICS_QA" and otif.schema_name == "MR_758_validate_intermediate"
+    assert base.registry.get_model("int_capital_deposit_otif").database == "ANALYTICS_PRD"
+    # Columns recovered from compiled SQL; account_holder_id traces to accounts.
+    assert otif.columns["account_holder_id"].lineage[0].source_columns == {
+        "accounts.account_holder_id"
     }
 
-    agg = head.get_changeset_impact(changes, base_service=base)
     affected = {m["name"] for m in agg["affected_models"]}
-    assert "int_breach" in affected
-    assert ("int_breach", "reporting_month") in {
+    assert "int_capital_deposit_otif" in affected
+    assert ("int_capital_deposit_otif", "account_holder_id") in {
         (c["model"], c["column"]) for c in agg["affected_columns"]
     }
-    # Nothing reachable was unanalyzable: int_breach was analyzed via its compiled SQL.
+    # Not misclassified as removed just because it left the head catalog.
+    assert not any(
+        c.model == "int_capital_deposit_otif" and c.kind == ChangeKind.REMOVED for c in changes
+    )
+    # It is analyzable via parsed SQL, so it does not land in any unanalyzable bucket.
     conf = agg["confidence"]
-    assert conf["level"] == "full"
-    assert conf["unanalyzable_models"] == 0
-    assert conf["no_column_info"] == 0
-    assert conf["parse_failed"] == 0
+    assert "int_capital_deposit_otif" not in conf["no_column_info_models"]
+    assert "int_capital_deposit_otif" not in conf["parse_failed_models"]
 
 
-def test_catalogued_and_uncatalogued_downstream_yield_same_impact(tmp_path):
-    """Whether int_breach happens to be in the head catalog or not, the impact result
-    is identical — catalog membership no longer changes analyzability."""
-    base_a = _base_registry(tmp_path)
-    head_catalogued = _head_registry(tmp_path, int_in_catalog=True)
-    changes_a = ChangesetBuilder(base_a.registry, head_catalogued.registry).build()
-    impact_catalogued = head_catalogued.get_changeset_impact(changes_a, base_service=base_a)
+def test_shape2_semantic_view_projecting_accounts_is_included(tmp_path):
+    """A ``materialized: semantic_view`` relation that is absent from the catalog but
+    whose compiled SQL projects an accounts column is recovered and reported — the
+    coordinator's cited ``identifications_and_onboardings_semantic_view`` analogue."""
+    base, head, changes, agg = _changeset_impact(tmp_path)
 
-    base_b = _base_registry(tmp_path)
-    head_uncatalogued = _head_registry(tmp_path, int_in_catalog=False)
-    changes_b = ChangesetBuilder(base_b.registry, head_uncatalogued.registry).build()
-    impact_uncatalogued = head_uncatalogued.get_changeset_impact(changes_b, base_service=base_b)
-
-    def _affected(impact):
-        return (
-            {m["name"] for m in impact["affected_models"]},
-            {(c["model"], c["column"]) for c in impact["affected_columns"]},
-        )
-
-    assert _affected(impact_catalogued) == _affected(impact_uncatalogued)
+    sv = "identifications_and_onboardings_semantic_view"
+    assert head.registry.is_catalog_backed(sv) is False
+    assert sv in {m["name"] for m in agg["affected_models"]}
+    assert (sv, "account_holder_id") in {
+        (c["model"], c["column"]) for c in agg["affected_columns"]
+    }
+    assert not any(c.model == sv and c.kind == ChangeKind.REMOVED for c in changes)
 
 
 # --- registry seeding / coverage -------------------------------------------
@@ -191,7 +381,9 @@ def test_manifest_only_model_is_seeded_and_parsed(tmp_path):
     catalog = {"model.p.a": _catalog_node("a", ["id"])}
     manifest = {
         "model.p.a": _manifest_node("a", compiled="select 1 as id"),
-        "model.p.b": _manifest_node("b", compiled="select a.id as id from d.s.a as a", depends_on=["a"]),
+        "model.p.b": _manifest_node(
+            "b", compiled="select a.id as id from d.s.a as a", depends_on=["a"]
+        ),
     }
     cat, man = _write(tmp_path, "only", catalog, manifest)
     registry = ModelRegistry(cat, man, adapter_override="snowflake")
@@ -212,25 +404,24 @@ def test_manifest_only_model_is_seeded_and_parsed(tmp_path):
 
 def test_unanalyzable_model_is_labelled_honestly_not_as_unbuilt(tmp_path):
     """A reachable downstream with neither catalog columns nor parseable SQL (e.g. a
-    semantic view / python model) is reported as unanalyzable via ``no_column_info``,
-    and the rendered reason never claims it 'hasn't been built'."""
-    # 'sv' is a downstream of 'a' with no compiled SQL and no catalog entry.
+    semantic view whose body is not a SELECT, or a python model) is reported as
+    unanalyzable via ``no_column_info`` and never claimed to be 'not built'."""
     catalog = {"model.p.a": _catalog_node("a", ["id"])}
     manifest = {
         "model.p.a": _manifest_node("a", compiled="select 1 as id"),
-        "model.p.sv": _manifest_node("sv", compiled=None, depends_on=["a"]),
+        # no compiled SELECT body to recover columns from.
+        "model.p.opaque": _manifest_node("opaque", compiled=None, depends_on=["a"]),
     }
-    cat, man = _write(tmp_path, "sv", catalog, manifest)
+    cat, man = _write(tmp_path, "opaque", catalog, manifest)
     service = LineageService(cat, man, adapter="snowflake")
 
     impact = service.get_column_impact("a", "id")
     conf = impact["confidence"]
     assert conf["level"] == "partial"
     assert conf["no_column_info"] == 1
-    assert "sv" in conf["no_column_info_models"]
+    assert "opaque" in conf["no_column_info_models"]
     assert conf["parse_failed"] == 0
 
-    # The rendered reason must be honest: no column-level info, never "not built".
     reason = _confidence_reasons(conf)
     assert "no column-level information" in reason
     assert "semantic view" in reason
@@ -260,46 +451,3 @@ def test_model_absent_from_head_manifest_is_still_removed(tmp_path):
     assert any(
         c.model == "gone" and c.column == "x" and c.kind == ChangeKind.REMOVED for c in changes
     )
-
-
-# --- Issue B: join/filter-only dependencies are out of scope (by design) ----
-
-
-def test_join_or_filter_only_dependency_is_not_reported_by_column_lineage(tmp_path):
-    """A downstream that references the changed model only in a JOIN/WHERE (projecting
-    no column from it) is not surfaced — column-propagation lineage is by design. This
-    test documents/locks that boundary so a future change is a conscious decision."""
-    accounts_head = (
-        "select coalesce(dim.status, dim.fallback) as status, dim.id as id "
-        "from d.s.dim as dim"
-    )
-    accounts_base = "select dim.status as status, dim.id as id from d.s.dim as dim"
-    join_only = (
-        "with events as (select * from d.s.events), "
-        "accounts as (select * from d.s.accounts), "
-        "final as (select events.event_id as event_id from events "
-        "join accounts on events.id = accounts.id where accounts.status = 'x') "
-        "select * from final"
-    )
-    manifest = lambda acc: {
-        "model.p.dim": _manifest_node("dim", compiled="select 1 as status"),
-        "model.p.events": _manifest_node("events", compiled="select 1 as event_id, 2 as id"),
-        "model.p.accounts": _manifest_node("accounts", compiled=acc, depends_on=["dim"]),
-        "model.p.usage": _manifest_node("usage", compiled=join_only, depends_on=["accounts", "events"]),
-    }
-    catalog = {
-        "model.p.dim": _catalog_node("dim", ["status"]),
-        "model.p.events": _catalog_node("events", ["event_id", "id"]),
-        "model.p.accounts": _catalog_node("accounts", ["status", "id"]),
-        "model.p.usage": _catalog_node("usage", ["event_id"]),
-    }
-    bcat, bman = _write(tmp_path, "jbase", catalog, manifest(accounts_base))
-    hcat, hman = _write(tmp_path, "jhead", catalog, manifest(accounts_head))
-    base = LineageService(bcat, bman, adapter="snowflake")
-    head = LineageService(hcat, hman, adapter="snowflake")
-
-    changes = ChangesetBuilder(base.registry, head.registry).build()
-    agg = head.get_changeset_impact(changes, base_service=base)
-    # 'usage' joins/filters on accounts but projects no accounts column -> not reported.
-    assert "usage" not in {m["name"] for m in agg["affected_models"]}
-    assert "usage" in head.registry.get_model("accounts").downstream
