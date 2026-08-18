@@ -187,7 +187,7 @@ const ImpactModule = (function() {
                         <div class="hero-metric-content">
                             <div class="hero-metric-value">${criticalColumns.length}</div>
                             <div class="hero-metric-label">Requires Review</div>
-                            <div class="hero-metric-desc">Transformations may break</div>
+                            <div class="hero-metric-desc">Downstream value recomputed</div>
                         </div>
                     </div>
                     <div class="hero-metric hero-metric-pass-through">
@@ -245,7 +245,7 @@ const ImpactModule = (function() {
                             </span>
                             <div>
                                 <h3 class="section-title">Requires Review</h3>
-                                <p class="section-description">${criticalColumns.length} column${criticalColumns.length !== 1 ? 's' : ''} with transformations that may break</p>
+                                <p class="section-description">${criticalColumns.length} downstream column${criticalColumns.length !== 1 ? 's' : ''} whose value is recomputed from the change</p>
                             </div>
                         </div>
                     </div>
@@ -280,7 +280,7 @@ const ImpactModule = (function() {
                                     </svg>
                                 </span>
                                 <span class="model-group-name">${modelName}</span>
-                                <span class="model-group-count">${modelColumns.length} transformation${modelColumns.length !== 1 ? 's' : ''}</span>
+                                <span class="model-group-count">${modelColumns.length} recomputed column${modelColumns.length !== 1 ? 's' : ''}</span>
                             </div>
                         </div>
                         <div class="model-group-content collapsed" id="${modelId}">
@@ -302,7 +302,7 @@ const ImpactModule = (function() {
                             ${col.sql_expression ? `
                                 <div class="column-card-body">
                                     <div class="sql-expression-card">
-                                        <div class="sql-expression-label">Transformation Logic</div>
+                                        <div class="sql-expression-label">Expression</div>
                                         <code class="sql-expression-code">${escapeHtml(col.sql_expression)}</code>
                                     </div>
                                 </div>
@@ -565,7 +565,7 @@ const ImpactModule = (function() {
                 </div>
                 <div class="summary-metric-content">
                     <div class="summary-metric-value">${transformations}</div>
-                    <div class="summary-metric-label">Transformations</div>
+                    <div class="summary-metric-label">Recomputed</div>
                 </div>
             </div>
             <div class="summary-metric summary-metric-pass-through">
