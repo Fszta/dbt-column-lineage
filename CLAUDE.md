@@ -53,6 +53,9 @@ Test fixtures / a sample dbt project live in `tests/resources/dbt_test_project`.
   releases. Use `feat:`, `fix:`, `chore:`, `docs:`, etc.
 - Data types are **pydantic** models in `models/schema.py` — extend those rather than
   passing loose dicts.
+- **Design system is `DESIGN.md`** (definitive). Any UI work on the docs site *or* the
+  explorer app must follow it: DM Sans + JetBrains Mono, single indigo accent, cool slate,
+  no serif, no gradients. Both surfaces must stay visually one product.
 - Run `pre-commit` (or `poetry run format && poetry run type-check && poetry run test`)
   before pushing — CI (`.github/workflows/test.yml`) runs the same checks.
 
