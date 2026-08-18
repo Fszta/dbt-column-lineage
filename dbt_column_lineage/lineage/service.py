@@ -123,25 +123,42 @@ class LineageService:
         """Confidence block: "full" when every reachable model was analyzable, else "partial".
 
         The honest signal is the *coverage gap* — reachable downstream models we could
-        not analyze at the column level, split by reason (absent from the catalog vs.
-        SQL that failed to parse). That gap is what makes the impact a lower bound; the
-        resolved-vs-reachable ratio is misleading because most reachable models simply
-        do not reference this column.
+        not analyze at the column level. A model is analyzable when we have its output
+        columns (from the catalog OR recovered from its compiled SQL); most reachable
+        models are analyzable and simply don't reference the changed column, so the
+        resolved-vs-reachable ratio is not the signal.
+
+        A reachable model is *unanalyzable* only when we have no columns to inspect,
+        split by reason:
+        - ``parse_failed``: it had compiled SQL but the parser could not read it;
+        - ``no_column_info``: neither a catalog entry nor parseable compiled SQL — e.g.
+          a non-table relation such as a semantic view, a python model, or a relation
+          dbt has not built/compiled. We deliberately do NOT claim these are "not built".
         """
-        all_model_keys = set(self.registry.get_models().keys())
-        unparsed = self.registry.get_unparsed_models()
-        not_in_catalog = reachable - all_model_keys
-        parse_failed = reachable & unparsed
-        unanalyzable_reachable = not_in_catalog | parse_failed
+        models = self.registry.get_models()
+        parse_failed_names = self.registry.get_parse_failed_models()
+
+        parse_failed: Set[str] = set()
+        no_column_info: Set[str] = set()
+        for name in reachable:
+            model = models.get(name)
+            if model is not None and model.columns:
+                continue  # analyzable: we have columns to trace
+            if name in parse_failed_names:
+                parse_failed.add(name)
+            else:
+                no_column_info.add(name)
+
+        unanalyzable_reachable = parse_failed | no_column_info
         level: Literal["full", "partial"] = "full" if not unanalyzable_reachable else "partial"
         cap = _IMPACT_CONFIDENCE_NAME_CAP
         return ImpactConfidence(
             reachable_models=len(reachable),
             resolved_models=resolved_models,
             unanalyzable_models=len(unanalyzable_reachable),
-            not_in_catalog=len(not_in_catalog),
+            no_column_info=len(no_column_info),
             parse_failed=len(parse_failed),
-            not_in_catalog_models=sorted(not_in_catalog)[:cap],
+            no_column_info_models=sorted(no_column_info)[:cap],
             parse_failed_models=sorted(parse_failed)[:cap],
             level=level,
         ).model_dump()
@@ -320,7 +337,9 @@ class LineageService:
                 except (ValueError, KeyError):
                     pass
 
-                # Some models in manifest dependencies may not be in catalog
+                # Safety net: the universe is manifest-seeded, so every manifest node
+                # (built or not, catalogued or not) resolves here; this only skips names
+                # that are genuinely unknown to the registry.
                 if other_name not in self.registry.get_models():
                     continue
 
@@ -413,7 +432,9 @@ class LineageService:
                         except (ValueError, KeyError):
                             pass
 
-                        # Some models in manifest dependencies may not be in catalog
+                        # Safety net: the universe is manifest-seeded, so every manifest node
+                # (built or not, catalogued or not) resolves here; this only skips names
+                # that are genuinely unknown to the registry.
                         if other_name not in self.registry.get_models():
                             continue
 

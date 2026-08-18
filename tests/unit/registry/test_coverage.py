@@ -92,7 +92,10 @@ def test_coverage_partial_when_catalog_is_sparse(tmp_path):
     assert coverage.models_in_manifest == 3
     assert coverage.models_in_catalog == 1
     assert coverage.not_in_catalog_count == 2
-    assert coverage.parsed_ok == 1
+    # b and c are absent from the catalog but present in the manifest with compiled SQL,
+    # so the universe now seeds and parses them too: all three parse OK (the catalog gap
+    # is about data types, not analyzability).
+    assert coverage.parsed_ok == 3
 
 
 def test_coverage_reports_skipped_models_without_sql(tmp_path):

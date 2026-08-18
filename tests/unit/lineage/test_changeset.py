@@ -37,12 +37,23 @@ class _Model:
 class _FakeRegistry:
     """Minimal stand-in for ModelRegistry used by ChangesetBuilder."""
 
-    def __init__(self, models: Dict[str, _Model], compiled: Optional[Dict[str, str]] = None):
+    def __init__(
+        self,
+        models: Dict[str, _Model],
+        compiled: Optional[Dict[str, str]] = None,
+        catalog_backed: Optional[set] = None,
+    ):
         self._models = models
         self._compiled = compiled or {}
+        # Default: every model is catalog-backed (structural column diffs are trusted).
+        # Pass an explicit set to simulate catalog-missing (manifest-only) models.
+        self._catalog_backed = catalog_backed if catalog_backed is not None else set(models)
 
     def get_models(self) -> Dict[str, _Model]:
         return self._models
+
+    def is_catalog_backed(self, model_name: str) -> bool:
+        return model_name in self._catalog_backed
 
     def get_compiled_sql(self, model_name: str) -> str:
         if model_name not in self._compiled:
@@ -306,7 +317,7 @@ def test_markdown_renders_partial_confidence_and_coverage_warning():
         "reachable_models": 187,
         "resolved_models": 1,
         "unanalyzable_models": 186,
-        "not_in_catalog": 186,
+        "no_column_info": 186,
         "parse_failed": 0,
         "level": "partial",
     }
@@ -325,7 +336,10 @@ def test_markdown_renders_partial_confidence_and_coverage_warning():
 
     assert "Confidence:" in md and "partial" in md
     assert "186 of 187" in md
-    assert "haven't been built in the warehouse yet" in md
+    # The diagnosis must be honest: no column-level info, NOT a claim that the models
+    # "haven't been built" (a built model can still be absent from the catalog).
+    assert "no column-level information" in md
+    assert "haven't been built in the warehouse yet" not in md
     assert "lower bound" in md
     assert "Coverage is partial" in md
 

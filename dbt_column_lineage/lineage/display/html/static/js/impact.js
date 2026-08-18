@@ -20,29 +20,32 @@ const ImpactModule = (function() {
 
     // Confidence answers: "can I trust this impact list is complete?" We lead with the
     // consequence (complete vs. lower bound), then explain WHY — how many reachable
-    // downstream models we couldn't analyze and, crucially, the root cause: a model is
-    // absent from the catalog because it hasn't been built in the warehouse yet (the
-    // catalog only records built relations). The cause is bolded so it stands out.
+    // downstream models we couldn't analyze and the root cause. A model is unanalyzable
+    // only when we have no columns to trace: either its SQL couldn't be parsed, or it
+    // exposes no column-level information (absent from the catalog with no parseable
+    // compiled SQL — e.g. a non-table relation such as a semantic view). The cause is
+    // bolded so it stands out. Note: we do NOT claim these are "not built" — a model can
+    // be built yet still absent from the catalog (deferred docs, semantic views, ...).
     function confidenceReasonHtml(confidence) {
-        const notInCatalog = confidence.not_in_catalog || 0;
+        const noColumnInfo = confidence.no_column_info || 0;
         const parseFailed = confidence.parse_failed || 0;
-        if (notInCatalog && parseFailed) {
-            return `<strong>they haven't been built in the warehouse yet, or their SQL couldn't be parsed</strong> `
-                + `(${notInCatalog} not built, ${parseFailed} unparseable)`;
+        if (noColumnInfo && parseFailed) {
+            return `<strong>their SQL couldn't be parsed, or they expose no column-level information</strong> `
+                + `(${parseFailed} unparseable, ${noColumnInfo} without a column catalog)`;
         }
         if (parseFailed) {
             return `<strong>their SQL couldn't be parsed</strong>`;
         }
-        return `<strong>they haven't been built in the warehouse yet</strong>, so they're absent from the catalog`;
+        return `<strong>they expose no column-level information</strong>, so they're absent from the catalog with no parseable compiled SQL`;
     }
 
     // Drill-down panel: explains the catalog → column-lineage mechanism, lists the models
     // we could only trace at the model level, and shows how to close the gap.
     function confidenceWhyPanelHtml(confidence, sourceModel) {
-        const notBuilt = confidence.not_in_catalog_models || [];
+        const noColumnInfo = confidence.no_column_info_models || [];
         const unparseable = confidence.parse_failed_models || [];
-        const items = notBuilt
-            .map(m => ({ name: m, tag: 'not built' }))
+        const items = noColumnInfo
+            .map(m => ({ name: m, tag: 'no column info' }))
             .concat(unparseable.map(m => ({ name: m, tag: 'unparseable' })));
         if (!items.length) {
             return '';
@@ -54,10 +57,11 @@ const ImpactModule = (function() {
             + `<span class="confidence-why-tag">${it.tag}</span></li>`
         ).join('');
 
-        // Remediation: only the not-in-catalog case is fixed by building — parse failures
-        // are a different problem, so only surface the command when there's something to build.
+        // Remediation: building + regenerating the catalog closes the no-column-info gap
+        // for ordinary relations. Parse failures (and non-table relations like semantic
+        // views) are a different problem, so only surface the command when building helps.
         let fixHtml = '';
-        if (notBuilt.length && sourceModel) {
+        if (noColumnInfo.length && sourceModel) {
             const cmd = `dbt run --select ${sourceModel}+ --empty && dbt docs generate`;
             fixHtml = `
                 <div class="confidence-why-fix">

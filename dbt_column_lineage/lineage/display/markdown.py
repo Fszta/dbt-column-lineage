@@ -11,19 +11,21 @@ _SEVERITY_LABEL = {"critical": "🔴 critical", "low_impact": "🟢 low"}
 
 def _confidence_reasons(confidence: Dict[str, Any]) -> str:
     """Render the bolded root-cause clause explaining why models were unanalyzable."""
-    not_in_catalog = confidence.get("not_in_catalog", 0)
+    no_column_info = confidence.get("no_column_info", 0)
     parse_failed = confidence.get("parse_failed", 0)
-    if not_in_catalog and parse_failed:
+    if no_column_info and parse_failed:
         return (
-            f" because **they haven't been built in the warehouse yet, or their SQL "
-            f"couldn't be parsed** ({not_in_catalog} not built, {parse_failed} unparseable)"
+            f" because **their SQL couldn't be parsed, or they expose no column-level "
+            f"information** ({parse_failed} unparseable, {no_column_info} without a column "
+            f"catalog)"
         )
     if parse_failed:
         return " because **their SQL couldn't be parsed**"
-    if not_in_catalog:
+    if no_column_info:
         return (
-            " because **they haven't been built in the warehouse yet** (so they're "
-            "absent from the catalog)"
+            " because **they expose no column-level information** (absent from the catalog "
+            "and with no parseable compiled SQL — e.g. a non-table relation such as a "
+            "semantic view)"
         )
     return ""
 
