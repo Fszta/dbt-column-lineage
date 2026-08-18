@@ -50,6 +50,10 @@ class Model(BaseModel):
     unique_id: Optional[str] = None
     upstream: Set[str] = Field(default_factory=set)
     downstream: Set[str] = Field(default_factory=set)
+    # Upstream columns this model uses only in predicates (WHERE / JOIN / HAVING / QUALIFY).
+    predicate_sources: Set[str] = Field(default_factory=set)
+    # Upstream column -> the predicate condition text it appears in.
+    predicate_lineage: Dict[str, str] = Field(default_factory=dict)
     compiled_sql: Optional[str] = None
     language: Optional[str] = None
     resource_type: Literal["model", "source", "seed", "test", "exposure", "snapshot"]
@@ -63,6 +67,13 @@ class Model(BaseModel):
 class SQLParseResult(BaseModel):
     column_lineage: Dict[str, List[ColumnLineage]]
     star_sources: Set[str] = Field(default_factory=set)
+    # Upstream columns referenced only in predicates (WHERE / JOIN ON / HAVING / QUALIFY),
+    # never projected. A change to one of these alters this model's row-set (and therefore
+    # its aggregates), so it is a real — if indirect — downstream impact.
+    predicate_sources: Set[str] = Field(default_factory=set)
+    # Upstream column -> the predicate condition text it appears in (the "why" for the
+    # row-set impact, e.g. ``status = 'flagged'``).
+    predicate_lineage: Dict[str, str] = Field(default_factory=dict)
 
 
 class Coverage(BaseModel):
