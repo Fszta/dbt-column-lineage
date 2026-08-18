@@ -1,3 +1,19 @@
+## [0.12.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.11.0...v0.12.0) (2026-08-18)
+
+
+### Features
+
+* **changeset:** per-column logic-change precision ([1d0a843](https://github.com/Fszta/dbt-column-lineage/commit/1d0a843749351eb9dc4895ecf6c8b1dbdd2cbcb2))
+* **comment:** criticality-structured PR comment ([d686012](https://github.com/Fszta/dbt-column-lineage/commit/d686012d3f0269203616388f34709f54d7c411da))
+* **explorer:** generic 'recomputed / output changes' wording ([6c046bd](https://github.com/Fszta/dbt-column-lineage/commit/6c046bdfa83154da7dfa5c912ef08228bbfb38d3))
+* **impact:** surface predicate/row-set dependents as a distinct severity ([4b118e3](https://github.com/Fszta/dbt-column-lineage/commit/4b118e3263d0950c1a99c06441f68e3426778409))
+* **parser:** resolve predicate (filter/join) column dependencies ([168ccda](https://github.com/Fszta/dbt-column-lineage/commit/168ccdaa5c6113a7d0696f5e7f2841cd32268369))
+
+
+### Bug Fixes
+
+* seed model universe from manifest so uncatalogued models are analyzable ([#69](https://github.com/Fszta/dbt-column-lineage/issues/69)) ([78e372b](https://github.com/Fszta/dbt-column-lineage/commit/78e372b7786baa579a0f29d0bb88cdc9abf8a331))
+
 ## [0.11.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.10.0...v0.11.0) (2026-08-18)
 
 
