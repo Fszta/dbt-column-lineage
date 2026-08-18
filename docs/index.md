@@ -10,9 +10,9 @@ title: Impact analysis for dbt, column by column
 
 <section class="hero band"><div class="wrap">
   <div>
-    <div class="eyebrow" style="color:var(--indigo-light)">Column-level lineage &middot; impact analysis</div>
+    <div class="eyebrow" style="color:var(--indigo-light)"><b>Column-level</b> lineage &middot; <b>impact</b> analysis</div>
     <h1>Know what breaks<br>before you <em>change it.</em></h1>
-    <p class="sub">Column-level data lineage for dbt projects. Trace any column upstream and down, and see the exact blast radius of a change before you ship it.</p>
+    <p class="sub"><b>Column-level</b> data lineage for dbt projects. Trace any <b>column</b> upstream and down, and see a change's exact <b>impact</b> before you ship it.</p>
     <div class="cta">
       <a class="btn btn-primary" href="getting-started/quickstart/">Quick start &rarr;</a>
       <a class="btn btn-ghost" href="https://dbt-column-lineage.onrender.com">Explore a live project</a>
@@ -20,31 +20,34 @@ title: Impact analysis for dbt, column by column
     <div class="metrics">
       <div class="m"><b>6</b><span>columns changed</span></div>
       <div class="m"><b>1</b><span>mart downstream</span></div>
-      <div class="m"><b>2</b><span>exposures hit</span></div>
+      <div class="m"><b>1</b><span>exposure hit</span></div>
     </div>
   </div>
 
   <div class="frame">
     <div class="fh"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">lineage &middot; account_holder</span></div>
-    <svg viewBox="0 0 470 300" role="img" aria-label="dbt column lineage: raw.accounts flows 1:1 into stg_accounts; stg_accounts and stg_users fan into the dim_customer mart, which flows to a finance exposure and fct_orders.">
+    <svg viewBox="0 0 500 300" role="img" aria-label="dbt column lineage: two chains — raw_accounts to stg_accounts to accounts, and raw_transactions to stg_transactions to transactions — both feed one finance exposure. The account_holder change propagates down the accounts chain and breaks the exposure.">
       <defs>
         <marker id="lar" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7z" fill="#5E6AD2"/></marker>
         <marker id="larg" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7z" fill="#556173"/></marker>
         <marker id="lara" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7z" fill="#f59e0b"/></marker>
       </defs>
-      <!-- traced column path: raw -> stg -> dim -> exposure -->
-      <path d="M94 135 C112 135 112 96 126 96" fill="none" stroke="#5E6AD2" stroke-width="2" marker-end="url(#lar)"/>
-      <path d="M236 96 C252 96 250 140 262 140" fill="none" stroke="#5E6AD2" stroke-width="2" marker-end="url(#lar)"/>
-      <path d="M218 197 C244 197 244 140 262 140" fill="none" stroke="#556173" stroke-width="1.4" marker-end="url(#larg)"/>
-      <path d="M372 140 C388 140 386 90 398 90" fill="none" stroke="#f59e0b" stroke-width="2" marker-end="url(#lara)"/>
-      <path d="M372 140 C388 140 386 199 398 199" fill="none" stroke="#556173" stroke-width="1.4" marker-end="url(#larg)"/>
+      <!-- accounts chain (traced, indigo): raw_accounts -> stg_accounts -> accounts -> [break] exposure -->
+      <path d="M112 86 L130 86" fill="none" stroke="#5E6AD2" stroke-width="2" marker-end="url(#lar)"/>
+      <path d="M236 86 L254 86" fill="none" stroke="#5E6AD2" stroke-width="2" marker-end="url(#lar)"/>
+      <path d="M348 86 C370 86 366 148 383 148" fill="none" stroke="#f59e0b" stroke-width="2" marker-end="url(#lara)"/>
+      <!-- transactions chain (grey): raw_transactions -> stg_transactions -> transactions -> exposure -->
+      <path d="M112 212 L130 212" fill="none" stroke="#556173" stroke-width="1.4" marker-end="url(#larg)"/>
+      <path d="M236 212 L254 212" fill="none" stroke="#556173" stroke-width="1.4" marker-end="url(#larg)"/>
+      <path d="M348 212 C370 212 366 148 383 148" fill="none" stroke="#556173" stroke-width="1.4" marker-end="url(#larg)"/>
       <g font-family="'JetBrains Mono',ui-monospace,monospace" font-size="10">
-        <g><rect x="14" y="120" width="80" height="30" rx="7" fill="#171e2b" stroke="#2a3446"/><text x="25" y="139" fill="#94a1b8">raw.accounts</text></g>
-        <g><rect x="126" y="74" width="110" height="44" rx="9" fill="#1c2438" stroke="#5E6AD2" stroke-width="1.6"/><text x="139" y="94" fill="#fff">stg_accounts</text><text x="139" y="109" fill="#8A94EC" font-size="9">account_holder</text></g>
-        <g><rect x="126" y="182" width="92" height="30" rx="7" fill="#171e2b" stroke="#2a3446"/><text x="137" y="201" fill="#94a1b8">stg_users</text></g>
-        <g><rect x="262" y="118" width="110" height="44" rx="9" fill="#1c2438" stroke="#5E6AD2" stroke-width="1.6"/><text x="275" y="138" fill="#fff">dim_customer</text><text x="275" y="153" fill="#8A94EC" font-size="9">account_holder</text></g>
-        <g><rect x="398" y="74" width="62" height="32" rx="7" fill="#171e2b" stroke="#3a2f1c"/><text x="408" y="94" fill="#f59e0b" font-size="9">finance</text></g>
-        <g><rect x="398" y="184" width="62" height="30" rx="7" fill="#171e2b" stroke="#2a3446"/><text x="408" y="203" fill="#94a1b8" font-size="9">fct_orders</text></g>
+        <g><rect x="8" y="70" width="104" height="32" rx="7" fill="#171e2b" stroke="#2a3446"/><text x="20" y="90" fill="#94a1b8">raw_accounts</text></g>
+        <g><rect x="132" y="70" width="104" height="32" rx="7" fill="#1c2438" stroke="#5E6AD2" stroke-width="1.4"/><text x="146" y="90" fill="#fff">stg_accounts</text></g>
+        <g><rect x="256" y="70" width="92" height="32" rx="7" fill="#1c2438" stroke="#5E6AD2" stroke-width="1.4"/><text x="276" y="90" fill="#fff">accounts</text></g>
+        <g><rect x="8" y="196" width="104" height="32" rx="7" fill="#171e2b" stroke="#2a3446"/><text x="14" y="216" fill="#94a1b8" font-size="9">raw_transactions</text></g>
+        <g><rect x="132" y="196" width="104" height="32" rx="7" fill="#171e2b" stroke="#2a3446"/><text x="138" y="216" fill="#94a1b8" font-size="9">stg_transactions</text></g>
+        <g><rect x="256" y="196" width="92" height="32" rx="7" fill="#171e2b" stroke="#2a3446"/><text x="268" y="216" fill="#94a1b8" font-size="9">transactions</text></g>
+        <g><rect x="384" y="126" width="108" height="44" rx="9" fill="#1f1a10" stroke="#d97706" stroke-width="1.6"/><text x="398" y="146" fill="#f59e0b">finance_dash</text><text x="398" y="161" fill="#b98a3e" font-size="8.5">exposure</text></g>
       </g>
     </svg>
   </div>

@@ -139,7 +139,10 @@ html{scroll-behavior:smooth}
   letter-spacing:-.035em;margin:16px 0 0;color:var(--ink-text)!important;-webkit-text-fill-color:var(--ink-text);
   border:none;text-wrap:balance}
 .landing .hero h1 em{font-style:normal;color:var(--indigo-light)}
-.landing .sub{font-size:18px;color:var(--ink-muted);max-width:440px;margin:22px 0 0}
+.landing .sub{font-size:18px;color:var(--ink-muted);max-width:460px;margin:22px 0 0}
+/* the two differentiators — column-level + impact — lit up against the muted subline */
+.landing .sub b{color:var(--ink-text);font-weight:700}
+.landing .eyebrow b{font-weight:700;color:#fff}
 .landing .cta{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
 .landing .btn{font-weight:600;font-size:14px;border-radius:var(--radius-md);padding:12px 20px;
   display:inline-flex;align-items:center;gap:8px;border:1px solid transparent;transition:.15s}
