@@ -609,6 +609,59 @@ class LineageService:
                             f"Failed to process exposure {exposure_name} in impact analysis: {e}"
                         )
 
+            # Row-set (filter/join) dependents: models that reference this column ONLY in a
+            # predicate (WHERE / JOIN ON / HAVING / QUALIFY). They never project the value,
+            # so column-value lineage misses them — but changing the column's logic shifts
+            # which rows they keep, and therefore their aggregates. Surface them as a
+            # distinct 'filter' severity (skipping any already caught as a value impact).
+            filter_count = 0
+            value_affected = set(affected_models.keys())
+            for fm_name in sorted(self.registry.get_filter_dependents(f"{model_name}.{column_name}")):
+                if fm_name in value_affected:
+                    continue
+                try:
+                    fm = self.registry.get_model(fm_name)
+                except Exception:
+                    continue
+                affected_models.setdefault(
+                    fm_name,
+                    {
+                        "name": fm_name,
+                        "resource_type": getattr(fm, "resource_type", "model"),
+                        "schema": fm.schema_name,
+                        "database": fm.database,
+                    },
+                )
+                affected_columns.append(
+                    {
+                        "model": fm_name,
+                        "column": "(row-set)",
+                        "transformation_type": "filter",
+                        # The predicate condition the changed column appears in — the "why".
+                        "sql_expression": (fm.predicate_lineage or {}).get(
+                            f"{model_name}.{column_name}"
+                        ),
+                        "severity": "filter",
+                        "data_type": None,
+                    }
+                )
+                filter_count += 1
+                for other_name in sorted(fm.downstream):
+                    try:
+                        exposure = self.registry.get_exposure(other_name)
+                    except (ValueError, KeyError):
+                        continue
+                    if not any(e["name"] == exposure.name for e in affected_exposures):
+                        affected_exposures.append(
+                            {
+                                "name": exposure.name,
+                                "type": exposure.type,
+                                "url": exposure.url,
+                                "description": exposure.description,
+                                "depends_on_models": list(exposure.depends_on_models),
+                            }
+                        )
+
             reachable = self._dag_reachable_models(model_name)
             confidence = self._impact_confidence(reachable, len(affected_models))
 
@@ -619,6 +672,7 @@ class LineageService:
                     "affected_exposures": len(affected_exposures),
                     "critical_count": critical_count,
                     "low_impact_count": potential_count,
+                    "filter_count": filter_count,
                 },
                 "affected_models": list(affected_models.values()),
                 "affected_columns": affected_columns,

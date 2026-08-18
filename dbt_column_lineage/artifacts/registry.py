@@ -67,6 +67,9 @@ class ModelRegistry:
         # A manifest node absent from this set is "catalog-missing": still analyzable via
         # its compiled SQL, but with unknown column types.
         self._catalog_backed_model_names: set = set()
+        # Lazily-built reverse index: upstream column -> models that reference it ONLY in a
+        # predicate (filter/join), i.e. a row-set dependency rather than a value one.
+        self._filter_dependents: Optional[Dict[str, set]] = None
 
     @property
     def is_loaded(self) -> bool:
@@ -283,6 +286,9 @@ class ModelRegistry:
                 )
             model.columns[col_name].lineage = lineage
 
+        model.predicate_sources = set(parse_result.predicate_sources or set())
+        model.predicate_lineage = dict(parse_result.predicate_lineage or {})
+
         if parse_result.star_sources:
             model.metadata = model.metadata or {}
             model.metadata["star_sources"] = list(parse_result.star_sources)
@@ -435,6 +441,29 @@ class ModelRegistry:
     def get_manifest_downstream(self) -> Dict[str, set]:
         """Manifest-level downstream child map, covering every model (not just catalog ones)."""
         return self._manifest_reader.get_model_downstream()
+
+    def get_filter_dependents(self, source_column: str) -> set:
+        """Models that reference ``source_column`` ONLY in a predicate (filter/join/having).
+
+        These are row-set dependents: a change to ``source_column``'s logic changes which
+        rows they keep, and therefore their aggregates — a real impact that column-value
+        lineage misses. A model that also *projects* ``source_column`` is excluded here (it
+        is already reported as a value impact), so this stays the purely-predicate set.
+        """
+        if self._filter_dependents is None:
+            index: Dict[str, set] = {}
+            for name, model in self.get_models().items():
+                projected: set = set()
+                for column in model.columns.values():
+                    for lineage in column.lineage or []:
+                        projected |= {s.lower() for s in (lineage.source_columns or set())}
+                for src in model.predicate_sources or set():
+                    key = src.lower()
+                    if key in projected:
+                        continue
+                    index.setdefault(key, set()).add(name)
+            self._filter_dependents = index
+        return set(self._filter_dependents.get(source_column.lower(), set()))
 
     def _check_loaded(self) -> None:
         """Verify registry is loaded before operations"""
