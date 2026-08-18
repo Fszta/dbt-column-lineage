@@ -1,3 +1,23 @@
+## [0.11.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.10.0...v0.11.0) (2026-08-18)
+
+
+### Features
+
+* **explorer:** add design token system and dark-mode foundation ([9018328](https://github.com/Fszta/dbt-column-lineage/commit/9018328480b1e80f71b1a3a7e821c1af8123ec33))
+* **explorer:** modernize graph canvas and node cards ([b6a5e70](https://github.com/Fszta/dbt-column-lineage/commit/b6a5e7047592cd1eaf6744bf706273e5b2408606))
+* **explorer:** redesign impact panel and relationship summary ([b59959a](https://github.com/Fszta/dbt-column-lineage/commit/b59959a00050d73608365eecc5b1b7bcc36306ef))
+* **explorer:** restyle sidebar, tree, controls and primary button ([95f4121](https://github.com/Fszta/dbt-column-lineage/commit/95f4121c7536e6f8d2d0c5a38b7091407ff8317e))
+* **explorer:** surface impact confidence & coverage in the UI ([086c30c](https://github.com/Fszta/dbt-column-lineage/commit/086c30c7cc22cfac2fbf06134334ebd0afc2caab))
+* **explorer:** thermal-rail highlight and edge hierarchy on select ([aeb03e6](https://github.com/Fszta/dbt-column-lineage/commit/aeb03e6c395565365555bc7c01d36cc4c79fd9a9))
+* **explorer:** wire theme toggle, brand mark and empty state markup ([3265f49](https://github.com/Fszta/dbt-column-lineage/commit/3265f491e3114ec1109ce6c430e7a7cce85502b0))
+* **impact:** add coverage & confidence signal ([1451806](https://github.com/Fszta/dbt-column-lineage/commit/14518063eb2ebb9d4f20a760b95e44da997fb392))
+* **ui:** explorer readability & interaction polish ([f7cee98](https://github.com/Fszta/dbt-column-lineage/commit/f7cee9808f8ad286a270fde3c4ac66fad980b578))
+
+
+### Bug Fixes
+
+* declare requests as a runtime dependency ([#68](https://github.com/Fszta/dbt-column-lineage/issues/68)) ([a22488f](https://github.com/Fszta/dbt-column-lineage/commit/a22488f10b3e737dfedb7054c45d68591e105f4e))
+
 ## [0.10.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.9.0...v0.10.0) (2026-08-14)
 
 
