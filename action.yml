@@ -52,6 +52,22 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  affected_models:
+    description: "Number of downstream models whose output is affected by the change."
+    value: ${{ steps.impact.outputs.affected_models }}
+  affected_columns:
+    description: "Number of downstream columns affected by the change."
+    value: ${{ steps.impact.outputs.affected_columns }}
+  affected_exposures:
+    description: "Number of business-facing exposures (dashboards/apps) affected."
+    value: ${{ steps.impact.outputs.affected_exposures }}
+  tripped_level:
+    description: >-
+      Highest impact severity the change reaches, in gate terms:
+      exposures | critical | any | none.
+    value: ${{ steps.impact.outputs.tripped_level }}
+
 runs:
   using: "composite"
   steps:
@@ -59,6 +75,10 @@ runs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
+        # Cache pip downloads keyed on this action's own dependency spec so repeat
+        # runs skip re-downloading the tool's dependencies.
+        cache: pip
+        cache-dependency-path: ${{ github.action_path }}/pyproject.toml
 
     - name: Install dbt-col-lineage
       shell: bash
@@ -72,6 +92,7 @@ runs:
         fi
 
     - name: Run column-level impact assessment
+      id: impact
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}

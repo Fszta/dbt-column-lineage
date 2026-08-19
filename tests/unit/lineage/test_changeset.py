@@ -343,6 +343,29 @@ def test_markdown_empty_changeset():
     report = build_changeset_report("two-manifest", [], {**_impact([], [], []), "by_change": []})
     md = render_changeset_markdown(report)
     assert "No column changes" in md
+    # attribution footer present even on the empty report
+    assert "github.com/Fszta/dbt-column-lineage" in md
+
+
+def test_markdown_appends_attribution_footer():
+    columns = [
+        {
+            "model": "dm",
+            "column": "dc",
+            "severity": "critical",
+            "transformation_type": "derived",
+            "sql_expression": "sum(x)",
+        }
+    ]
+    aggregated = _impact([{"name": "dm"}], columns, [])
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
+    )
+    md = render_changeset_markdown(report)
+    # one subtle, linked credit line at the end of the comment body
+    assert "— lineage by [dbt-col-lineage](https://github.com/Fszta/dbt-column-lineage)" in md
+    assert md.count("github.com/Fszta/dbt-column-lineage") == 1
 
 
 def test_markdown_lists_exposures_first_and_blast_table():

@@ -343,7 +343,13 @@ def _run_ci(
         gate_exit_code,
         post_sticky_comment,
         resolve_context,
+        write_github_outputs,
     )
+
+    # Expose machine-readable results to the composite action (via $GITHUB_OUTPUT)
+    # before anything else, so downstream workflow steps get them even if the gate
+    # trips (non-zero exit) below.
+    write_github_outputs(report)
 
     body = render_changeset_markdown(report)
     context = resolve_context(token, repo, pr_number)

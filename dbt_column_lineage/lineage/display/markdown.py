@@ -18,6 +18,10 @@ _MAX_DASHBOARDS_INLINE = 8
 # line forces horizontal scroll and makes the whole disclosure useless).
 _MAX_SQL_CHARS = 400
 
+# Subtle attribution appended to every rendered report so an adopting repo's PRs
+# passively surface where the analysis came from. Kept to one muted line.
+_CREDIT_LINE = "<sub>— lineage by [dbt-col-lineage](https://github.com/Fszta/dbt-column-lineage)</sub>"  # noqa: E501
+
 # Machine kinds → words a reviewer reads without a glossary.
 _KIND_LABELS = {
     "logic_changed": "logic changed",
@@ -91,6 +95,8 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         out.append(
             "✅ **No column changes detected** between base and head — nothing downstream to check."
         )
+        out.append("")
+        out.append(_CREDIT_LINE)
         out.append("")
         return "\n".join(out)
 
@@ -290,5 +296,8 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         )
     if footer:
         out += ["<sub>" + " · ".join(footer) + "</sub>", ""]
+
+    out.append(_CREDIT_LINE)
+    out.append("")
 
     return "\n".join(out)

@@ -10,10 +10,12 @@ from dbt_column_lineage.lineage.ci import (
     FailOn,
     GitHubContext,
     gate_exit_code,
+    highest_tripped_level,
     post_sticky_comment,
     resolve_context,
     resolve_pr_number,
     with_marker,
+    write_github_outputs,
 )
 
 
@@ -40,6 +42,61 @@ class TestGateExitCode:
     def test_empty_summary_never_blocks(self):
         for policy in FailOn:
             assert gate_exit_code({}, policy) == 0
+
+
+class TestHighestTrippedLevel:
+    @pytest.mark.parametrize(
+        "summary,expected",
+        [
+            ({}, "none"),
+            ({"affected_models": 0, "affected_columns": 0, "affected_exposures": 0}, "none"),
+            # exposures is the most severe band and wins over critical/any
+            ({"affected_exposures": 2, "critical_count": 5, "affected_columns": 9}, "exposures"),
+            # no exposures, but derived logic recomputed downstream
+            ({"critical_count": 3, "affected_columns": 7}, "critical"),
+            # only pass-through references touched
+            ({"affected_columns": 4}, "any"),
+            ({"affected_models": 1}, "any"),
+        ],
+    )
+    def test_level(self, summary, expected):
+        assert highest_tripped_level(summary) == expected
+
+
+class TestWriteGithubOutputs:
+    def test_writes_expected_keys(self, tmp_path, monkeypatch):
+        out_file = tmp_path / "gh_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(out_file))
+        report = {
+            "summary": {
+                "affected_models": 3,
+                "affected_columns": 8,
+                "affected_exposures": 2,
+                "critical_count": 1,
+            }
+        }
+        assert write_github_outputs(report) is True
+        written = dict(
+            line.split("=", 1) for line in out_file.read_text().splitlines() if "=" in line
+        )
+        assert written["affected_models"] == "3"
+        assert written["affected_columns"] == "8"
+        assert written["affected_exposures"] == "2"
+        # exposures affected -> highest band
+        assert written["tripped_level"] == "exposures"
+
+    def test_appends_without_clobbering(self, tmp_path, monkeypatch):
+        out_file = tmp_path / "gh_output"
+        out_file.write_text("preexisting=1\n")
+        monkeypatch.setenv("GITHUB_OUTPUT", str(out_file))
+        write_github_outputs({"summary": {"affected_columns": 4}})
+        content = out_file.read_text()
+        assert "preexisting=1" in content
+        assert "tripped_level=any" in content
+
+    def test_noop_without_env(self, monkeypatch):
+        monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+        assert write_github_outputs({"summary": {"affected_models": 5}}) is False
 
 
 def test_fail_on_blocks_property():
