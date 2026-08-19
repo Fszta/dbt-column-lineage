@@ -275,10 +275,9 @@ def test_union_all_simple():
     assert "name" in lineage
     id_sources = {src for lineage_item in lineage["id"] for src in lineage_item.source_columns}
     name_sources = {src for lineage_item in lineage["name"] for src in lineage_item.source_columns}
-    assert any("table1" in src for src in id_sources) or any("table2" in src for src in id_sources)
-    assert any("table1" in src for src in name_sources) or any(
-        "table2" in src for src in name_sources
-    )
+    # BOTH branches must be traced — not just the left-most one.
+    assert id_sources == {"table1.id", "table2.id"}
+    assert name_sources == {"table1.name", "table2.name"}
 
 
 def test_union_all_multiple_branches():
@@ -306,7 +305,60 @@ def test_union_all_multiple_branches():
     assert "col1" in lineage
     assert "col2" in lineage
     col1_sources = {src for lineage_item in lineage["col1"] for src in lineage_item.source_columns}
-    assert len(col1_sources) > 0
+    col2_sources = {src for lineage_item in lineage["col2"] for src in lineage_item.source_columns}
+    # Every one of the four branches must contribute its source.
+    assert col1_sources == {"source1.col1", "source2.col1", "source3.col1", "source4.col1"}
+    assert col2_sources == {"source1.col2", "source2.col2", "source3.col2", "source4.col2"}
+
+
+def test_union_all_top_level_two_branches():
+    """A top-level UNION ALL (no wrapping CTE) must trace both branches' sources."""
+    sql = """
+    select customer_id, amount from source_a
+    union all
+    select customer_id, amount from source_b
+    """
+    result = SQLColumnParser().parse_column_lineage(sql)
+    lineage = result.column_lineage
+
+    cust_sources = {src for item in lineage["customer_id"] for src in item.source_columns}
+    amount_sources = {src for item in lineage["amount"] for src in item.source_columns}
+    assert cust_sources == {"source_a.customer_id", "source_b.customer_id"}
+    assert amount_sources == {"source_a.amount", "source_b.amount"}
+
+
+def test_union_all_three_way_top_level():
+    """A chained 3-way top-level UNION ALL must trace all three branches."""
+    sql = """
+    select id from t1
+    union all
+    select id from t2
+    union all
+    select id from t3
+    """
+    result = SQLColumnParser().parse_column_lineage(sql)
+    id_sources = {src for item in result.column_lineage["id"] for src in item.source_columns}
+    assert id_sources == {"t1.id", "t2.id", "t3.id"}
+
+
+def test_union_inside_cte_referenced_by_name():
+    """A union CTE referenced by explicit column names carries every branch's source."""
+    sql = """
+    with a as (select id, name from t1),
+    b as (select id, name from t2),
+    u as (
+        select id, name from a
+        union all
+        select id, name from b
+    )
+    select id, name from u
+    """
+    result = SQLColumnParser().parse_column_lineage(sql)
+    lineage = result.column_lineage
+    id_sources = {src for item in lineage["id"] for src in item.source_columns}
+    name_sources = {src for item in lineage["name"] for src in item.source_columns}
+    assert id_sources == {"t1.id", "t2.id"}
+    assert name_sources == {"t1.name", "t2.name"}
 
 
 def test_exclude_single_column():
@@ -828,9 +880,7 @@ def test_column_with_block_comment() -> None:
 
     # Source columns should also be clean
     customer_sources = {
-        src
-        for lineage_item in lineage["customer_name"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["customer_name"] for src in lineage_item.source_columns
     }
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 
@@ -872,9 +922,7 @@ def test_qualified_column_with_comment() -> None:
 
     # Source columns should be clean
     customer_sources = {
-        src
-        for lineage_item in lineage["customer_name"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["customer_name"] for src in lineage_item.source_columns
     }
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 
@@ -903,9 +951,7 @@ def test_cte_with_comments() -> None:
 
     # Source columns should trace back correctly without comments
     customer_sources = {
-        src
-        for lineage_item in lineage["customer_name"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["customer_name"] for src in lineage_item.source_columns
     }
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 
@@ -953,9 +999,7 @@ def test_comments_in_aliased_columns() -> None:
 
     # Source columns should be clean
     customer_sources = {
-        src
-        for lineage_item in lineage["customer"]
-        for src in lineage_item.source_columns
+        src for lineage_item in lineage["customer"] for src in lineage_item.source_columns
     }
     assert all("/*" not in src and "*/" not in src for src in customer_sources)
 

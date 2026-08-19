@@ -8,7 +8,7 @@ from dbt_column_lineage.parser.sql_parser_utils import (
     get_table_aliases,
     get_table_context,
     get_all_tables_from_select,
-    get_final_select,
+    get_final_selects,
     split_qualified_name,
     strip_sql_comments,
 )
@@ -27,6 +27,10 @@ class ParserContext:
     cte_transformation_types: Dict[str, Dict[str, str]] = field(default_factory=dict)
     cte_sql_expressions: Dict[str, Dict[str, Optional[str]]] = field(default_factory=dict)
     cte_base_tables: Dict[str, Set[str]] = field(default_factory=dict)
+    # Additional per-column sources contributed by non-left UNION branches of a CTE.
+    # cte_sources holds a single primary source per column; these are merged in on top
+    # so a CTE built from a UNION is not reduced to only its left-most branch.
+    cte_extra_sources: Dict[str, Dict[str, Set[str]]] = field(default_factory=dict)
     column_definitions: Optional[Dict[str, Any]] = None
 
 
@@ -248,6 +252,7 @@ class SQLColumnParser:
         cte_transformation_types: Dict[str, Dict[str, str]] = {}
         cte_sql_expressions: Dict[str, Dict[str, Optional[str]]] = {}
         cte_base_tables: Dict[str, Set[str]] = {}
+        cte_extra_sources: Dict[str, Dict[str, Set[str]]] = {}
 
         aliases = get_table_aliases(parsed)
         for cte in parsed.find_all(exp.CTE):
@@ -259,29 +264,35 @@ class SQLColumnParser:
             cte_transformation_types,
             cte_sql_expressions,
             cte_base_tables,
+            cte_extra_sources,
         )
 
         columns: Dict[str, List[ColumnLineage]] = {}
         star_sources: Set[str] = set()
 
-        final_select = get_final_select(parsed)
-        if not final_select:
+        final_selects = get_final_selects(parsed)
+        if not final_selects:
             selects_to_process: List[Any] = list(parsed.find_all(exp.Select))
         else:
-            selects_to_process = [final_select]
-            if len(final_select.expressions) == 1:
-                expr = final_select.expressions[0]
-                if self._star_handler.is_star_expression(expr):
-                    from_clause = final_select.find(exp.From)
-                    if from_clause:
-                        table = from_clause.find(exp.Table)
-                        if table:
-                            table_name = str(table.name).lower()
-                            for cte in parsed.find_all(exp.CTE):
-                                if cte.alias.lower() == table_name:
-                                    cte_select = cte.this.find(exp.Select)
-                                    if cte_select:
-                                        selects_to_process = [cte_select]
+            selects_to_process = list(final_selects)
+            # `select * from <cte>`: expand the CTE's own SELECT(s). Using
+            # get_final_selects on the CTE body pulls in *every* union branch,
+            # not just the left-most one.
+            if len(final_selects) == 1:
+                final_select = final_selects[0]
+                if len(final_select.expressions) == 1:
+                    expr = final_select.expressions[0]
+                    if self._star_handler.is_star_expression(expr):
+                        from_clause = final_select.find(exp.From)
+                        if from_clause:
+                            table = from_clause.find(exp.Table)
+                            if table:
+                                table_name = str(table.name).lower()
+                                for cte in parsed.find_all(exp.CTE):
+                                    if cte.alias.lower() == table_name:
+                                        cte_selects = get_final_selects(cte.this)
+                                        if cte_selects:
+                                            selects_to_process = cte_selects
                                         break
 
         for select in selects_to_process:
@@ -302,6 +313,7 @@ class SQLColumnParser:
                 cte_transformation_types=cte_transformation_types,
                 cte_sql_expressions=cte_sql_expressions,
                 cte_base_tables=cte_base_tables,
+                cte_extra_sources=cte_extra_sources,
                 column_definitions=column_definitions,
             )
 
@@ -355,7 +367,15 @@ class SQLColumnParser:
                 # Strip SQL comments that might be included in the column name
                 target_col = strip_sql_comments(target_col)
                 lineage = self._expression_analyzer.analyze(expr, context)
-                columns[target_col] = lineage
+                # Merge rather than overwrite: when processing multiple UNION branch
+                # SELECTs, each branch contributes its own sources for the same output
+                # column, so keep every distinct branch's lineage.
+                if target_col in columns:
+                    for lin in lineage:
+                        if lin not in columns[target_col]:
+                            columns[target_col].append(lin)
+                else:
+                    columns[target_col] = list(lineage)
 
         predicate_lineage = self._extract_predicate_lineage(
             parsed,
@@ -474,6 +494,7 @@ class SQLColumnParser:
         cte_transformation_types: Dict[str, Dict[str, str]],
         cte_sql_expressions: Dict[str, Dict[str, Optional[str]]],
         cte_base_tables: Dict[str, Set[str]],
+        cte_extra_sources: Dict[str, Dict[str, Set[str]]],
     ) -> Dict[str, Dict[str, str]]:
         cte_sources: Dict[str, Dict[str, str]] = {}
 
@@ -482,9 +503,11 @@ class SQLColumnParser:
             cte_sources[cte_name] = {}
             cte_transformation_types[cte_name] = {}
             cte_sql_expressions[cte_name] = {}
+            cte_extra_sources.setdefault(cte_name, {})
 
-            select = cte.this.find(exp.Select)
-            if select:
+            # A CTE body may be a UNION: process *every* branch SELECT so all branches'
+            # sources are captured, not just the left-most one.
+            for select in get_final_selects(cte.this):
                 table_context = get_table_context(select)
                 aliases = get_table_aliases(select)
 
@@ -503,6 +526,7 @@ class SQLColumnParser:
                     cte_transformation_types=cte_transformation_types,
                     cte_sql_expressions=cte_sql_expressions,
                     cte_base_tables=cte_base_tables,
+                    cte_extra_sources=cte_extra_sources,
                     column_definitions=column_definitions,
                 )
 
@@ -539,12 +563,18 @@ class SQLColumnParser:
                         lineage_list = self._expression_analyzer.analyze(expr, context)
                         if lineage_list:
                             lineage = lineage_list[0]
-                            self._store_column_lineage_in_cte(
-                                cte_name,
-                                col_name,
-                                lineage,
-                                context,
-                            )
+                            if col_name not in cte_sources[cte_name]:
+                                self._store_column_lineage_in_cte(
+                                    cte_name,
+                                    col_name,
+                                    lineage,
+                                    context,
+                                )
+                            else:
+                                # Later UNION branch for a column already seen: keep its
+                                # sources as extras so no branch is dropped.
+                                extras = cte_extra_sources[cte_name].setdefault(col_name, set())
+                                extras.update(lineage.source_columns or set())
 
         return cte_sources
 
@@ -732,13 +762,32 @@ class SQLColumnParser:
         elif resolved_col:
             resolved_source = resolved_col.lower()
 
+        source_columns = {resolved_source}
+        # Merge in sources contributed by non-left UNION branches of the referenced CTE,
+        # so a reference to a union CTE column carries every branch's source.
+        source_columns.update(
+            self._normalize_extra_cte_sources(context.cte_extra_sources.get(table, {}), col_name)
+        )
+
         return [
             ColumnLineage(
-                source_columns={resolved_source},
+                source_columns=source_columns,
                 transformation_type=cast(Literal["direct", "renamed", "derived"], trans_type),
                 sql_expression=sql_expr,
             )
         ]
+
+    def _normalize_extra_cte_sources(
+        self, extras_for_table: Dict[str, Set[str]], col_name: str
+    ) -> Set[str]:
+        normalized: Set[str] = set()
+        for extra in extras_for_table.get(col_name, set()):
+            extra_table, extra_col = split_qualified_name(extra)
+            if extra_table:
+                normalized.add(f"{extra_table}.{extra_col.lower()}")
+            elif extra_col:
+                normalized.add(extra_col.lower())
+        return normalized
 
     def _normalize_source_columns(self, source_cols: Set[str]) -> Set[str]:
         """Normalize source columns, ensuring all are cleaned of comments and lowercase."""
@@ -817,4 +866,9 @@ class SQLColumnParser:
                 source_col, table, context.cte_sources, context.cte_to_model
             )
             columns.add(resolved)
+            columns.update(
+                self._normalize_extra_cte_sources(
+                    context.cte_extra_sources.get(table, {}), col_name
+                )
+            )
         return columns
