@@ -41,6 +41,45 @@ The impact analysis categorizes columns into:
 ![Impact Analysis Screenshot](../assets/impact-analysis.png)
 *Impact Analysis panel showing column dependencies and transformations*
 
+## In CI (GitHub Action)
+
+Run the same impact analysis on every pull request. The action diffs the base- and
+head-branch dbt artifacts and posts a sticky column-level blast-radius comment on the PR.
+See the [copy-paste workflow](https://github.com/Fszta/dbt-column-lineage/blob/main/docs/examples/impact-pr-check.yml)
+to wire it up.
+
+### Outputs
+
+The action exposes the impact result so later workflow steps can react to it:
+
+| Output | Description |
+|--------|-------------|
+| `affected_models` | Number of downstream models whose output is affected by the change. |
+| `affected_columns` | Number of downstream columns affected. |
+| `affected_exposures` | Number of business-facing exposures (dashboards/apps) affected. |
+| `tripped_level` | Highest severity band reached — `none`, `any`, `critical`, or `exposures`. |
+
+Give the action an `id` and read `steps.<id>.outputs.*` in a later step:
+
+```yaml
+      - name: Column-level impact assessment
+        id: impact
+        uses: Fszta/dbt-column-lineage@v0
+        with:
+          manifest: artifacts/head/manifest.json
+          catalog: artifacts/head/catalog.json
+          base-manifest: artifacts/base/manifest.json
+          base-catalog: artifacts/base/catalog.json
+          fail-on: none
+
+      - name: Warn on exposure impact
+        if: steps.impact.outputs.tripped_level == 'exposures'
+        run: echo "::warning::This PR affects ${{ steps.impact.outputs.affected_exposures }} exposure(s)"
+```
+
+The outputs are populated even when `fail-on` trips the gate, so a downstream step still
+runs on failure with `if: always()`.
+
 ## Use Cases
 
 **Before modifying a column:**
