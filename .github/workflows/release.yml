@@ -86,3 +86,19 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: trigger-docs
+
+      # Deploy the live interactive-explorer demo (scripts/render_start.py) hosted
+      # on Render. Uses a Deploy Hook URL stored as a secret so releases stay in
+      # sync automatically instead of a manual "Deploy" click in the dashboard.
+      # No-ops (with a note) if the secret isn't configured — secrets can't be
+      # referenced directly in `if:`, so gate on an env var instead.
+      - name: Deploy demo to Render
+        if: steps.changelog.outputs.skipped != 'true'
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL not set — skipping Render demo deploy."
+            exit 0
+          fi
+          curl -fsSL -X POST "$RENDER_DEPLOY_HOOK_URL"
