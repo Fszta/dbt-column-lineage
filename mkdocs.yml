@@ -18,12 +18,23 @@ theme:
   logo: assets/logo.svg
   favicon: assets/favicon.svg
   palette:
-    - scheme: default
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: indigo
-      accent: deep purple
-  font:
-    text: Roboto
-    code: Roboto Mono
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  # Fonts are driven from stylesheets/custom.css (DM Sans / Fraunces / JetBrains Mono)
+  # to match the interactive explorer's design system.
+  font: false
   features:
     - navigation.instant
     - navigation.tracking
