@@ -81,6 +81,39 @@ def get_final_select(parsed: Any) -> Optional[Any]:
     return None
 
 
+def get_final_selects(parsed: Any) -> List[Any]:
+    """Return every top-level branch SELECT to process.
+
+    For a ``UNION`` / ``UNION ALL`` (including chained/nested unions), returns the
+    SELECT of *every* branch so per-column lineage from all branches can be merged —
+    otherwise only the left-most branch is traced and downstream blast radius is
+    under-reported. For a plain query, returns the single final SELECT.
+    """
+    query = parsed
+    # Unwrap outer wrappers (e.g. a Subquery/paren) until we reach a Select or Union,
+    # so a union nested inside a wrapper is still flattened into its branches.
+    while (
+        hasattr(query, "this")
+        and query.this is not None
+        and not isinstance(query, (exp.Select, exp.Union))
+    ):
+        query = query.this
+
+    if isinstance(query, exp.Union):
+        selects: List[Any] = []
+        for side in (query.this, query.expression):
+            selects.extend(get_final_selects(side))
+        return selects
+
+    if isinstance(query, exp.Select):
+        return [query]
+
+    if isinstance(query, exp.Query):
+        return [query.this] if isinstance(query.this, exp.Select) else []
+
+    return []
+
+
 def split_qualified_name(qualified_name: str) -> tuple[str, str]:
     """Split a qualified name into table and column parts, stripping SQL comments."""
     if "." not in qualified_name:
