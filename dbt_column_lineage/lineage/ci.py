@@ -71,6 +71,49 @@ def gate_exit_code(summary: Dict[str, Any], fail_on: FailOn) -> int:
     return 0  # FailOn.NONE and any unknown policy: warn only.
 
 
+def highest_tripped_level(summary: Dict[str, Any]) -> str:
+    """Return the most severe gate level this ``summary`` trips, ignoring policy.
+
+    Walks the blocking policies from most to least severe and returns the first whose
+    gate condition is met, so downstream workflow steps can branch on the real reach of
+    a change (``exposures`` > ``critical`` > ``any``) independently of the configured
+    ``fail-on``. Returns ``"none"`` when nothing downstream is touched.
+    """
+    for level in (FailOn.EXPOSURES, FailOn.CRITICAL, FailOn.ANY):
+        if gate_exit_code(summary, level):
+            return level.value
+    return FailOn.NONE.value
+
+
+def write_github_outputs(report: Dict[str, Any]) -> bool:
+    """Emit machine-readable results to ``$GITHUB_OUTPUT`` for the composite action.
+
+    Writes ``affected_models``, ``affected_columns``, ``affected_exposures`` and
+    ``tripped_level`` so an adopting workflow can wire the Action's ``outputs:`` into
+    downstream steps. A no-op (returns ``False``) when ``$GITHUB_OUTPUT`` is unset, so
+    running the CLI outside GitHub Actions is unaffected.
+    """
+    output_path = os.environ.get("GITHUB_OUTPUT")
+    if not output_path:
+        return False
+
+    summary = report.get("summary", {}) or {}
+    values = {
+        "affected_models": int(summary.get("affected_models", 0)),
+        "affected_columns": int(summary.get("affected_columns", 0)),
+        "affected_exposures": int(summary.get("affected_exposures", 0)),
+        "tripped_level": highest_tripped_level(summary),
+    }
+    try:
+        with open(output_path, "a", encoding="utf-8") as handle:
+            for key, value in values.items():
+                handle.write(f"{key}={value}\n")
+    except OSError as exc:
+        logger.warning("Could not write GitHub Action outputs: %s", exc)
+        return False
+    return True
+
+
 def with_marker(body: str) -> str:
     """Prefix a comment body with the hidden sticky marker (idempotent)."""
     if COMMENT_MARKER in body:
