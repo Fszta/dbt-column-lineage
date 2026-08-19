@@ -122,11 +122,11 @@
 
 .impact-question {
     margin: 0 0 4px 0;
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 25px;
     line-height: 1.2;
-    font-weight: 600;
-    letter-spacing: -0.015em;
+    font-weight: 700;
+    letter-spacing: -0.03em;
     color: var(--text);
 }
 
@@ -158,7 +158,7 @@
     gap: 16px;
     padding: 24px 24px 16px;
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(to bottom, var(--secondary), transparent);
+    background: var(--surface-2);
 }
 
 .impact-hero-content {
@@ -471,7 +471,7 @@
     background: var(--secondary);
     padding: 3px 8px;
     border-radius: 4px;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--primary);
     font-weight: 600;
@@ -521,24 +521,10 @@
     height: 16px;
 }
 
+/* Icons stay neutral; only the amber "requires review" signal is tinted. */
 .hero-metric-critical .hero-metric-icon {
     background: color-mix(in srgb, var(--accent) 16%, transparent);
     color: var(--accent-dark);
-}
-
-.hero-metric-models .hero-metric-icon {
-    background: var(--ring-soft);
-    color: var(--primary);
-}
-
-.hero-metric-exposures .hero-metric-icon {
-    background: color-mix(in srgb, var(--violet) 15%, transparent);
-    color: var(--violet);
-}
-
-.hero-metric-pass-through .hero-metric-icon {
-    background: color-mix(in srgb, var(--success) 15%, transparent);
-    color: color-mix(in srgb, var(--success) 70%, var(--text));
 }
 
 .hero-metric-content {
@@ -561,11 +547,12 @@
 }
 
 .hero-metric-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-light);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.1em;
     margin-bottom: 2px;
 }
 
@@ -618,7 +605,7 @@
     background: var(--surface);
     padding: 2px 6px;
     border-radius: 3px;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--primary);
 }
@@ -1182,7 +1169,7 @@
 
 .sql-expression-code {
     display: block;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text-dark);
     line-height: 1.6;
@@ -1302,7 +1289,7 @@
 }
 
 .sql-expression code {
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-family: var(--font-mono);
     color: var(--text-dark);
     white-space: pre-wrap;
     word-break: break-all;
@@ -1369,19 +1356,16 @@
 }
 
 .exposure-card {
-    background: var(--model-bg);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-left: 3px solid var(--violet);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     padding: 14px;
-    transition: all 0.2s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.15s;
+    box-shadow: none;
 }
 
 .exposure-card:hover {
-    box-shadow: 0 4px 12px rgba(147, 51, 234, 0.2);
-    transform: translateY(-1px);
-    border-left-color: #7e22ce;
+    border-color: var(--primary);
 }
 
 .exposure-card-header {
@@ -1407,12 +1391,13 @@
 }
 
 .exposure-card-type {
-    padding: 2px 8px;
-    background: var(--secondary);
-    color: var(--text-dark);
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 600;
+    padding: 0;
+    background: none;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     flex-shrink: 0;
 }
@@ -1440,7 +1425,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--violet);
+    color: var(--primary);
     text-decoration: none;
     font-size: 12px;
     font-weight: 600;
@@ -1454,7 +1439,7 @@
 }
 
 .exposure-link:hover {
-    color: #7e22ce;
+    color: var(--primary-dark);
     text-decoration: underline;
 }
 
@@ -1470,11 +1455,9 @@
     bottom: 16px;
     left: 16px;
     background: var(--surface);
-    border-radius: 10px;
-    box-shadow:
-        0 4px 16px rgba(0, 0, 0, 0.08),
-        0 1px 4px rgba(0, 0, 0, 0.04);
-    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px -14px var(--shadow);
+    border: 1px solid var(--border);
     z-index: 200;
     animation: slideInUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1737,12 +1720,9 @@
     width: 380px;
     max-width: calc(100% - 32px);
     background: var(--surface);
-    border-radius: 16px;
-    box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.08),
-        0 2px 8px rgba(0, 0, 0, 0.04),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px -12px var(--shadow);
+    border: 1px solid var(--border);
     z-index: 200;
     animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
@@ -1856,6 +1836,8 @@
     width: 100%;
 }
 
+/* Flat tiles, hairline border. Color is reserved for the one meaningful signal:
+   the "requires review" (critical) tile keeps amber. Everything else is neutral. */
 .summary-metric {
     display: flex;
     flex-direction: row;
@@ -1863,60 +1845,61 @@
     justify-content: flex-start;
     gap: 10px;
     padding: 10px 12px;
-    background: var(--slate-50);
-    border-radius: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     min-width: 0;
     text-align: left;
-    border-left: 3px solid transparent;
 }
 
 .summary-metric:hover {
-    background: var(--slate-100);
+    background: var(--surface-hover);
 }
 
 .summary-metric-critical {
-    background: color-mix(in srgb, var(--warning) 12%, var(--surface));
-    border-left-color: #f59e0b;
+    background: color-mix(in srgb, var(--warning) 9%, var(--surface));
+    border-color: color-mix(in srgb, var(--warning) 32%, transparent);
 }
 
 .summary-metric-critical:hover {
-    background: color-mix(in srgb, var(--warning) 22%, var(--surface));
+    background: color-mix(in srgb, var(--warning) 16%, var(--surface));
 }
 
-.summary-metric-pass-through {
-    background: color-mix(in srgb, var(--success) 12%, var(--surface));
-    border-left-color: #10b981;
-}
-
-.summary-metric-pass-through:hover {
-    background: color-mix(in srgb, var(--success) 22%, var(--surface));
-}
-
-.summary-metric-models {
-    background: color-mix(in srgb, var(--info) 12%, var(--surface));
-    border-left-color: #3b82f6;
-}
-
-.summary-metric-models:hover {
-    background: color-mix(in srgb, var(--info) 22%, var(--surface));
-}
-
-.summary-metric-exposures {
-    background: color-mix(in srgb, var(--violet) 12%, var(--surface));
-    border-left-color: var(--violet);
-}
-
-.summary-metric-exposures:hover {
-    background: color-mix(in srgb, var(--violet) 22%, var(--surface));
-}
-
+/* Small per-category icon chip — a restrained highlight so the four categories
+   read at a glance without the old full-color tiles. Colors match the app system:
+   models = indigo, exposures = amber, pass-through = teal, review = caution red. */
 .summary-metric-icon {
-    display: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--surface-hover);
+    color: var(--text-muted);
 }
 
 .summary-metric-icon svg {
-    width: 100%;
-    height: 100%;
+    width: 15px;
+    height: 15px;
+}
+
+.summary-metric-models .summary-metric-icon {
+    background: var(--ring-soft);
+    color: var(--primary);
+}
+.summary-metric-exposures .summary-metric-icon {
+    background: var(--ring-soft);
+    color: var(--primary);
+}
+.summary-metric-pass-through .summary-metric-icon {
+    background: color-mix(in srgb, var(--entity-source) 14%, transparent);
+    color: var(--entity-source);
+}
+.summary-metric-critical .summary-metric-icon {
+    background: color-mix(in srgb, var(--warning) 16%, transparent);
+    color: var(--accent-dark);
 }
 
 .summary-metric-content {
@@ -1930,26 +1913,13 @@
 .summary-metric-value {
     font-size: 20px;
     font-weight: 700;
-    color: var(--slate-700);
+    color: var(--text);
     line-height: 1;
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
 }
 
-.summary-metric-critical .summary-metric-value {
-    color: #d97706;
-}
-
-.summary-metric-pass-through .summary-metric-value {
-    color: #059669;
-}
-
-.summary-metric-models .summary-metric-value {
-    color: #2563eb;
-}
-
-.summary-metric-exposures .summary-metric-value {
-    color: var(--violet);
-}
+/* Values stay neutral; the category icon chip + subtle tile tint carry the color. */
 
 .summary-metric-label {
     font-size: 10px;
