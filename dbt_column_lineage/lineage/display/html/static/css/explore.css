@@ -229,13 +229,13 @@
 .model-tree .tree-icon.snapshot-icon { color: var(--entity-snapshot); }
 .model-tree .tree-icon.default-icon { color: var(--slate-400); }
 
-/* Crisp outline icons: lighten the heavy inline fills so entity glyphs (the
-   source/database cylinder especially) read with depth instead of flat blobs. */
-.model-tree .tree-icon.source-icon path,
+/* Crisp outline glyphs: lighten heavy inline fills so they read as outlines,
+   not blobs. The source/database cylinder is excluded — it carries its own
+   two-tone opacities (faint body + solid lid) for a dimensional look. */
 .model-tree .tree-icon.snapshot-icon path,
 .model-tree .tree-icon.exposure-icon path,
 .model-tree .tree-icon.seed-icon path {
-  fill-opacity: 0.12;
+  fill-opacity: 0.14;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
