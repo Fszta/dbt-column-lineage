@@ -1,3 +1,17 @@
+## [0.13.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.12.0...v0.13.0) (2026-08-19)
+
+
+### Features
+
+* **docs:** realistic two-chain lineage graph + emphasize column/impact ([986c7b8](https://github.com/Fszta/dbt-column-lineage/commit/986c7b879112adf08f49fc6e6b11204f962f3069))
+* **docs:** redesign documentation site to match explorer design system ([c6b17ab](https://github.com/Fszta/dbt-column-lineage/commit/c6b17abae450dfe08e3c1b46ada3a775e82a0e8d)), closes [#5E6AD2](https://github.com/Fszta/dbt-column-lineage/issues/5E6AD2)
+* **explorer:** align app frontend with the docs design system ([b8cf0b1](https://github.com/Fszta/dbt-column-lineage/commit/b8cf0b1e1bcbaa14a9f5aeaba923aad38eaffa68))
+
+
+### Bug Fixes
+
+* **explorer:** dimensional database icon in the tree ([101d794](https://github.com/Fszta/dbt-column-lineage/commit/101d79439e662d3bedc53ece85d25c64a3d029e2))
+
 ## [0.12.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.11.0...v0.12.0) (2026-08-18)
 
 
