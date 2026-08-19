@@ -200,7 +200,9 @@ def test_builder_logic_change_is_per_column_when_lineage_is_available():
         {
             "m": _Model(
                 {
-                    "a": _LinCol("text", [_Lin({"up.a", "up.z"}, "derived", "coalesce(up.a, up.z)")]),
+                    "a": _LinCol(
+                        "text", [_Lin({"up.a", "up.z"}, "derived", "coalesce(up.a, up.z)")]
+                    ),
                     "b": _LinCol("text", [_Lin({"up.b"}, "direct", "up.b")]),
                     "c": _LinCol("text", [_Lin({"up.c"}, "direct", "up.c")]),
                 }
@@ -340,7 +342,7 @@ def test_build_changeset_report_shape():
 def test_markdown_empty_changeset():
     report = build_changeset_report("two-manifest", [], {**_impact([], [], []), "by_change": []})
     md = render_changeset_markdown(report)
-    assert "No column changes detected" in md
+    assert "No column changes" in md
 
 
 def test_markdown_lists_exposures_first_and_blast_table():
@@ -369,14 +371,20 @@ def test_markdown_lists_exposures_first_and_blast_table():
     )
     md = render_changeset_markdown(report)
 
-    assert "Affected exposures" in md
+    # verdict banner leads, fusing severity + blast radius
+    assert "Review required" in md
+    assert md.index("Review required") < md.index("Column-level impact") + 200
+    # business-facing exposures section present
+    assert "Business-facing exposures" in md
     assert "Finance Dashboard" in md
-    # criticality-first: the review section (derived + row-set) comes before exposures.
-    assert "Review — downstream output changes" in md
-    assert md.index("Review — downstream output changes") < md.index("Affected exposures")
-    assert "`dm`" in md and "`dc`" in md and "derived" in md
-    # the derived expression is reachable behind the fold, not cluttering the scannable list
-    assert "Show expressions" in md and "sum(x)" in md
+    # criticality-first: the output-changes section comes before exposures.
+    assert "Check these — their output changes" in md
+    assert md.index("Check these — their output changes") < md.index("Business-facing exposures")
+    # the review section is a scannable table with plain-language tags
+    assert "| Model | What changes | How |" in md
+    assert "`dm`" in md and "`dc`" in md and "value recomputed" in md
+    # the derived expression is reachable behind a per-model fold, not cluttering the table
+    assert "Show new logic" in md and "sum(x)" in md
 
 
 def test_markdown_renders_partial_confidence_and_coverage_warning():
@@ -410,8 +418,10 @@ def test_markdown_renders_partial_confidence_and_coverage_warning():
     # "haven't been built" (a built model can still be absent from the catalog).
     assert "no column-level information" in md
     assert "haven't been built in the warehouse yet" not in md
+    # the "this is a floor, not a count" caveat is surfaced in the verdict banner
     assert "lower bound" in md
-    assert "Coverage:" in md and "176/1217" in md
+    # coverage stated in plain words with the real counts
+    assert "Parser reached" in md and "176" in md and "1,217" in md
 
 
 def test_markdown_full_confidence_is_quiet_without_coverage_warning():
@@ -451,10 +461,10 @@ def test_markdown_folds_passthrough_columns_and_omits_empty_critical_section():
     md = render_changeset_markdown(report)
 
     # Pass-throughs are low-risk: folded into a <details>, not shown as a wall of rows.
-    assert "Pass-through references" in md
+    assert "passes through unchanged" in md
     assert "<details>" in md and "`c1`" in md
     # With no derived or row-set impact, the review section is omitted entirely.
-    assert "Review — downstream output changes" not in md
+    assert "Check these — their output changes" not in md
 
 
 def test_markdown_renders_filter_section_for_row_set_impact():
@@ -476,14 +486,14 @@ def test_markdown_renders_filter_section_for_row_set_impact():
     )
     md = render_changeset_markdown(report)
 
-    # Filter/join-only consumers appear in the merged review section, tagged as row-set,
-    # with the predicate condition available in the fold.
-    assert "Review — downstream output changes" in md
+    # Filter/join-only consumers appear in the output-changes table with plain tags,
+    # with the predicate condition available in the per-model fold.
+    assert "Check these — their output changes" in md
     assert "`orders_flag_rate`" in md
-    assert "row-set · filtered/joined" in md
+    assert "rows kept may change" in md and "filtered/joined on this column" in md
     assert "order_status = 'flagged'" in md
     # A row-set impact is not a pass-through.
-    assert "Pass-through references" not in md
+    assert "passes through unchanged" not in md
 
 
 # --- git scope filter ------------------------------------------------------

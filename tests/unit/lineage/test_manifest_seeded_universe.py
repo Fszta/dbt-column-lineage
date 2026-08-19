@@ -34,7 +34,7 @@ import json
 from dbt_column_lineage.artifacts.registry import ModelRegistry
 from dbt_column_lineage.lineage.service import LineageService
 from dbt_column_lineage.lineage.changeset import ChangeKind, ChangesetBuilder
-from dbt_column_lineage.lineage.display.markdown import _confidence_reasons
+from dbt_column_lineage.lineage.display.markdown import _confidence_reason_words
 
 
 # --- fixture helpers -------------------------------------------------------
@@ -280,7 +280,10 @@ def _catalog_nodes(env, *, include_absent):
 def _base(tmp_path):
     """Base (prod) service: everything built & catalogued in ANALYTICS_PRD.PRD_*."""
     cat, man = _write(
-        tmp_path, "base", _catalog_nodes("PRD", include_absent=True), _manifest_nodes("PRD", _ORDERS_BASE)
+        tmp_path,
+        "base",
+        _catalog_nodes("PRD", include_absent=True),
+        _manifest_nodes("PRD", _ORDERS_BASE),
     )
     return LineageService(cat, man, adapter="snowflake")
 
@@ -291,7 +294,10 @@ def _head(tmp_path):
     not built, so absent from the head catalog). Same unique_ids as base, divergent
     database + schema — exercising the multi-schema / multi-database divergence."""
     cat, man = _write(
-        tmp_path, "head", _catalog_nodes("QA", include_absent=False), _manifest_nodes("QA", _ORDERS_HEAD)
+        tmp_path,
+        "head",
+        _catalog_nodes("QA", include_absent=False),
+        _manifest_nodes("QA", _ORDERS_HEAD),
     )
     return LineageService(cat, man, adapter="snowflake")
 
@@ -332,9 +338,7 @@ def test_shape1_filter_join_only_consumer_is_flagged_as_row_set_impact(tmp_path)
 
     # And it rides through to the aggregated changeset blast radius, still not "removed".
     assert "orders_flag_rate" in {m["name"] for m in agg["affected_models"]}
-    assert not any(
-        c.model == "orders_flag_rate" and c.kind == ChangeKind.REMOVED for c in changes
-    )
+    assert not any(c.model == "orders_flag_rate" and c.kind == ChangeKind.REMOVED for c in changes)
     # Being analyzable, it does not inflate the unanalyzable/confidence buckets.
     conf = agg["confidence"]
     assert "orders_flag_rate" not in conf["no_column_info_models"]
@@ -354,9 +358,7 @@ def test_shape2_projecting_catalog_absent_consumer_is_included(tmp_path):
     assert otif.database == "ANALYTICS_QA" and otif.schema_name == "MR_PR_validate_intermediate"
     assert base.registry.get_model("orders_fulfilment_flags").database == "ANALYTICS_PRD"
     # Columns recovered from compiled SQL; customer_id traces to orders.
-    assert otif.columns["customer_id"].lineage[0].source_columns == {
-        "orders.customer_id"
-    }
+    assert otif.columns["customer_id"].lineage[0].source_columns == {"orders.customer_id"}
 
     affected = {m["name"] for m in agg["affected_models"]}
     assert "orders_fulfilment_flags" in affected
@@ -382,9 +384,7 @@ def test_shape2_semantic_view_projecting_orders_is_included(tmp_path):
     sv = "orders_semantic_view"
     assert head.registry.is_catalog_backed(sv) is False
     assert sv in {m["name"] for m in agg["affected_models"]}
-    assert (sv, "order_status") in {
-        (c["model"], c["column"]) for c in agg["affected_columns"]
-    }
+    assert (sv, "order_status") in {(c["model"], c["column"]) for c in agg["affected_columns"]}
     assert not any(c.model == sv and c.kind == ChangeKind.REMOVED for c in changes)
 
 
@@ -438,9 +438,8 @@ def test_unanalyzable_model_is_labelled_honestly_not_as_unbuilt(tmp_path):
     assert "opaque" in conf["no_column_info_models"]
     assert conf["parse_failed"] == 0
 
-    reason = _confidence_reasons(conf)
+    reason = _confidence_reason_words(conf)
     assert "no column-level information" in reason
-    assert "semantic view" in reason
     assert "haven't been built in the warehouse yet" not in reason
 
 
