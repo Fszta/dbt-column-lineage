@@ -44,12 +44,12 @@
     fill-opacity: 1;
   rx: 9px;
   ry: 9px;
-  fill: color-mix(in srgb, var(--violet) 10%, var(--surface));
+  fill: color-mix(in srgb, var(--primary) 10%, var(--surface));
 }
 
 .exposure-container {
     fill: var(--surface);
-  stroke: color-mix(in srgb, var(--violet) 55%, transparent);
+  stroke: color-mix(in srgb, var(--primary) 55%, transparent);
   stroke-width: 1.5px;
   rx: 10px;
   ry: 10px;
@@ -57,7 +57,7 @@
 }
 
 .exposure-title {
-  fill: var(--violet);
+  fill: var(--primary);
     font-weight: 600;
   font-size: 13.5px;
   font-family: var(--font-sans);
@@ -71,11 +71,11 @@
 }
 
 .model-exposure:hover {
-  filter: drop-shadow(0 4px 16px rgba(168, 85, 247, 0.2));
+  filter: drop-shadow(0 4px 16px color-mix(in srgb, var(--primary) 22%, transparent));
 }
 
 .model-exposure:hover .exposure-container {
-  stroke: var(--violet);
+  stroke: var(--primary);
 }
 
 .columns-header rect {
@@ -177,14 +177,14 @@
 }
 
 .edge.exposure {
-  stroke: var(--violet);
+  stroke: var(--primary);
     stroke-width: 2px;
   stroke-dasharray: 8, 4;
   stroke-opacity: 1;
 }
 
 .edge.exposure:hover {
-  stroke: color-mix(in srgb, var(--violet) 80%, var(--text));
+  stroke: color-mix(in srgb, var(--primary) 80%, var(--text));
     stroke-width: 2.5px;
     stroke-opacity: 1;
 }
@@ -386,10 +386,10 @@
 .graph-empty-state h3 {
   margin: 0 0 10px 0;
   font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--text);
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   text-wrap: balance;
 }
 

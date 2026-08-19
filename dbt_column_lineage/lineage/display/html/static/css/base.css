@@ -1,21 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
 :root {
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', monospace;
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  /* Display face is DM Sans set bold + tight — no serif (see DESIGN.md) */
+  --font-display: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-  /* Cool neutral ramp (light) */
+  /* Cool neutral ramp (light) — darkened text end + firmer hairlines so light
+     mode reads crisp and high-contrast, not washed out. Slight indigo bias. */
   --slate-50: #f7f9fc;
   --slate-100: #eef2f8;
-  --slate-200: #e1e7f0;
-  --slate-300: #cbd4e1;
-  --slate-400: #94a1b8;
-  --slate-500: #64748b;
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1e293b;
-  --slate-900: #0f172a;
+  --slate-200: #d8e0ec;
+  --slate-300: #bcc7d9;
+  --slate-400: #7c8aa4;
+  --slate-500: #566478;
+  --slate-600: #3b4a60;
+  --slate-700: #28374c;
+  --slate-800: #121c2c;
+  --slate-900: #0b1220;
 
   /* Warm spark — kept deliberately so the palette never reads grey */
   --accent: #f59e0b;
@@ -35,11 +37,20 @@
   --info: #3b82f6;
   --violet: #8b5cf6;
 
-  /* Semantic surface / text / border tokens (theme-aware) */
-  --bg: var(--slate-50);
+  /* Entity-type accents — a restrained, harmonized categorical palette (muted,
+     similar chroma) so the tree differentiates types with life, not a loud
+     rainbow. Model stays on the brand indigo (--primary). */
+  --entity-source: #1f958c;
+  --entity-seed: #46a46a;
+  --entity-exposure: #d9820a;
+  --entity-snapshot: #8172d6;
+
+  /* Semantic surface / text / border tokens (theme-aware).
+     Neutrals carry a faint indigo bias so light mode reads considered, not grey. */
+  --bg: #f4f6fd;
   --surface: #ffffff;
-  --surface-2: var(--slate-50);
-  --surface-hover: var(--slate-100);
+  --surface-2: #f2f5fd;
+  --surface-hover: #eaeffb;
   --border: var(--slate-200);
   --border-strong: var(--slate-300);
   --text: var(--slate-800);
@@ -48,7 +59,7 @@
 
   --ring: rgba(94, 106, 210, 0.35);
   --ring-soft: rgba(94, 106, 210, 0.15);
-  --dot-color: rgba(100, 116, 139, 0.22);
+  --dot-color: rgba(94, 106, 210, 0.16);
 
   /* legacy aliases still referenced across the codebase */
   --primary-legacy: var(--primary);
@@ -100,6 +111,12 @@
   --info: #60a5fa;
   --violet: #a78bfa;
 
+  /* Entity-type accents — brighter for the dark canvas, same harmonized family. */
+  --entity-source: #4fc9be;
+  --entity-seed: #5fce8a;
+  --entity-exposure: #f0a83a;
+  --entity-snapshot: #a99bf0;
+
   --bg: #0b0f17;
   --surface: #161d2b;
   --surface-2: #10151f;
@@ -112,7 +129,7 @@
 
   --ring: rgba(138, 148, 236, 0.40);
   --ring-soft: rgba(138, 148, 236, 0.18);
-  --dot-color: rgba(255, 255, 255, 0.05);
+  --dot-color: rgba(138, 148, 236, 0.16);
 
   --shadow: rgba(0, 0, 0, 0.5);
   --edge-color: var(--slate-400);
