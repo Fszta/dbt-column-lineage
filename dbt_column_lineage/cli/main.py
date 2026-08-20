@@ -24,6 +24,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
 
 @click.command()
+@click.version_option(package_name="dbt-col-lineage", message="%(version)s")
 @click.option(
     "--select",
     help="Select models/columns to generate lineage for. Format: [+]model_name[.column_name][+]\n"
