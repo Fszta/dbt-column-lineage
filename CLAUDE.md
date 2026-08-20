@@ -25,7 +25,7 @@ cli/        → main.py, Click entrypoint that wires everything together
 
 Entrypoint: `dbt-col-lineage` → `dbt_column_lineage.cli.main:main`.
 Selector grammar: `+model.col` = upstream, `model.col+` = downstream, `model.col` = both.
-Change kinds ranked by blast radius: `removed` > `type_changed` > `logic_changed` > `renamed` > `added`.
+Change kinds ranked by blast radius: `removed` > `type_changed` > `logic_changed` > `added`.
 
 ## Commands (Poetry scripts — always via `poetry run`)
 
