@@ -182,6 +182,22 @@ class ChangesetBuilder:
             model_name
         )
 
+    def structural_diff_available(self) -> bool:
+        """Whether add/removed/type_changed detection could run at all.
+
+        Those structural checks require a real catalog on BOTH sides (see
+        :meth:`_both_catalog_backed`); without one we fall back to the compiled-SQL
+        (logic) diff and cannot see columns added, removed, or retyped. Returns
+        ``True`` only when each side contributes at least one catalog-backed model —
+        so the report can be honest that structural checks were skipped when a
+        ``catalog.json`` is absent on either side.
+        """
+        return self._side_has_catalog(self.base) and self._side_has_catalog(self.head)
+
+    @staticmethod
+    def _side_has_catalog(registry: ModelRegistry) -> bool:
+        return any(registry.is_catalog_backed(name) for name in registry.get_models())
+
     def _logic_changed(self, model_name: str) -> bool:
         base_sql = _normalize_sql(self._safe_compiled_sql(self.base, model_name))
         head_sql = _normalize_sql(self._safe_compiled_sql(self.head, model_name))

@@ -32,6 +32,18 @@ _KIND_LABELS = {
 }
 
 
+# Honesty note when a catalog.json was missing on a side: add/removed/type_changed
+# detection never ran, so a clean report is not proof those changes are absent.
+_STRUCTURAL_SKIP_NOTE = (
+    "Structural checks (type/added/removed) skipped — no `catalog.json` on both sides; "
+    "run `dbt docs generate`."
+)
+
+
+def _structural_checks_skipped(report: Dict[str, Any]) -> bool:
+    return not report.get("structural_checks_available", True)
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}" + ("" if n == 1 else "s")
 
@@ -95,6 +107,8 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         out.append(
             "✅ **No column changes detected** between base and head — nothing downstream to check."
         )
+        if _structural_checks_skipped(report):
+            out += ["", "<sub>" + _STRUCTURAL_SKIP_NOTE + "</sub>"]
         out.append("")
         out.append(_CREDIT_LINE)
         out.append("")
@@ -268,6 +282,8 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
 
     # --- Footer: confidence + coverage (small, plain, honest) ----------------------------
     footer: List[str] = []
+    if _structural_checks_skipped(report):
+        footer.append(_STRUCTURAL_SKIP_NOTE)
     if confidence:
         if confidence.get("level") == "full":
             footer.append(

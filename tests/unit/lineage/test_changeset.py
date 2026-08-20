@@ -233,6 +233,19 @@ def test_builder_logic_change_flags_all_columns_when_lineage_missing():
     assert logic == {"a", "b"}, logic
 
 
+def test_structural_diff_available_requires_catalog_on_both_sides():
+    base = _FakeRegistry({"m": _Model({"a": _Col("int")})})
+    head = _FakeRegistry({"m": _Model({"a": _Col("int")})})
+    # Both sides catalog-backed -> add/removed/type_changed detection is trustworthy.
+    assert ChangesetBuilder(base, head).structural_diff_available() is True
+
+    # A side with no catalog-backed model (e.g. catalog.json absent on that side) means
+    # structural checks were skipped, regardless of which side is missing it.
+    no_catalog = _FakeRegistry({"m": _Model({"a": _Col("int")})}, catalog_backed=set())
+    assert ChangesetBuilder(base, no_catalog).structural_diff_available() is False
+    assert ChangesetBuilder(no_catalog, head).structural_diff_available() is False
+
+
 # --- get_changeset_impact (severity-aware aggregation) ---------------------
 
 
@@ -517,6 +530,43 @@ def test_markdown_renders_filter_section_for_row_set_impact():
     assert "order_status = 'flagged'" in md
     # A row-set impact is not a pass-through.
     assert "passes through unchanged" not in md
+
+
+def test_markdown_notes_skipped_structural_checks_without_catalog():
+    aggregated = _impact([{"name": "dm"}], [], [])
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
+    )
+    report["structural_checks_available"] = False
+    md = render_changeset_markdown(report)
+    # One honest line telling the reviewer add/removed/type_changed were not checked.
+    assert "Structural checks (type/added/removed) skipped" in md
+    assert "dbt docs generate" in md
+
+
+def test_markdown_omits_structural_note_when_catalog_present():
+    aggregated = _impact([{"name": "dm"}], [], [])
+    aggregated["by_change"] = []
+    change = [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)]
+
+    with_catalog = build_changeset_report("two-manifest", change, aggregated)
+    with_catalog["structural_checks_available"] = True
+    assert "Structural checks" not in render_changeset_markdown(with_catalog)
+
+    # Absent flag (older/other report shapes) also stays quiet — no false alarm.
+    default = build_changeset_report("two-manifest", change, aggregated)
+    assert "Structural checks" not in render_changeset_markdown(default)
+
+
+def test_markdown_empty_changeset_warns_when_structural_skipped():
+    # A clean "no changes" verdict must not hide the fact that add/removed/type_changed
+    # were never checked when a catalog.json was missing on a side.
+    report = build_changeset_report("two-manifest", [], {**_impact([], [], []), "by_change": []})
+    report["structural_checks_available"] = False
+    md = render_changeset_markdown(report)
+    assert "No column changes" in md
+    assert "Structural checks (type/added/removed) skipped" in md
 
 
 # --- git scope filter ------------------------------------------------------
