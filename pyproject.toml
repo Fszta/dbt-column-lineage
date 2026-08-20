@@ -6,7 +6,7 @@ authors = [
     {name = "Fszta"}
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.10.6,<3.0.0",
     "sqlglot (>=26.8.0,<27.0.0)",
@@ -31,8 +31,12 @@ type-check = "scripts.type_check:type_check"
 # test project's manifest.json / catalog.json artifacts. The tool itself only reads
 # those artifacts, so they are dev-only and not runtime dependencies.
 dbt-duckdb = ">=1.9.2,<2.0.0"
+# Cap dbt-core below the 2.0 (Fusion) line: it's dev-only (regenerates the test
+# project's artifacts) and 2.0's stricter config validation rejects the fixtures.
+# Also stops poetry from resolving to a 2.0.0bN prerelease.
+dbt-core = ">=1.9.0,<2.0.0"
 duckdb = ">=1.2.1,<2.0.0"
-pytest = ">=8.3.4,<9.0.0"
+pytest = ">=8.3.4,<10.0.0"
 mypy = ">=1.15.0,<2.0.0"
 black = ">=24.10.0"
 ruff = ">=0.8.4"
@@ -55,7 +59,7 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 files = ["dbt_column_lineage", "tests"]
 show_error_codes = true
 pretty = true
