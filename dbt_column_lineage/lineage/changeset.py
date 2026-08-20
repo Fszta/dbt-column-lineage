@@ -34,7 +34,6 @@ class ChangeKind(str, Enum):
     REMOVED = "removed"
     TYPE_CHANGED = "type_changed"
     LOGIC_CHANGED = "logic_changed"
-    RENAMED = "renamed"
     ADDED = "added"
 
     @property
@@ -46,7 +45,6 @@ _KIND_PRIORITY: Dict[ChangeKind, int] = {
     ChangeKind.REMOVED: 5,
     ChangeKind.TYPE_CHANGED: 4,
     ChangeKind.LOGIC_CHANGED: 3,
-    ChangeKind.RENAMED: 2,
     ChangeKind.ADDED: 1,
 }
 

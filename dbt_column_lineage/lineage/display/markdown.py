@@ -28,7 +28,6 @@ _KIND_LABELS = {
     "type_changed": "type changed",
     "added": "added",
     "removed": "removed",
-    "renamed": "renamed",
 }
 
 
