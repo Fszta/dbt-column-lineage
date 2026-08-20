@@ -1,3 +1,21 @@
+## [0.14.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.13.0...v0.14.0) (2026-08-20)
+
+### ⚠ BREAKING CHANGES
+
+* drops support for Python 3.9; the minimum supported version is now Python 3.10.
+
+### Features
+
+* **ci:** note when structural checks are skipped without a catalog ([23b88fc](https://github.com/Fszta/dbt-column-lineage/commit/23b88fc083083a3e772a5d0f08586bb2ea9457a8))
+* **cli:** add --version flag ([bce9d67](https://github.com/Fszta/dbt-column-lineage/commit/bce9d67b90998a0e6279cf328df3449e35b1bce2))
+* **action:** add PR-comment credit, outputs, and pip cache ([d6e1031](https://github.com/Fszta/dbt-column-lineage/commit/d6e103166de33ec750b2f826d526db38a41ab082))
+* **impact:** restructure the CI impact PR comment for reviewer-first triage ([286e403](https://github.com/Fszta/dbt-column-lineage/commit/286e403dbc930c9c1ab03f2c9e9232776ed78565))
+
+### Bug Fixes
+
+* **parser:** expand adapter-to-dialect mapping and warn on unknown dialect ([a195fc7](https://github.com/Fszta/dbt-column-lineage/commit/a195fc7a6290af28c618f2d65c6d83cf29fcabbc))
+* **parser:** trace all UNION branches in column lineage ([2844bba](https://github.com/Fszta/dbt-column-lineage/commit/2844bbaf5a0f7092bd9b24a2825b2e108059497d))
+
 ## [0.13.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.12.0...v0.13.0) (2026-08-19)
 
 
