@@ -122,6 +122,8 @@ class LineageExplorer:
                             node["display_name"] = part
                             node["columns"] = model_data.get("columns", [])
                             node["resource_type"] = model_data["resource_type"]
+                            if "description" in model_data:
+                                node["description"] = model_data["description"]
                             if "exposure_data" in model_data:
                                 node["exposure_data"] = model_data["exposure_data"]
 
@@ -163,7 +165,7 @@ class LineageExplorer:
                     path_parts = [model_name_for_path]
 
                 columns = [
-                    {"name": col_name, "type": col.data_type}
+                    {"name": col_name, "type": col.data_type, "description": col.description}
                     for col_name, col in model.columns.items()
                 ]
 
@@ -172,6 +174,7 @@ class LineageExplorer:
                     "model_name": model_registry_key,
                     "columns": columns,
                     "resource_type": resource_type,
+                    "description": getattr(model, "description", None),
                 }
 
                 insert_into_tree(model_tree_root, path_parts, model_data_payload)

@@ -299,6 +299,9 @@ const ImpactModule = (function() {
                                 </div>
                                 <span class="transformation-badge critical-transformation">${transformationType}</span>
                             </div>
+                            ${col.description ? `
+                                <p class="column-card-description">${escapeHtml(col.description)}</p>
+                            ` : ''}
                             ${col.sql_expression ? `
                                 <div class="column-card-body">
                                     <div class="sql-expression-card">
@@ -430,6 +433,9 @@ const ImpactModule = (function() {
                             ` : ''}
                         </div>
                         <div class="model-card-body">
+                            ${model.description ? `
+                                <p class="model-card-description">${escapeHtml(model.description)}</p>
+                            ` : ''}
                             <div class="model-card-info">
                                 <span class="model-schema">${model.database || ''}.${schemaName}</span>
                                 <span class="model-columns-count">${columnsInModel.length} column${columnsInModel.length !== 1 ? 's' : ''} affected</span>
@@ -479,6 +485,9 @@ const ImpactModule = (function() {
                             </div>
                             <span class="transformation-badge low-impact-transformation">${transformationType}</span>
                         </div>
+                        ${col.description ? `
+                            <p class="column-card-description">${escapeHtml(col.description)}</p>
+                        ` : ''}
                     </div>
                 `;
             });
@@ -616,6 +625,13 @@ const ImpactModule = (function() {
 
         closeImpactPanel.addEventListener('click', function() {
             impactPanel.style.display = 'none';
+            // Restore the floating relationship-summary card that was hidden while
+            // the panel (which shows the same metrics) was open.
+            const relCard = document.getElementById('relationshipSummaryCard');
+            if (relCard && relCard.dataset.hiddenByImpact === 'true') {
+                relCard.style.display = 'block';
+                delete relCard.dataset.hiddenByImpact;
+            }
         });
 
         const resizeHandle = document.getElementById('impactPanelResizeHandle');
@@ -691,6 +707,13 @@ const ImpactModule = (function() {
                             const impactCard = document.getElementById('impactAnalysisCard');
                             if (impactCard) {
                                 impactCard.style.display = 'none';
+                            }
+                            // Hide the floating relationship-summary card: it shows the same
+                            // metrics and otherwise sits under (or bleeds past) the panel.
+                            const relCard = document.getElementById('relationshipSummaryCard');
+                            if (relCard && getComputedStyle(relCard).display !== 'none') {
+                                relCard.dataset.hiddenByImpact = 'true';
+                                relCard.style.display = 'none';
                             }
                         })
                         .catch(error => {
