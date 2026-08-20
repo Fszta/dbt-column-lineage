@@ -44,8 +44,9 @@ Test fixtures / a sample dbt project live in `tests/resources/dbt_test_project`.
 ## Conventions — must follow
 
 - **Line length 100** for both black and ruff.
-- **Python 3.9 floor** (`requires-python >=3.9`, mypy pinned to 3.9). Do **not** use
-  3.10+ syntax (`X | Y` unions, `match`, etc.) — use `typing.Optional`/`Union`.
+- **Python 3.10 floor** (`requires-python >=3.10`, mypy pinned to 3.10). Do **not** use
+  3.11+ syntax. 3.10 features (`X | Y` unions, `match`) are allowed, but existing code
+  favors `typing.Optional`/`Union` — match the surrounding style rather than mixing both.
 - **Type everything.** mypy runs over `dbt_column_lineage` and `tests` with
   `show_error_codes`, strict-ish settings; new code must pass `poetry run type-check`.
 - **Conventional Commits**, enforced by commitlint (`.commitlintrc.json`) as a

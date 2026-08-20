@@ -65,7 +65,7 @@ jobs:
         if: steps.changelog.outputs.skipped != 'true'
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Build and verify documentation
         if: steps.changelog.outputs.skipped != 'true'
