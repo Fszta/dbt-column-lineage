@@ -643,6 +643,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#in-ci-github-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In CI (GitHub Action)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="In CI (GitHub Action)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#use-cases" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -757,6 +785,56 @@
 </ul>
 <p><img alt="Impact Analysis Screenshot" src="../../assets/impact-analysis.png" />
 <em>Impact Analysis panel showing column dependencies and transformations</em></p>
+<h2 id="in-ci-github-action">In CI (GitHub Action)</h2>
+<p>Run the same impact analysis on every pull request. The action diffs the base- and
+head-branch dbt artifacts and posts a sticky column-level blast-radius comment on the PR.
+See the <a href="https://github.com/Fszta/dbt-column-lineage/blob/main/docs/examples/impact-pr-check.yml">copy-paste workflow</a>
+to wire it up.</p>
+<h3 id="outputs">Outputs</h3>
+<p>The action exposes the impact result so later workflow steps can react to it:</p>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>affected_models</code></td>
+<td>Number of downstream models whose output is affected by the change.</td>
+</tr>
+<tr>
+<td><code>affected_columns</code></td>
+<td>Number of downstream columns affected.</td>
+</tr>
+<tr>
+<td><code>affected_exposures</code></td>
+<td>Number of business-facing exposures (dashboards/apps) affected.</td>
+</tr>
+<tr>
+<td><code>tripped_level</code></td>
+<td>Highest severity band reached — <code>none</code>, <code>any</code>, <code>critical</code>, or <code>exposures</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Give the action an <code>id</code> and read <code>steps.&lt;id&gt;.outputs.*</code> in a later step:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Column-level impact assessment</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">impact</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Fszta/dbt-column-lineage@v0</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">          </span><span class="nt">manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/manifest.json</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">          </span><span class="nt">catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/catalog.json</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">          </span><span class="nt">base-manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/manifest.json</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">          </span><span class="nt">base-catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/catalog.json</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">          </span><span class="nt">fail-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Warn on exposure impact</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">steps.impact.outputs.tripped_level == 'exposures'</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo "::warning::This PR affects ${{ steps.impact.outputs.affected_exposures }} exposure(s)"</span>
+</code></pre></div>
+<p>The outputs are populated even when <code>fail-on</code> trips the gate, so a downstream step still
+runs on failure with <code>if: always()</code>.</p>
 <h2 id="use-cases">Use Cases</h2>
 <p><strong>Before modifying a column:</strong>
 - Understand which transformations depend on it
