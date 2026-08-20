@@ -1,5 +1,6 @@
 import json
-from typing import Dict, Optional, Set, Any
+import os
+from typing import Dict, List, Optional, Set, Any
 from pathlib import Path
 
 from dbt_column_lineage.artifacts.adapter_mapping import normalize_adapter
@@ -9,6 +10,10 @@ class ManifestReader:
     def __init__(self, manifest_path: Optional[str] = None):
         self.manifest_path = Path(manifest_path) if manifest_path else None
         self.manifest: Dict[str, Any] = {}
+        # Lazily-built index of on-disk compiled SQL keyed by filename (e.g. ``orders.sql``),
+        # used to recover a model's compiled SQL when the manifest's ``original_file_path``
+        # has drifted from the ``target/compiled`` layout (a model moved between builds).
+        self._compiled_index: Optional[Dict[str, List[Path]]] = None
 
     def load(self) -> None:
         if not self.manifest_path or not self.manifest_path.exists():
@@ -127,7 +132,49 @@ class ManifestReader:
                     return candidate
             except OSError:
                 continue
+
+        # Fallback: the exact path missed, but the compiled file may still be on disk under
+        # a different sub-path — the manifest's ``original_file_path`` can drift from the
+        # ``target/compiled`` layout when a model was moved/refactored between the build that
+        # produced the manifest and the one that produced ``compiled/``. Recover it by the
+        # compiled filename (dbt names it ``<model>.sql``), but ONLY when the match is
+        # unambiguous, so we never silently attach the wrong (or stale-duplicate) SQL.
+        if original_file_path:
+            return self._recover_compiled_by_name(Path(original_file_path).name, package_name)
         return None
+
+    def _recover_compiled_by_name(
+        self, filename: str, package_name: Optional[str]
+    ) -> Optional[Path]:
+        """Find an on-disk compiled file by its ``<model>.sql`` name, unambiguously.
+
+        Prefers a single match under the model's own package dir; otherwise accepts a single
+        match anywhere under ``target/compiled``. Returns ``None`` on zero or multiple matches
+        (ambiguous → we decline to guess, keeping the model honestly unresolved).
+        """
+        index = self._compiled_basename_index()
+        matches = index.get(filename, [])
+        if not matches:
+            return None
+        if package_name:
+            marker = f"{os.sep}compiled{os.sep}{package_name}{os.sep}"
+            scoped = [p for p in matches if marker in f"{os.sep}{p}{os.sep}"]
+            if len(scoped) == 1:
+                return scoped[0]
+        return matches[0] if len(matches) == 1 else None
+
+    def _compiled_basename_index(self) -> Dict[str, List[Path]]:
+        """Lazily index ``target/compiled/**/*.sql`` by filename → list of paths."""
+        if self._compiled_index is not None:
+            return self._compiled_index
+        index: Dict[str, List[Path]] = {}
+        if self.manifest_path:
+            compiled_dir = self.manifest_path.parent / "compiled"
+            if compiled_dir.is_dir():
+                for path in compiled_dir.rglob("*.sql"):
+                    index.setdefault(path.name, []).append(path)
+        self._compiled_index = index
+        return index
 
     def get_compiled_sql(self, model_name: str) -> Optional[str]:
         """Get compiled SQL for a model.
