@@ -68,6 +68,14 @@ class JsonDisplay(LineageStaticDisplay):
         self._result["data_type"] = column.data_type
         self._result["description"] = column.description
 
+    def set_model_description(self, description: Optional[str]) -> None:
+        """Attach the selected column's parent model description (its dbt docs).
+
+        Kept alongside the column's own ``description`` so an agent triaging
+        "what breaks if I change X" also sees what the *model* X lives in is.
+        """
+        self._result["model_description"] = description
+
     def display_upstream(self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]) -> None:
         self._result["upstream"] = serialize_refs(refs)
 
