@@ -263,6 +263,11 @@ def impact(
 
         base_service: Optional[LineageService] = None
         changes: List[ColumnChange]
+        # Whether structural checks (added/removed/type_changed) could run. They need a
+        # real catalog on both sides; the two-manifest path decides this from the builder
+        # below. The git-diff fallback is a separate, self-evident coarse mode, so it is
+        # left as-is (no catalog note).
+        structural_checks_available = True
 
         if scope_git and not base_manifest:
             click.echo(
@@ -289,7 +294,9 @@ def impact(
             base_service = LineageService(
                 Path(resolved_base_catalog), Path(base_manifest), adapter=adapter
             )
-            changes = ChangesetBuilder(base_service.registry, head_service.registry).build()
+            builder = ChangesetBuilder(base_service.registry, head_service.registry)
+            changes = builder.build()
+            structural_checks_available = builder.structural_diff_available()
             source = "two-manifest"
 
             if scope_git:
@@ -313,6 +320,7 @@ def impact(
         aggregated = head_service.get_changeset_impact(changes, base_service=base_service)
         report = build_changeset_report(source, changes, aggregated)
         report["coverage"] = head_service.get_coverage().model_dump()
+        report["structural_checks_available"] = structural_checks_available
 
         if format == "json":
             click.echo(json.dumps(report, indent=2, sort_keys=False))
