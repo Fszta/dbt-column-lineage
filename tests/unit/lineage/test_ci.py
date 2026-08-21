@@ -34,6 +34,11 @@ class TestGateExitCode:
             # any gate trips on any downstream touch
             ({"affected_models": 0, "affected_columns": 0, "affected_exposures": 0}, FailOn.ANY, 0),
             ({"affected_columns": 4}, FailOn.ANY, 1),
+            # tests gate keys off provable breaks only, ignoring heuristic reach
+            ({"provable_break_count": 0, "critical_count": 9}, FailOn.TESTS, 0),
+            ({"provable_break_count": 2}, FailOn.TESTS, 1),
+            # a provable break does NOT trip the exposures/critical gates on its own
+            ({"provable_break_count": 3, "affected_exposures": 0}, FailOn.EXPOSURES, 0),
         ],
     )
     def test_gate(self, summary, fail_on, expected):
@@ -50,6 +55,8 @@ class TestHighestTrippedLevel:
         [
             ({}, "none"),
             ({"affected_models": 0, "affected_columns": 0, "affected_exposures": 0}, "none"),
+            # a provable break is the most severe band, above exposures
+            ({"provable_break_count": 1, "affected_exposures": 5}, "tests"),
             # exposures is the most severe band and wins over critical/any
             ({"affected_exposures": 2, "critical_count": 5, "affected_columns": 9}, "exposures"),
             # no exposures, but derived logic recomputed downstream
@@ -68,12 +75,14 @@ class TestWriteGithubOutputs:
         out_file = tmp_path / "gh_output"
         monkeypatch.setenv("GITHUB_OUTPUT", str(out_file))
         report = {
+            "verdict": "block",
             "summary": {
                 "affected_models": 3,
                 "affected_columns": 8,
                 "affected_exposures": 2,
                 "critical_count": 1,
-            }
+                "provable_break_count": 4,
+            },
         }
         assert write_github_outputs(report) is True
         written = dict(
@@ -82,8 +91,10 @@ class TestWriteGithubOutputs:
         assert written["affected_models"] == "3"
         assert written["affected_columns"] == "8"
         assert written["affected_exposures"] == "2"
-        # exposures affected -> highest band
-        assert written["tripped_level"] == "exposures"
+        assert written["provable_breaks"] == "4"
+        assert written["verdict"] == "block"
+        # a provable break is the highest band
+        assert written["tripped_level"] == "tests"
 
     def test_appends_without_clobbering(self, tmp_path, monkeypatch):
         out_file = tmp_path / "gh_output"
@@ -101,6 +112,7 @@ class TestWriteGithubOutputs:
 
 def test_fail_on_blocks_property():
     assert FailOn.NONE.blocks is False
+    assert FailOn.TESTS.blocks is True
     assert FailOn.EXPOSURES.blocks is True
     assert FailOn.CRITICAL.blocks is True
     assert FailOn.ANY.blocks is True

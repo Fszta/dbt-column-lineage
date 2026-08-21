@@ -73,12 +73,14 @@ edit the same comment instead of spamming the thread).
 | `fail-on`   | Blocks the PR when… |
 |-------------|---------------------|
 | `none`      | never — comment only (**default**, the safe on-ramp) |
+| `tests`     | a change **provably breaks a dbt test** (removes/renames a column a `not_null`/`unique`/`relationships` test still targets) — the objective, false-positive-free level to block on (needs `base-manifest`) |
 | `exposures` | a change reaches a business-facing **exposure** (dashboard / app) |
 | `critical`  | a downstream column **recomputes derived logic** (not just a pass-through) |
 | `any`       | any downstream column is affected at all |
 
 The action also emits step outputs for your own gating/reporting: `affected_models`,
-`affected_columns`, `affected_exposures`, and `tripped_level`.
+`affected_columns`, `affected_exposures`, `provable_breaks`, `verdict` (`safe`/`review`/`block`),
+and `tripped_level`.
 
 Pin `@v0` for updates within the current major (like `actions/checkout@v4`), or an
 exact release — `@v0.13.0` — for reproducible builds. The action installs the CLI

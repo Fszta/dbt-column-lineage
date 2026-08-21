@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass, field
 import logging
 
@@ -11,6 +11,7 @@ from dbt_column_lineage.models.schema import (
     ColumnLineage,
     Exposure,
     Coverage,
+    TestNode,
 )
 from dbt_column_lineage.artifacts.exceptions import (
     ModelNotFoundError,
@@ -70,6 +71,25 @@ class ModelRegistry:
         # Lazily-built reverse index: upstream column -> models that reference it ONLY in a
         # predicate (filter/join), i.e. a row-set dependency rather than a value one.
         self._filter_dependents: Optional[Dict[str, set]] = None
+        # Reverse index built at load time: (model, column) -> tests targeting that column.
+        # Keys are lowercased to match the codebase's case-insensitive model/column naming.
+        self._column_tests: Dict[Tuple[str, str], List[TestNode]] = {}
+        # Reverse index for the *referenced* side of relationships tests: (model, column) ->
+        # relationships tests pointing AT that column via ``to=``/``field=``. Removing this
+        # parent key breaks the child's relationships test just as surely as removing the
+        # child column does, so it is a distinct provable-break lookup.
+        self._referenced_tests: Dict[Tuple[str, str], List[TestNode]] = {}
+        # Tests we could not attribute to a (model, column) pair — kept for coverage honesty
+        # (counted, never guessed at). See :meth:`get_unattributable_test_count`.
+        self._unattributable_tests: List[TestNode] = []
+        # Every test node's unique_id present in this manifest. Lets the verdict classifier
+        # confirm a base test STILL EXISTS in head before flagging it broken — so a rename
+        # that updates the test's yml (new unique_id) is not a false break.
+        self._test_unique_ids: Set[str] = set()
+        # model (lowercased) -> every test that breaks if the whole model is removed: those
+        # attached to it AND relationships tests referencing it. Column-level recovery can
+        # miss a model's tested columns, but a wholly-removed model breaks all of its tests.
+        self._model_tests: Dict[str, List[TestNode]] = {}
 
     @property
     def is_loaded(self) -> bool:
@@ -235,6 +255,92 @@ class ModelRegistry:
 
         return exposures
 
+    def _build_test_index(self) -> None:
+        """Build the reverse index (model, column) -> tests from the manifest test nodes.
+
+        A test is only indexed under a (model, column) pair when *both* the target model
+        and the target column are known. Tests missing either are set aside as
+        unattributable and merely counted (never guessed at) — they surface in the
+        coverage honesty signal rather than silently disappearing.
+        """
+        self._column_tests = {}
+        self._referenced_tests = {}
+        self._unattributable_tests = []
+        self._test_unique_ids = set()
+        self._model_tests = {}
+
+        def _attach_to_model(model_name: Optional[str], test: TestNode) -> None:
+            if model_name is None:
+                return
+            bucket = self._model_tests.setdefault(model_name.lower(), [])
+            if all(t.unique_id != test.unique_id for t in bucket):
+                bucket.append(test)
+
+        for test in self._manifest_reader.get_tests():
+            self._test_unique_ids.add(test.unique_id)
+            # Every test that a whole-model removal would break: attached to the model, or a
+            # relationships test pointing at it from elsewhere.
+            _attach_to_model(test.target_model, test)
+            _attach_to_model(test.referenced_model, test)
+            # A relationships test also depends on its *referenced* (parent) column; index
+            # that side too so a change to the parent key can be found. Both sides may be
+            # unknown independently.
+            if test.referenced_model is not None and test.referenced_column is not None:
+                ref_key = (test.referenced_model.lower(), test.referenced_column.lower())
+                self._referenced_tests.setdefault(ref_key, []).append(test)
+
+            if test.target_model is None or test.target_column is None:
+                self._unattributable_tests.append(test)
+                continue
+            key = (test.target_model.lower(), test.target_column.lower())
+            self._column_tests.setdefault(key, []).append(test)
+
+    def get_column_tests(self, model: str, column: str) -> List[TestNode]:
+        """Return the dbt tests targeting ``model.column`` (case-insensitive).
+
+        Returns an empty list for an unknown (model, column) pair or one with no tests.
+        """
+        return list(self._column_tests.get((model.lower(), column.lower()), []))
+
+    def get_tests_referencing(self, model: str, column: str) -> List[TestNode]:
+        """Return relationships tests whose *referenced* (parent) side is ``model.column``.
+
+        These break when the parent key is removed/renamed, distinct from the tests that
+        target the column directly (:meth:`get_column_tests`). Case-insensitive; empty when
+        nothing references it.
+        """
+        return list(self._referenced_tests.get((model.lower(), column.lower()), []))
+
+    def get_model_tests(self, model: str) -> List[TestNode]:
+        """Every test that breaks if ``model`` is removed wholesale (case-insensitive).
+
+        Includes tests attached to the model and relationships tests referencing it — used
+        for whole-model removals, where incomplete column recovery would otherwise miss
+        tests on columns we couldn't reconstruct from compiled SQL.
+        """
+        return list(self._model_tests.get(model.lower(), []))
+
+    def get_test_unique_ids(self) -> Set[str]:
+        """All dbt test unique_ids present in this manifest.
+
+        The verdict classifier intersects a base test against this head set to confirm the
+        test survived the change: a rename that updated the test's yml yields a *new*
+        unique_id, so the base one is absent here and is correctly not flagged as broken.
+        """
+        return set(self._test_unique_ids)
+
+    def get_unattributable_test_count(self) -> int:
+        """Number of test nodes whose (model, column) target could not be attributed.
+
+        These are kept out of the reverse index but counted here so later coverage
+        reporting can stay honest about what the index does and does not cover.
+        """
+        return len(self._unattributable_tests)
+
+    def get_unattributable_tests(self) -> List[TestNode]:
+        """The test nodes whose (model, column) target could not be attributed."""
+        return list(self._unattributable_tests)
+
     def _process_lineage(self, models: Dict[str, Model]) -> None:
         """Process and apply column lineage to models."""
         logger = logging.getLogger(__name__)
@@ -383,6 +489,7 @@ class ModelRegistry:
             self._process_lineage(models)
             self._apply_descriptions(models)
             exposures = self._load_exposures()
+            self._build_test_index()
             self._state = RegistryState(models=models, exposures=exposures, is_loaded=True)
         except Exception as e:
             raise RegistryError(f"Failed to load registry: {e}")

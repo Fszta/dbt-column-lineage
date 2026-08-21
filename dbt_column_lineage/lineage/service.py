@@ -20,6 +20,32 @@ _SEVERITY_RANK: Dict[str, int] = {"critical": 2, "low_impact": 1}
 # huge coverage gap doesn't bloat the impact payload. Totals stay in the integer counts.
 _IMPACT_CONFIDENCE_NAME_CAP = 100
 
+# A downstream column's ``transformation_type`` → the plain-language *mechanism* by which
+# the change reaches it. This is the machine-readable twin of the markdown's mechanism
+# split (derived recompute / row-set filter / pass-through): it lets an agent or the
+# Impact Report envelope reason over *how* impact propagates, not just how many nodes.
+_MECHANISM_LABELS: Dict[str, str] = {
+    "derived": "derived_recompute",
+    "filter": "rowset_filter",
+    "renamed": "renamed_passthrough",
+    "direct": "direct_passthrough",
+}
+
+
+def _mechanism_breakdown(affected_columns: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Count affected downstream columns by the mechanism that propagates the change.
+
+    Pure aggregation over the ``transformation_type`` each affected column already
+    carries — no new traversal. An unrecognized type is bucketed under its raw value so
+    nothing is silently dropped.
+    """
+    breakdown: Dict[str, int] = {}
+    for column in affected_columns:
+        raw = column.get("transformation_type") or "unknown"
+        label = _MECHANISM_LABELS.get(raw, raw)
+        breakdown[label] = breakdown.get(label, 0) + 1
+    return breakdown
+
 
 @dataclass
 class LineageSelector:
@@ -603,6 +629,7 @@ class LineageService:
                                 "type": exposure.type,
                                 "url": exposure.url,
                                 "description": exposure.description,
+                                "owner": exposure.owner,
                                 "depends_on_models": list(exposure.depends_on_models),
                             }
                         )
@@ -611,62 +638,74 @@ class LineageService:
                             f"Failed to process exposure {exposure_name} in impact analysis: {e}"
                         )
 
-            # Row-set (filter/join) dependents: models that reference this column ONLY in a
-            # predicate (WHERE / JOIN ON / HAVING / QUALIFY). They never project the value,
-            # so column-value lineage misses them — but changing the column's logic shifts
-            # which rows they keep, and therefore their aggregates. Surface them as a
-            # distinct 'filter' severity (skipping any already caught as a value impact).
+            # Row-set (filter/join) dependents: models that reference a column ONLY in a
+            # predicate (WHERE / JOIN ON / HAVING / QUALIFY, incl. a window ORDER BY). They
+            # never project the value, so column-value lineage misses them — but changing the
+            # column shifts which rows they keep (and which row a QUALIFY picks), and therefore
+            # their aggregates. Surface them as a distinct 'filter' severity.
+            #
+            # Crucially this is checked for EVERY value-carrying column in the lineage, not just
+            # the queried one: the change flows by value to each downstream column, and a model
+            # that filters on any of those has its row-set shifted too. (Without this, a source
+            # column renamed through staging and then used only in a downstream QUALIFY ... ORDER
+            # BY — e.g. "pick the first account by created_at" — is silently dropped.)
             filter_count = 0
             value_affected = set(affected_models.keys())
-            for fm_name in sorted(
-                self.registry.get_filter_dependents(f"{model_name}.{column_name}")
-            ):
-                if fm_name in value_affected:
-                    continue
-                try:
-                    fm = self.registry.get_model(fm_name)
-                except Exception:
-                    continue
-                affected_models.setdefault(
-                    fm_name,
-                    {
-                        "name": fm_name,
-                        "resource_type": getattr(fm, "resource_type", "model"),
-                        "schema": fm.schema_name,
-                        "database": fm.database,
-                        "description": fm.description,
-                    },
-                )
-                affected_columns.append(
-                    {
-                        "model": fm_name,
-                        "column": "(row-set)",
-                        "transformation_type": "filter",
-                        # The predicate condition the changed column appears in — the "why".
-                        "sql_expression": (fm.predicate_lineage or {}).get(
-                            f"{model_name}.{column_name}"
-                        ),
-                        "severity": "filter",
-                        "data_type": None,
-                        "description": None,
-                    }
-                )
-                filter_count += 1
-                for other_name in sorted(fm.downstream):
-                    try:
-                        exposure = self.registry.get_exposure(other_name)
-                    except (ValueError, KeyError):
+            value_columns = {(model_name, column_name)} | {
+                (c["model"], c["column"])
+                for c in affected_columns
+                if c.get("transformation_type") != "filter"
+            }
+            added_filter_models: set = set()
+            for src_model, src_col in sorted(value_columns):
+                src_key = f"{src_model}.{src_col}"
+                for fm_name in sorted(self.registry.get_filter_dependents(src_key)):
+                    if fm_name in value_affected or fm_name in added_filter_models:
                         continue
-                    if not any(e["name"] == exposure.name for e in affected_exposures):
-                        affected_exposures.append(
-                            {
-                                "name": exposure.name,
-                                "type": exposure.type,
-                                "url": exposure.url,
-                                "description": exposure.description,
-                                "depends_on_models": list(exposure.depends_on_models),
-                            }
-                        )
+                    try:
+                        fm = self.registry.get_model(fm_name)
+                    except Exception:
+                        continue
+                    added_filter_models.add(fm_name)
+                    affected_models.setdefault(
+                        fm_name,
+                        {
+                            "name": fm_name,
+                            "resource_type": getattr(fm, "resource_type", "model"),
+                            "schema": fm.schema_name,
+                            "database": fm.database,
+                            "description": fm.description,
+                        },
+                    )
+                    affected_columns.append(
+                        {
+                            "model": fm_name,
+                            "column": "(row-set)",
+                            "transformation_type": "filter",
+                            # The predicate condition the (value-reached) column appears in.
+                            "sql_expression": (fm.predicate_lineage or {}).get(src_key),
+                            "severity": "filter",
+                            "data_type": None,
+                            "description": None,
+                        }
+                    )
+                    filter_count += 1
+                    for other_name in sorted(fm.downstream):
+                        try:
+                            exposure = self.registry.get_exposure(other_name)
+                        except (ValueError, KeyError):
+                            continue
+                        if not any(e["name"] == exposure.name for e in affected_exposures):
+                            affected_exposures.append(
+                                {
+                                    "name": exposure.name,
+                                    "type": exposure.type,
+                                    "url": exposure.url,
+                                    "description": exposure.description,
+                                    "owner": exposure.owner,
+                                    "depends_on_models": list(exposure.depends_on_models),
+                                }
+                            )
 
             reachable = self._dag_reachable_models(model_name)
             confidence = self._impact_confidence(reachable, len(affected_models))
@@ -679,6 +718,7 @@ class LineageService:
                     "critical_count": critical_count,
                     "low_impact_count": potential_count,
                     "filter_count": filter_count,
+                    "by_mechanism": _mechanism_breakdown(affected_columns),
                 },
                 "affected_models": list(affected_models.values()),
                 "affected_columns": affected_columns,
@@ -789,7 +829,11 @@ class LineageService:
 
         deduped_columns = [affected_columns[key] for key in sorted(affected_columns)]
         critical_count = sum(1 for c in deduped_columns if c["severity"] == "critical")
-        low_impact_count = len(deduped_columns) - critical_count
+        # Row-set (filter/join) dependents are a distinct band, mirroring the single-column
+        # summary — without this key a filter-only changeset would read as SAFE in the JSON
+        # verdict while the markdown banner (which counts filter columns) says REVIEW.
+        filter_count = sum(1 for c in deduped_columns if c["severity"] == "filter")
+        low_impact_count = len(deduped_columns) - critical_count - filter_count
 
         # Guarded so a stub service without a real registry omits confidence rather than erroring.
         confidence: Optional[Dict[str, Any]] = None
@@ -806,7 +850,9 @@ class LineageService:
                 "affected_exposures": len(affected_exposures),
                 "critical_count": critical_count,
                 "low_impact_count": low_impact_count,
+                "filter_count": filter_count,
                 "unresolved_changes": unresolved,
+                "by_mechanism": _mechanism_breakdown(deduped_columns),
             },
             "affected_models": [affected_models[name] for name in sorted(affected_models)],
             "affected_columns": deduped_columns,

@@ -3,6 +3,19 @@ version: 2
 models:
   - name: stg_transactions
     description: "Staging model for raw transaction data. Cleanses and standardizes transaction records from the raw source, including type casting and column renaming."
+    columns:
+      - name: transaction_id
+        description: "Primary key of the staged transaction."
+        data_tests:
+          - not_null
+          - unique
+      - name: account_id
+        description: "Account the transaction belongs to."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_accounts')
+              field: account_id
 
   - name: stg_accounts
     description: "Staging model for account data. Transforms raw account information into a standardized format with proper data types."
@@ -11,11 +24,32 @@ models:
     columns:
       - name: account_id
         description: "Unique identifier for the account, cast to integer from the raw source id."
+        data_tests:
+          - not_null
+          - unique
       - name: account_holder
         description: "Name of the account holder."
+      - name: country_id
+        description: "Country the account is registered in."
+        data_tests:
+          - relationships:
+              to: ref('stg_countries')
+              field: country_id
 
   - name: stg_countries
     description: "Staging model for country reference data. Provides standardized country information used across the data warehouse."
+    columns:
+      - name: country_id
+        description: "Primary key of the country."
+        data_tests:
+          - not_null
+          - unique
 
   - name: stg_crypto_trades
     description: "Staging model for cryptocurrency trade data. Processes raw crypto trading information for downstream analytics."
+    columns:
+      - name: trade_id
+        description: "Primary key of the crypto trade."
+        data_tests:
+          - not_null
+          - unique

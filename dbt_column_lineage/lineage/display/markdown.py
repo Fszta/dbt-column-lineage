@@ -64,6 +64,36 @@ def _truncate_sql(raw: str) -> Tuple[str, str]:
     return head + " …", note
 
 
+def _format_break(b: Dict[str, Any]) -> str:
+    """One compiler-style diagnostic line for a provable break.
+
+    ``error[BREAK-TEST]`` — <removing|renaming> `model.column` breaks the **<kind>** test,
+    with the schema-file path the reviewer opens to fix it. A relationships test broken
+    through its referenced parent key is called out so the fix location is unambiguous.
+    """
+    verb = "renaming" if b.get("change_kind") == "renamed" else "removing"
+    node = f"`{b.get('change_model', '?')}.{b.get('change_column', '?')}`"
+    test_name = b.get("test_name", "?")
+    via = " (via its referenced key)" if b.get("via_reference") else ""
+    path = b.get("resource_path")
+    where = f" — `{path}`" if path else ""
+    return f"- `error[BREAK-TEST]` {verb} {node} breaks the **{test_name}** test{via}{where}"
+
+
+def _owner_suffix(exposure: Dict[str, Any]) -> str:
+    """A ' — owner: **Name**' clause routing the exposure to who must sign off.
+
+    dbt stores an exposure ``owner`` as ``{name, email}``. Surfacing it turns blast
+    radius into accountability — the reviewer knows who to ping without leaving the PR.
+    Returns "" when no owner is declared.
+    """
+    owner = exposure.get("owner") or {}
+    if not isinstance(owner, dict):
+        return ""
+    label = owner.get("name") or owner.get("email")
+    return f" — owner: **{label}**" if label else ""
+
+
 def _group_by_model(columns: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for column in columns:
@@ -130,9 +160,18 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
     filter_by_model = {c.get("model", "?"): c for c in filtered}
     review_models = sorted(set(derived_by_model) | set(filter_by_model))
     confidence = report.get("confidence") or {}
+    breaks = report.get("provable_breaks") or []
 
     # --- Verdict banner (the 5-second read) ----------------------------------------------
-    if review_models:
+    # A provable break (a dbt test the change orphans) is the only BLOCK-worthy signal; it
+    # outranks the heuristic review/safe banner below.
+    if breaks:
+        out.append(
+            f"> ⛔ **Blocked — {_plural(len(breaks), 'provable break')}.** "
+            f"This change orphans {_plural(len(breaks), 'dbt test')} that will fail on the "
+            f"next `dbt build`." + _confidence_floor_clause(confidence)
+        )
+    elif review_models:
         if len(changed_nodes) == 1:
             subject = f"**`{changed_nodes[0][0]}.{changed_nodes[0][1]}`**"
         elif changed_nodes:
@@ -181,6 +220,18 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         f"**{_plural(summary.get('affected_exposures', 0), 'exposure')}** downstream."
     )
     out.append("")
+
+    # --- ⛔ Provable breaks — the block-worthy diagnostics --------------------------------
+    if breaks:
+        out.append(f"### ⛔ Provable breaks ({len(breaks)})")
+        out.append("")
+        out.append(
+            "These fail on the next `dbt build` — a dbt test now targets a column this "
+            "change removed. Fix the test or restore the column."
+        )
+        out.append("")
+        out += [_format_break(b) for b in breaks]
+        out.append("")
 
     # --- 🔴 Output changes — the scannable table -----------------------------------------
     if review_models:
@@ -246,7 +297,8 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         def _fmt(exp: Dict[str, Any]) -> str:
             name = exp.get("name", "?")
             url = exp.get("url")
-            return f"- **[{name}]({url})**" if url else f"- **{name}**"
+            head = f"- **[{name}]({url})**" if url else f"- **{name}**"
+            return head + _owner_suffix(exp)
 
         if apps:
             out.append(
@@ -283,6 +335,14 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
     footer: List[str] = []
     if _structural_checks_skipped(report):
         footer.append(_STRUCTURAL_SKIP_NOTE)
+    # Break detection is a lower bound: tests it couldn't attribute to a column are never
+    # checked, so a clean (SAFE/REVIEW) ruling is not proof no test breaks.
+    unattributable = (report.get("verdict_coverage") or {}).get("unattributable_tests", 0)
+    if unattributable:
+        footer.append(
+            f"Break detection skipped {_plural(unattributable, 'dbt test')} it couldn't tie "
+            f"to a column (singular/custom tests); a clean ruling is a lower bound."
+        )
     if confidence:
         if confidence.get("level") == "full":
             footer.append(
