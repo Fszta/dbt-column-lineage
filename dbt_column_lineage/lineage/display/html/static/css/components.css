@@ -276,6 +276,48 @@
   transform: translate(1px, -1px);
 }
 
+/* "Show tests" toggle in the floating controls panel */
+.control-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--slate-600);
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.control-toggle:hover {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--slate-800);
+}
+
+.control-toggle input {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.control-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.control-toggle-label svg {
+  color: var(--slate-500);
+}
+
 @media (max-width: 768px) {
   .controls {
     bottom: 12px;

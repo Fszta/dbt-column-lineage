@@ -156,6 +156,28 @@
   stroke: none;
 }
 
+/* dbt-test badge on a column — muted, metadata-weight (never louder than lineage) */
+.column-test-badge-bg {
+  fill: var(--slate-100);
+  stroke: var(--slate-300);
+  stroke-width: 1;
+}
+
+.column-test-badge-icon {
+  stroke: var(--slate-500);
+}
+
+.column-test-badge-count {
+  fill: var(--slate-600);
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+
+.column-test-badge:hover .column-test-badge-bg {
+  fill: var(--slate-200);
+  stroke: var(--slate-400);
+}
+
 .column-type {
     font-size: 10px;
   fill: var(--slate-500);

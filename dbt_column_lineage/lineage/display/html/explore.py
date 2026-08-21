@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from pathlib import Path
 import uvicorn
 import logging
-from dbt_column_lineage.models.schema import Column, ColumnLineage
+from dbt_column_lineage.models.schema import Column, ColumnLineage, TestNode
 
 if TYPE_CHECKING:
     from dbt_column_lineage.lineage.service import LineageService
@@ -34,6 +34,9 @@ class GraphNode(BaseModel):
     # For row-set (filter/join/QUALIFY) dependents: the predicate the upstream column appears
     # in — the "why" behind a node that consumes the column without projecting its value.
     note: Optional[str] = None
+    # dbt tests (not_null / unique / relationships / ...) declared on this column — the
+    # guardrails a reviewer wants to see at a glance. Empty list = untested; None until enriched.
+    tests: Optional[List[Dict[str, Any]]] = None
 
 
 class GraphEdge(BaseModel):
@@ -283,7 +286,7 @@ class LineageExplorer:
                     return {"error": f"Column '{column}' not found in model '{model}'"}
 
                 impact_data = self.lineage_service.get_column_impact(model, column)
-                return impact_data
+                return self._enrich_impact_with_tests(impact_data)
             except ValueError as e:
                 # Handle specific value errors (e.g., model/column not found)
                 logger.warning(f"Impact analysis error for {model}.{column}: {e}")
@@ -326,9 +329,62 @@ class LineageExplorer:
             self._add_processed_data(upstream_refs, "upstream", main_node_id)
             self._add_processed_data(downstream_refs, "downstream")
             self._add_rowset_dependents()
+            self._attach_column_tests()
 
         except Exception as e:
             logger.error(f"Error processing lineage for {start_model}.{start_column}: {e}")
+
+    @staticmethod
+    def _serialize_test(test: TestNode) -> Dict[str, Any]:
+        """Flatten a :class:`TestNode` into the compact dict the frontend renders."""
+        return {
+            "test_name": test.test_name,
+            "unique_id": test.unique_id,
+            "resource_path": test.resource_path,
+            "referenced_model": test.referenced_model,
+            "referenced_column": test.referenced_column,
+        }
+
+    def _column_tests_payload(
+        self, model: Optional[str], column: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """The dbt tests declared on ``model.column`` (empty when untested/unknown).
+
+        Reuses the registry's prebuilt reverse index — never re-parses artifacts.
+        """
+        if not self.lineage_service or not model or not column:
+            return []
+        try:
+            tests = self.lineage_service.registry.get_column_tests(model, column)
+        except Exception as e:
+            logger.debug(f"Could not load tests for {model}.{column}: {e}")
+            return []
+        return [self._serialize_test(t) for t in tests]
+
+    def _enrich_impact_with_tests(self, impact_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Attach the tests covering each affected column to an impact payload.
+
+        Lets the impact panel show which guarantees a change threatens. Mutates and returns
+        the payload; a non-dict (e.g. an error) is passed through untouched.
+        """
+        if isinstance(impact_data, dict):
+            for affected in impact_data.get("affected_columns", []):
+                if isinstance(affected, dict):
+                    affected["tests"] = self._column_tests_payload(
+                        affected.get("model"), affected.get("column")
+                    )
+        return impact_data
+
+    def _attach_column_tests(self) -> None:
+        """Annotate every column node in the graph with the tests covering it.
+
+        A single post-pass over the assembled nodes keeps the (many) node-creation sites
+        untouched — each ``column`` node gets a ``tests`` list the UI shows behind the toggle.
+        """
+        for node in self.data.nodes:
+            if node.get("type") != "column":
+                continue
+            node["tests"] = self._column_tests_payload(node.get("model"), node.get("label"))
 
     def _add_rowset_dependents(self) -> None:
         """Add row-set (filter/join/QUALIFY) dependents as distinct nodes.

@@ -115,6 +115,16 @@
                 <button id="zoomOut">Zoom Out</button>
                 <button id="resetView">Reset View</button>
                 <button id="relayout">Re-layout</button>
+                <label class="control-toggle" for="showTestsToggle" title="Show dbt tests (not_null, unique, relationships, ...) on tested columns">
+                    <input type="checkbox" id="showTestsToggle">
+                    <span class="control-toggle-label">
+                        <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4.5 0.5 L9 2.1 V5.1 C9 7.9 7 9.8 4.5 10.5 C2 9.8 0 7.9 0 5.1 V2.1 Z"></path>
+                            <path d="M2.4 5.3 L4 6.9 L6.8 3.7"></path>
+                        </svg>
+                        Show tests
+                    </span>
+                </label>
             </div>
         </div>
         <div id="graph">
@@ -206,6 +216,34 @@
                     // Keep the D3 graph palette in sync for subsequent interactions
                     if (window.graphConfig && typeof resolveGraphColors === 'function') {
                         window.graphConfig.colors = resolveGraphColors();
+                    }
+                });
+            }
+
+            // "Show tests" toggle — reveals dbt-test indicators in the graph and the tests
+            // covering each column in the impact panel. Default OFF; choice persisted.
+            const testsToggle = document.getElementById('showTestsToggle');
+            if (testsToggle) {
+                let saved = false;
+                try { saved = localStorage.getItem('dbtcl-show-tests') === '1'; } catch (e) {}
+                const applyTestsState = function (on) {
+                    window.__showTests = on;
+                    document.body.classList.toggle('show-tests', on);
+                };
+                testsToggle.checked = saved;
+                applyTestsState(saved);
+                testsToggle.addEventListener('change', function () {
+                    const on = testsToggle.checked;
+                    applyTestsState(on);
+                    try { localStorage.setItem('dbtcl-show-tests', on ? '1' : '0'); } catch (e) {}
+                    // Re-render the graph so column badges reserve/release their space cleanly.
+                    if (window.__lastGraphData && typeof initGraph === 'function') {
+                        const inst = initGraph(window.__lastGraphData);
+                        // setGraphInstance shares the closure var behind the explore
+                        // controller's graphInstanceRef, so this keeps both in sync.
+                        if (window.app && window.app.setGraphInstance) {
+                            window.app.setGraphInstance(inst);
+                        }
                     }
                 });
             }
