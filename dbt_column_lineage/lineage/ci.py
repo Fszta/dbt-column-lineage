@@ -42,6 +42,7 @@ class FailOn(str, Enum):
     """
 
     NONE = "none"  # never fail — comment only
+    TESTS = "tests"  # fail only on a PROVABLE break (a dbt test the change orphans)
     EXPOSURES = "exposures"  # fail if a business-facing exposure is affected
     CRITICAL = "critical"  # fail if a downstream column recomputes derived logic
     ANY = "any"  # fail if the change touches anything downstream
@@ -57,6 +58,8 @@ def gate_exit_code(summary: Dict[str, Any], fail_on: FailOn) -> int:
     Returns ``1`` when the policy is tripped, ``0`` otherwise. An empty/missing
     summary is always a pass — no impact never blocks.
     """
+    if fail_on == FailOn.TESTS:
+        return 1 if summary.get("provable_break_count", 0) > 0 else 0
     if fail_on == FailOn.EXPOSURES:
         return 1 if summary.get("affected_exposures", 0) > 0 else 0
     if fail_on == FailOn.CRITICAL:
@@ -76,10 +79,11 @@ def highest_tripped_level(summary: Dict[str, Any]) -> str:
 
     Walks the blocking policies from most to least severe and returns the first whose
     gate condition is met, so downstream workflow steps can branch on the real reach of
-    a change (``exposures`` > ``critical`` > ``any``) independently of the configured
-    ``fail-on``. Returns ``"none"`` when nothing downstream is touched.
+    a change (``tests`` > ``exposures`` > ``critical`` > ``any``) independently of the
+    configured ``fail-on``. A provable break (``tests``) is the most severe. Returns
+    ``"none"`` when nothing downstream is touched.
     """
-    for level in (FailOn.EXPOSURES, FailOn.CRITICAL, FailOn.ANY):
+    for level in (FailOn.TESTS, FailOn.EXPOSURES, FailOn.CRITICAL, FailOn.ANY):
         if gate_exit_code(summary, level):
             return level.value
     return FailOn.NONE.value
@@ -102,6 +106,8 @@ def write_github_outputs(report: Dict[str, Any]) -> bool:
         "affected_models": int(summary.get("affected_models", 0)),
         "affected_columns": int(summary.get("affected_columns", 0)),
         "affected_exposures": int(summary.get("affected_exposures", 0)),
+        "provable_breaks": int(summary.get("provable_break_count", 0)),
+        "verdict": str(report.get("verdict", "")),
         "tripped_level": highest_tripped_level(summary),
     }
     try:

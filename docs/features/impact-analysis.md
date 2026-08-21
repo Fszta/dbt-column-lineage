@@ -57,7 +57,9 @@ The action exposes the impact result so later workflow steps can react to it:
 | `affected_models` | Number of downstream models whose output is affected by the change. |
 | `affected_columns` | Number of downstream columns affected. |
 | `affected_exposures` | Number of business-facing exposures (dashboards/apps) affected. |
-| `tripped_level` | Highest severity band reached — `none`, `any`, `critical`, or `exposures`. |
+| `provable_breaks` | Number of dbt tests the change orphans (will fail on the next `dbt build`). |
+| `verdict` | Overall ruling — `safe`, `review`, or `block`. |
+| `tripped_level` | Highest severity band reached — `none`, `any`, `critical`, `exposures`, or `tests`. |
 
 Give the action an `id` and read `steps.<id>.outputs.*` in a later step:
 

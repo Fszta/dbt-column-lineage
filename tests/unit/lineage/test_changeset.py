@@ -532,6 +532,105 @@ def test_markdown_renders_filter_section_for_row_set_impact():
     assert "passes through unchanged" not in md
 
 
+def test_markdown_routes_exposure_to_its_owner():
+    """Each affected exposure is routed to the owner who must sign off (dbt owner.name)."""
+    exposures = [
+        {
+            "name": "Finance Dashboard",
+            "type": "dashboard",
+            "url": "https://x",
+            "description": None,
+            "owner": {"name": "Jane Doe", "email": "jane@example.com"},
+            "depends_on_models": ["dm"],
+        },
+        {
+            "name": "Billing API",
+            "type": "application",
+            "url": None,
+            "description": None,
+            "owner": {"email": "platform@example.com"},  # name absent → falls back to email
+            "depends_on_models": ["dm"],
+        },
+    ]
+    aggregated = _impact([{"name": "dm"}], [], exposures)
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
+    )
+    md = render_changeset_markdown(report)
+
+    assert "owner: **Jane Doe**" in md
+    assert "owner: **platform@example.com**" in md  # email fallback when name absent
+
+
+def test_markdown_omits_owner_clause_when_no_owner_declared():
+    exposures = [
+        {
+            "name": "Ownerless Dashboard",
+            "type": "dashboard",
+            "url": "https://x",
+            "description": None,
+            "owner": None,
+            "depends_on_models": ["dm"],
+        }
+    ]
+    aggregated = _impact([{"name": "dm"}], [], exposures)
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
+    )
+    md = render_changeset_markdown(report)
+
+    assert "Ownerless Dashboard" in md
+    assert "owner:" not in md
+
+
+def test_markdown_renders_block_verdict_and_provable_breaks():
+    """A provable break drives a ⛔ BLOCK banner + a compiler-style diagnostics section."""
+    aggregated = _impact([{"name": "dm"}], [], [])
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("orders", "customer_id", ChangeKind.REMOVED)], aggregated
+    )
+    report["provable_breaks"] = [
+        {
+            "break_kind": "break_test",
+            "change_model": "orders",
+            "change_column": "customer_id",
+            "change_kind": "removed",
+            "test_name": "not_null",
+            "test_unique_id": "test.pkg.not_null_orders_customer_id",
+            "resource_path": "models/marts/_orders.yml",
+            "via_reference": False,
+        }
+    ]
+    report["verdict"] = "block"
+    md = render_changeset_markdown(report)
+
+    assert "Blocked" in md and "provable break" in md
+    # The block banner outranks the heuristic safe/review banner.
+    assert "Looks safe" not in md
+    assert "### ⛔ Provable breaks (1)" in md
+    # Compiler-style diagnostic names the exact test, change, and file to fix.
+    assert "`error[BREAK-TEST]`" in md
+    assert "removing `orders.customer_id`" in md
+    assert "**not_null**" in md
+    assert "`models/marts/_orders.yml`" in md
+
+
+def test_markdown_without_breaks_is_unchanged_safe_banner():
+    """No provable_breaks key → falls back to the existing safe/review banner (compatibility)."""
+    aggregated = _impact([{"name": "dm"}], [], [])
+    aggregated["by_change"] = []
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
+    )
+    md = render_changeset_markdown(report)
+
+    assert "Provable breaks" not in md
+    assert "Looks safe" in md
+
+
 def test_markdown_notes_skipped_structural_checks_without_catalog():
     aggregated = _impact([{"name": "dm"}], [], [])
     aggregated["by_change"] = []

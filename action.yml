@@ -31,7 +31,10 @@ inputs:
     required: false
     default: ""
   fail-on:
-    description: "Severity gate: none | exposures | critical | any (default 'none' = warn only, never block)"
+    description: >-
+      Severity gate: none | tests | exposures | critical | any (default 'none' = warn only,
+      never block). 'tests' fails only on a provable break (a dbt test the change orphans) —
+      the safe level to block on; requires base-manifest.
     default: "none"
   adapter:
     description: "Override the sqlglot dialect (e.g. snowflake, bigquery, tsql)"
@@ -62,10 +65,18 @@ outputs:
   affected_exposures:
     description: "Number of business-facing exposures (dashboards/apps) affected."
     value: ${{ steps.impact.outputs.affected_exposures }}
+  provable_breaks:
+    description: >-
+      Number of provable breaks — dbt tests the change orphans that will fail on the next
+      `dbt build`. The block-worthy signal behind `fail-on: tests`.
+    value: ${{ steps.impact.outputs.provable_breaks }}
+  verdict:
+    description: "Overall ruling for the change: safe | review | block."
+    value: ${{ steps.impact.outputs.verdict }}
   tripped_level:
     description: >-
       Highest impact severity the change reaches, in gate terms:
-      exposures | critical | any | none.
+      tests | exposures | critical | any | none.
     value: ${{ steps.impact.outputs.tripped_level }}
 
 runs:

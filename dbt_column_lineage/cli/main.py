@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 import click
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from dbt_column_lineage.lineage.changeset import (
     ChangesetBuilder,
@@ -13,6 +13,7 @@ from dbt_column_lineage.lineage.changeset import (
     git_changed_models,
     scope_changes_to_models,
 )
+from dbt_column_lineage.lineage.verdict import classify_provable_breaks, decide_verdict
 from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay, JsonDisplay
 from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
 from dbt_column_lineage.lineage.display.markdown import render_changeset_markdown
@@ -218,10 +219,11 @@ def cli(
 )
 @click.option(
     "--fail-on",
-    type=click.Choice(["none", "exposures", "critical", "any"]),
+    type=click.Choice(["none", "tests", "exposures", "critical", "any"]),
     default="none",
-    help="Severity gate for --ci: fail (exit 1) when the impact reaches this "
-    "level. Defaults to 'none' (warn only, never block).",
+    help="Severity gate for --ci: fail (exit 1) when the impact reaches this level. "
+    "'tests' fails only on a provable break (a dbt test the change orphans) — the "
+    "safe level to block on. Defaults to 'none' (warn only, never block).",
 )
 @click.option(
     "--github-token",
@@ -318,10 +320,38 @@ def impact(
             )
             sys.exit(1)
 
+        if fail_on == "tests" and base_service is None:
+            click.echo(
+                "Warning: --fail-on tests needs a two-manifest diff (--base-manifest). The "
+                "git-diff fallback only detects logic changes, so no provable break can be "
+                "found and the gate will never fire.",
+                err=True,
+            )
+
         aggregated = head_service.get_changeset_impact(changes, base_service=base_service)
         report = build_changeset_report(source, changes, aggregated)
         report["coverage"] = head_service.get_coverage().model_dump()
         report["structural_checks_available"] = structural_checks_available
+
+        # Provable breaks + the SAFE/REVIEW/BLOCK ruling. Base registry (when present) is the
+        # reliable source of the tests that existed before the change.
+        breaks = classify_provable_breaks(
+            changes,
+            head_service.registry,
+            base_service.registry if base_service else None,
+        )
+        report["provable_breaks"] = [b.model_dump() for b in breaks]
+        summary_obj = report.get("summary", {})
+        summary: Dict[str, Any] = summary_obj if isinstance(summary_obj, dict) else {}
+        report["verdict"] = decide_verdict(breaks, summary)
+        # Expose the count in the summary so the CI gate (--fail-on tests) can read it.
+        summary["provable_break_count"] = len(breaks)
+        # Honesty: break detection only sees catalog-backed models and tests it could
+        # attribute to a column. Surface the blind spots so a SAFE ruling reads as a lower
+        # bound, not a guarantee.
+        report["verdict_coverage"] = {
+            "unattributable_tests": head_service.registry.get_unattributable_test_count(),
+        }
 
         if format == "json":
             click.echo(json.dumps(report, indent=2, sort_keys=False))
