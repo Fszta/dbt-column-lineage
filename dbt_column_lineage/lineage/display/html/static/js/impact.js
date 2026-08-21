@@ -5,6 +5,31 @@ const ImpactModule = (function() {
         return div.innerHTML;
     }
 
+    // The dbt tests covering an affected column — the guarantees a change threatens.
+    // Gated behind the "Show tests" toggle via the body.show-tests class (see impact.css).
+    function testGuardrailsHtml(tests) {
+        if (!tests || tests.length === 0) return '';
+        const pills = tests.map(t => {
+            const label = t.test_name || 'test';
+            let title = label;
+            if (t.test_name === 'relationships' && t.referenced_model) {
+                const ref = t.referenced_column
+                    ? `${t.referenced_model}.${t.referenced_column}`
+                    : t.referenced_model;
+                title = `relationships → ${ref}`;
+            }
+            return `<span class="test-pill" title="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
+        }).join('');
+        return `
+            <div class="column-test-guardrails">
+                <span class="test-guardrails-label">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 0.5 L10.5 2.1 V5.1 C10.5 7.9 8.5 9.8 6 10.5 C3.5 9.8 1.5 7.9 1.5 5.1 V2.1 Z"></path><path d="M3.9 5.3 L5.5 6.9 L8.3 3.7"></path></svg>
+                    Tests
+                </span>
+                <span class="test-pill-group">${pills}</span>
+            </div>`;
+    }
+
     // Coverage is a property of the loaded artifacts (not of a single column), so
     // fetch it once and memoize the promise for every panel that wants to show it.
     let coveragePromise = null;
@@ -302,6 +327,7 @@ const ImpactModule = (function() {
                             ${col.description ? `
                                 <p class="column-card-description">${escapeHtml(col.description)}</p>
                             ` : ''}
+                            ${testGuardrailsHtml(col.tests)}
                             ${col.sql_expression ? `
                                 <div class="column-card-body">
                                     <div class="sql-expression-card">
@@ -488,6 +514,7 @@ const ImpactModule = (function() {
                         ${col.description ? `
                             <p class="column-card-description">${escapeHtml(col.description)}</p>
                         ` : ''}
+                        ${testGuardrailsHtml(col.tests)}
                     </div>
                 `;
             });

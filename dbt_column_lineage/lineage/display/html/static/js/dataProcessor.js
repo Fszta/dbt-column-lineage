@@ -76,7 +76,8 @@ function processData(data, state) {
                 name: node.label,
                 id: node.id,
                 dataType: node.data_type,
-                isKey: node.is_key || false
+                isKey: node.is_key || false,
+                tests: node.tests || []
             });
         } else if (node.type === 'exposure') {
             if (!exposureGroups[node.model]) {

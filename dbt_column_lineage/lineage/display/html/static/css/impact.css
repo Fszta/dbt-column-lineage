@@ -4,6 +4,54 @@
     margin-top: 12px;
 }
 
+/* dbt tests covering an affected column — shown only when "Show tests" is on. */
+.column-test-guardrails {
+    display: none;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+body.show-tests .column-test-guardrails {
+    display: flex;
+}
+
+.test-guardrails-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.test-guardrails-label svg {
+    color: var(--slate-500);
+}
+
+.test-pill-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.test-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--slate-100);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
 .action-buttons button {
     flex: 1;
 }

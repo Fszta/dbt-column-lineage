@@ -5,6 +5,12 @@
 function initGraph(data) {
     const graphElement = document.getElementById('graph');
 
+    // Cache the last non-empty payload so UI toggles (e.g. "Show tests") can re-render the
+    // graph from the same data without another round-trip.
+    if (data && data.nodes && data.edges && data.nodes.length > 0) {
+        window.__lastGraphData = data;
+    }
+
     const impactCard = document.getElementById('impactAnalysisCard');
     const relationshipSummaryCard = document.getElementById('relationshipSummaryCard');
     const emptyState = document.getElementById('graphEmptyState');

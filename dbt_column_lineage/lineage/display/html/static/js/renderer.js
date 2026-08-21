@@ -781,6 +781,39 @@ function drawColumns(nodes, state, config, onColumnClick) {
                 nameAvailableWidth = xPosition - nameX - nameTagGap;
             }
 
+            // --- Test badge geometry (guardrails on the column, shown behind the toggle) ---
+            // Reserve space to the LEFT of the type tag so the name truncates around it.
+            let testBadgeInfo = null;
+            const showTests = (typeof window !== 'undefined') && window.__showTests;
+            if (showTests && col.tests && col.tests.length > 0) {
+                const safetyMargin = 8;
+                const badgeGap = 6;
+                const badgePadX = 5;
+                const iconW = 9;
+                const iconGap = 3;
+
+                const countText = String(col.tests.length);
+                const tempCount = columnGroup.append('text')
+                    .attr('font-size', '10px')
+                    .attr('font-weight', '600')
+                    .text(countText)
+                    .style('visibility', 'hidden');
+                const countWidth = tempCount.node().getComputedTextLength();
+                tempCount.remove();
+
+                const badgeWidth = badgePadX * 2 + iconW + iconGap + countWidth;
+                // Right anchor: the tag's left edge if a tag exists, else the box's right edge.
+                const rightAnchor = tagInfo
+                    ? tagInfo.xPosition
+                    : (config.box.width - (config.box.padding * 2) - safetyMargin);
+                const badgeX = rightAnchor - badgeGap - badgeWidth;
+                const badgeY = (config.box.columnHeight - config.box.columnPadding) / 2;
+
+                testBadgeInfo = { badgeWidth, badgeX, badgeY, iconW, iconGap, badgePadX, countText };
+                // Shrink the name so it never overlaps the badge.
+                nameAvailableWidth = Math.max(0, badgeX - nameX - nameTagGap);
+            }
+
             // --- Column Name Text (pixel-width truncation, matching model-title) ---
             const columnNameText = columnGroup.append('text')
                 .attr('class', 'column-name')
@@ -831,6 +864,68 @@ function drawColumns(nodes, state, config, onColumnClick) {
                     .style('font-size', '11px')
                     .style('font-weight', '500')
                     .text(shortType);
+            }
+
+            // --- Test badge (drawn after name + tag so it sits on top) ---
+            if (testBadgeInfo) {
+                const { badgeWidth, badgeX, badgeY, iconW, iconGap, badgePadX, countText } = testBadgeInfo;
+                const badgeHeight = 16;
+
+                const badgeGroup = columnGroup.append('g')
+                    .attr('class', 'column-test-badge')
+                    .attr('transform', `translate(${badgeX}, 0)`)
+                    .style('cursor', 'default');
+
+                badgeGroup.append('rect')
+                    .attr('class', 'column-test-badge-bg')
+                    .attr('rx', 4)
+                    .attr('ry', 4)
+                    .attr('width', badgeWidth)
+                    .attr('height', badgeHeight)
+                    .attr('y', badgeY - badgeHeight / 2);
+
+                // Shield-check glyph: a guardrail metaphor, kept small and muted.
+                const iconX = badgePadX;
+                const iconTop = badgeY - 5;
+                badgeGroup.append('path')
+                    .attr('class', 'column-test-badge-icon')
+                    .attr('fill', 'none')
+                    .attr('stroke-width', 1.3)
+                    .attr('stroke-linecap', 'round')
+                    .attr('stroke-linejoin', 'round')
+                    .attr('transform', `translate(${iconX}, ${iconTop})`)
+                    .attr('d', 'M4.5 0 L9 1.6 V4.6 C9 7.4 7 9.3 4.5 10 C2 9.3 0 7.4 0 4.6 V1.6 Z M2.4 4.8 L4 6.4 L6.8 3.2');
+
+                badgeGroup.append('text')
+                    .attr('class', 'column-test-badge-count')
+                    .attr('x', badgePadX + iconW + iconGap)
+                    .attr('y', badgeY)
+                    .attr('dominant-baseline', 'central')
+                    .attr('dy', '0.02em')
+                    .attr('font-size', '10px')
+                    .attr('font-weight', '600')
+                    .text(countText);
+
+                const tipNames = col.tests.map(t => {
+                    if (t.test_name === 'relationships' && t.referenced_model) {
+                        const ref = t.referenced_column
+                            ? `${t.referenced_model}.${t.referenced_column}`
+                            : t.referenced_model;
+                        return `relationships → ${ref}`;
+                    }
+                    return t.test_name;
+                }).join(', ');
+                const tipText = `Tests (${col.tests.length}): ${tipNames}`;
+
+                badgeGroup
+                    .on('mouseenter', function(event) { showTooltip(event, tipText); })
+                    .on('mousemove', function(event) {
+                        const tt = createTooltip();
+                        const x = (event.pageX !== undefined ? event.pageX : event.clientX + window.scrollX);
+                        const y = (event.pageY !== undefined ? event.pageY : event.clientY + window.scrollY);
+                        tt.style('left', (x + 10) + 'px').style('top', (y - 10) + 'px');
+                    })
+                    .on('mouseleave', function() { hideTooltip(); });
             }
 
             // Calculate and store column position for edge connections
