@@ -236,3 +236,142 @@ function hideTooltip() {
             .style('opacity', 0);
     }
 }
+
+// --- Minimal, dependency-free Markdown renderer -------------------------------------------
+// dbt descriptions are authored as Markdown most of the time; render the common subset
+// (headings, bold/italic, inline + fenced code, links, ordered/unordered lists, paragraphs)
+// as HTML. Self-contained on purpose: the explorer ships no external JS and runs offline.
+// Input is HTML-escaped FIRST, so raw HTML/scripts in a description can never execute; only
+// the tags this renderer emits are produced. Returns an HTML string for `.markdown-body`.
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Only allow safe link schemes (block javascript:, data:, etc.). Accepts http(s), mailto,
+// and relative/anchor links. `url` is already HTML-escaped by the caller.
+function safeHref(url) {
+    const raw = url.trim();
+    if (/^(https?:\/\/|mailto:|\/|#|\.\/|\.\.\/)/i.test(raw)) return raw;
+    return null;
+}
+
+function renderInlineMarkdown(text) {
+    // `text` is already HTML-escaped. Protect inline code spans from other transforms by
+    // stashing them behind placeholders, transform the rest, then restore.
+    const codeSpans = [];
+    let s = text.replace(/`([^`]+)`/g, function (_, code) {
+        codeSpans.push(code);
+        return '\u0000' + (codeSpans.length - 1) + '\u0000';
+    });
+
+    // Links: [label](url) — validate the scheme.
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (m, label, url) {
+        const href = safeHref(url);
+        if (!href) return label;
+        return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+    });
+
+    // Bold before italic so ** / __ win over single * / _.
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    s = s.replace(/(^|[^\w])_([^_\n]+)_(?=[^\w]|$)/g, '$1<em>$2</em>');
+
+    // Restore code spans.
+    s = s.replace(/\u0000(\d+)\u0000/g, function (_, i) {
+        return '<code>' + codeSpans[Number(i)] + '</code>';
+    });
+    return s;
+}
+
+function renderMarkdown(text) {
+    if (!text) return '';
+    const lines = escapeHtml(text).replace(/\r\n?/g, '\n').split('\n');
+    const html = [];
+    let i = 0;
+    let paragraph = [];
+    let listType = null; // 'ul' | 'ol' | null
+
+    const flushParagraph = function () {
+        if (paragraph.length) {
+            html.push('<p>' + renderInlineMarkdown(paragraph.join(' ')) + '</p>');
+            paragraph = [];
+        }
+    };
+    const closeList = function () {
+        if (listType) {
+            html.push('</' + listType + '>');
+            listType = null;
+        }
+    };
+
+    while (i < lines.length) {
+        const line = lines[i];
+
+        // Fenced code block ```
+        const fence = line.match(/^\s*```/);
+        if (fence) {
+            flushParagraph();
+            closeList();
+            const code = [];
+            i++;
+            while (i < lines.length && !/^\s*```/.test(lines[i])) {
+                code.push(lines[i]);
+                i++;
+            }
+            i++; // skip closing fence
+            html.push('<pre><code>' + code.join('\n') + '</code></pre>');
+            continue;
+        }
+
+        // Heading  #..######
+        const heading = line.match(/^\s*(#{1,6})\s+(.*)$/);
+        if (heading) {
+            flushParagraph();
+            closeList();
+            const level = heading[1].length;
+            html.push('<h' + level + '>' + renderInlineMarkdown(heading[2].trim()) + '</h' + level + '>');
+            i++;
+            continue;
+        }
+
+        // List items  - / * / +  and  1.
+        const ul = line.match(/^\s*[-*+]\s+(.*)$/);
+        const ol = line.match(/^\s*\d+\.\s+(.*)$/);
+        if (ul || ol) {
+            flushParagraph();
+            const wanted = ul ? 'ul' : 'ol';
+            if (listType !== wanted) {
+                closeList();
+                html.push('<' + wanted + '>');
+                listType = wanted;
+            }
+            html.push('<li>' + renderInlineMarkdown((ul || ol)[1].trim()) + '</li>');
+            i++;
+            continue;
+        }
+
+        // Blank line: paragraph / list boundary
+        if (/^\s*$/.test(line)) {
+            flushParagraph();
+            closeList();
+            i++;
+            continue;
+        }
+
+        // Plain text -> accumulate into the current paragraph
+        closeList();
+        paragraph.push(line.trim());
+        i++;
+    }
+
+    flushParagraph();
+    closeList();
+    return html.join('\n');
+}
