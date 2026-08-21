@@ -18,7 +18,7 @@
         <link rel="prev" href="../../getting-started/quickstart/">
       
       
-        <link rel="next" href="../../changelog/">
+        <link rel="next" href="../../reference/json-output/">
       
       
         
@@ -270,6 +270,26 @@
   
   
   Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/json-output/" class="md-tabs__link">
+          
+  
+  
+  Reference
 
         </a>
       </li>
@@ -703,6 +723,95 @@
   
   
   
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../../changelog/" class="md-nav__link">
         
@@ -813,8 +922,16 @@ to wire it up.</p>
 <td>Number of business-facing exposures (dashboards/apps) affected.</td>
 </tr>
 <tr>
+<td><code>provable_breaks</code></td>
+<td>Number of dbt tests the change orphans (will fail on the next <code>dbt build</code>).</td>
+</tr>
+<tr>
+<td><code>verdict</code></td>
+<td>Overall ruling — <code>safe</code>, <code>review</code>, or <code>block</code>.</td>
+</tr>
+<tr>
 <td><code>tripped_level</code></td>
-<td>Highest severity band reached — <code>none</code>, <code>any</code>, <code>critical</code>, or <code>exposures</code>.</td>
+<td>Highest severity band reached — <code>none</code>, <code>any</code>, <code>critical</code>, <code>exposures</code>, or <code>tests</code>.</td>
 </tr>
 </tbody>
 </table>
