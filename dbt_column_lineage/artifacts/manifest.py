@@ -1,9 +1,41 @@
 import json
 import os
+import re
 from typing import Dict, List, Optional, Set, Any
 from pathlib import Path
 
 from dbt_column_lineage.artifacts.adapter_mapping import normalize_adapter
+from dbt_column_lineage.models.schema import TestNode
+
+
+# Matches the quoted name(s) inside a dbt ``ref(...)`` expression, e.g.
+# ``ref('stg_accounts')`` or ``ref('my_pkg', 'stg_accounts')``. The *last* quoted
+# token is the model name (the first, when present, is the package).
+_REF_QUOTED_RE = re.compile(r"""['"]([^'"]+)['"]""")
+
+
+def _model_name_from_ref(ref_expr: Optional[str]) -> Optional[str]:
+    """Extract the model name from a dbt ``ref(...)`` expression string.
+
+    Returns ``None`` when nothing quoted can be found (e.g. a ``source(...)`` target
+    or an unexpected shape) rather than guessing.
+    """
+    if not ref_expr:
+        return None
+    matches = _REF_QUOTED_RE.findall(ref_expr)
+    if not matches:
+        return None
+    return matches[-1].lower()
+
+
+def _model_name_from_unique_id(unique_id: Optional[str]) -> Optional[str]:
+    """Return the lowercased model name from a ``model.<pkg>.<name>`` unique_id."""
+    if not unique_id:
+        return None
+    parts = unique_id.split(".")
+    if parts[0] != "model":
+        return None
+    return parts[-1].lower()
 
 
 class ManifestReader:
@@ -226,6 +258,79 @@ class ManifestReader:
         if node is None:
             return None
         return dict(node)
+
+    def get_tests(self) -> List[TestNode]:
+        """Read dbt test nodes (``resource_type == "test"``) from the manifest.
+
+        We never run the tests; we read what they *declare*. For each test we extract:
+        its ``unique_id``; the test kind (``test_metadata.name`` — not_null / unique /
+        relationships / ...); the target column (top-level ``column_name``, falling back
+        to ``test_metadata.kwargs.column_name``); the target model (from ``attached_node``,
+        falling back to the sole model in ``depends_on.nodes``); for ``relationships``
+        tests the referenced model/column (``kwargs.to`` / ``kwargs.field``); and the
+        ``original_file_path``.
+
+        Tests whose target column or model cannot be attributed are kept with the
+        unknown field set to ``None`` (never guessed), so the reverse index can report
+        coverage honestly.
+        """
+        tests: List[TestNode] = []
+
+        for node_id, node in self.manifest.get("nodes", {}).items():
+            if node.get("resource_type") != "test":
+                continue
+
+            test_metadata = node.get("test_metadata") or {}
+            test_name = test_metadata.get("name")
+            if not test_name:
+                # Singular / custom SQL tests carry no ``test_metadata`` and no declared
+                # column target. They CAN break on a column removal, but we can't know which
+                # columns they touch without parsing the test SQL, so they're out of scope
+                # for the column-level index — an unavoidable blind spot, not a safe one.
+                continue
+
+            kwargs = test_metadata.get("kwargs") or {}
+
+            target_column = node.get("column_name") or kwargs.get("column_name")
+            if isinstance(target_column, str):
+                target_column = target_column.lower()
+            else:
+                target_column = None
+
+            target_model = _model_name_from_unique_id(node.get("attached_node"))
+            if target_model is None:
+                model_deps = [
+                    _model_name_from_unique_id(dep)
+                    for dep in node.get("depends_on", {}).get("nodes", [])
+                ]
+                model_deps = [m for m in model_deps if m is not None]
+                # Only attribute when unambiguous. A ``relationships`` test depends on
+                # two models, so without ``attached_node`` we cannot tell which side is
+                # the target — leave it unknown rather than guess.
+                if len(model_deps) == 1:
+                    target_model = model_deps[0]
+
+            referenced_model: Optional[str] = None
+            referenced_column: Optional[str] = None
+            if test_name == "relationships":
+                referenced_model = _model_name_from_ref(kwargs.get("to"))
+                field = kwargs.get("field")
+                if isinstance(field, str):
+                    referenced_column = field.lower()
+
+            tests.append(
+                TestNode(
+                    unique_id=node.get("unique_id") or node_id,
+                    test_name=test_name,
+                    target_model=target_model,
+                    target_column=target_column,
+                    referenced_model=referenced_model,
+                    referenced_column=referenced_column,
+                    resource_path=node.get("original_file_path"),
+                )
+            )
+
+        return tests
 
     def get_exposures(self) -> Dict[str, Dict[str, Any]]:
         """Get all exposures from the manifest.
