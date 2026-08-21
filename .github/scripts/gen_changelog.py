@@ -39,6 +39,11 @@ def main() -> int:
     new_version = sys.argv[1].lstrip("v")
     prev_tag = sys.argv[2] if len(sys.argv) > 2 else ""
 
+    # Defensive: a `git describe` long form (v0.14.0-27-g<sha>) resolves back to
+    # HEAD, which would make the commit range empty and blank the changelog.
+    # Strip the "-<n>-g<sha>" suffix so only the bare tag is used as the range base.
+    prev_tag = re.sub(r"-\d+-g[0-9a-f]+$", "", prev_tag)
+
     server = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
     repo = os.environ.get("GITHUB_REPOSITORY", "Fszta/dbt-column-lineage")
     repo_url = f"{server}/{repo}"
