@@ -297,6 +297,7 @@ function expandDownstreamInternal(modelName, state, config) {
                     let detailRows = 0;
                     if (exposureData.type) detailRows++;
                     if (exposureData.url) detailRows++;
+                    if (exposureData.rowset && exposureData.note) detailRows++;
                     item.height = config.box.titleHeight +
                                   (detailRows * config.box.columnHeight) +
                                   config.box.padding;
@@ -358,6 +359,7 @@ function expandDownstreamInternal(modelName, state, config) {
                 let detailRows = 0;
                 if (exposureData.type) detailRows++;
                 if (exposureData.url) detailRows++;
+                if (exposureData.rowset && exposureData.note) detailRows++;
                 exposure.height = config.box.titleHeight +
                                   (detailRows * config.box.columnHeight) +
                                   config.box.padding;
