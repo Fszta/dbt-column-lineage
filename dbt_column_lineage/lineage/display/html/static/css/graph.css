@@ -78,6 +78,47 @@
   stroke: var(--primary);
 }
 
+/* "+N more" progressive-disclosure node: a neutral, muted, dashed control that
+   reads clearly as NOT a real model/exposure. Follows theme via CSS variables. */
+.more-node {
+  transition: filter 0.2s ease;
+}
+
+.more-node-box {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 1.5px;
+  stroke-dasharray: 6 4;
+  transition: fill 0.15s ease, stroke 0.15s ease;
+}
+
+.more-node:hover .more-node-box {
+  fill: var(--surface-hover);
+  stroke: var(--primary);
+}
+
+.more-node-count {
+  fill: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+}
+
+.more-node:hover .more-node-count {
+  fill: var(--primary);
+}
+
+.more-node-hint {
+  fill: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
 .columns-header rect {
   fill: var(--slate-50);
   transition: fill 0.15s ease;

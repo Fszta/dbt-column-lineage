@@ -3,6 +3,19 @@
  */
 
 /**
+ * Progressive-disclosure caps. When a column's fan-out exceeds these, only the
+ * first N nodes of a group render by default and the overflow collapses behind a
+ * distinct "+N more" node (see dataProcessor.initializeVisibility / renderer.drawMoreNodes).
+ * Tune the defaults here — kept intentionally readable (~8) so the initial view stays legible.
+ */
+const GRAPH_NODE_LIMITS = {
+    // Max direct downstream MODELS shown off the focused column before collapsing.
+    maxDownstreamModels: 8,
+    // Max EXPOSURES (incl. row-set dependents) shown before collapsing.
+    maxExposures: 8,
+};
+
+/**
  * Resolve the graph palette from CSS custom properties on :root so the D3
  * canvas follows the active (light/dark) theme. Falls back to the light
  * values if a variable is missing.
