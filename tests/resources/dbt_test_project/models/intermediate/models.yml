@@ -5,11 +5,28 @@ models:
     description: "Intermediate model that enriches transaction data with account holder information and categorizes transaction amounts. Adds monthly aggregation and amount categorization logic."
     config:
       tags: ['PII']
+    columns:
+      - name: transaction_id
+        description: "Primary key of the enriched transaction."
+        data_tests:
+          - not_null
+          - unique
 
   - name: int_monthly_account_metrics
     description: "Intermediate model calculating monthly metrics per account, including transaction counts, total amounts, and average transaction values."
     config:
       tags: ['PII']
+    columns:
+      - name: account_id
+        description: "Account the monthly metrics are computed for."
+        data_tests:
+          - not_null
 
   - name: int_trade_flow
     description: "Intermediate model tracking cryptocurrency trade flows and aggregating trade volumes by time periods."
+    columns:
+      - name: trade_id
+        description: "Primary key of the trade flow row."
+        data_tests:
+          - not_null
+          - unique
