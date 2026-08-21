@@ -636,61 +636,72 @@ class LineageService:
                             f"Failed to process exposure {exposure_name} in impact analysis: {e}"
                         )
 
-            # Row-set (filter/join) dependents: models that reference this column ONLY in a
-            # predicate (WHERE / JOIN ON / HAVING / QUALIFY). They never project the value,
-            # so column-value lineage misses them — but changing the column's logic shifts
-            # which rows they keep, and therefore their aggregates. Surface them as a
-            # distinct 'filter' severity (skipping any already caught as a value impact).
+            # Row-set (filter/join) dependents: models that reference a column ONLY in a
+            # predicate (WHERE / JOIN ON / HAVING / QUALIFY, incl. a window ORDER BY). They
+            # never project the value, so column-value lineage misses them — but changing the
+            # column shifts which rows they keep (and which row a QUALIFY picks), and therefore
+            # their aggregates. Surface them as a distinct 'filter' severity.
+            #
+            # Crucially this is checked for EVERY value-carrying column in the lineage, not just
+            # the queried one: the change flows by value to each downstream column, and a model
+            # that filters on any of those has its row-set shifted too. (Without this, a source
+            # column renamed through staging and then used only in a downstream QUALIFY ... ORDER
+            # BY — e.g. "pick the first account by created_at" — is silently dropped.)
             filter_count = 0
             value_affected = set(affected_models.keys())
-            for fm_name in sorted(
-                self.registry.get_filter_dependents(f"{model_name}.{column_name}")
-            ):
-                if fm_name in value_affected:
-                    continue
-                try:
-                    fm = self.registry.get_model(fm_name)
-                except Exception:
-                    continue
-                affected_models.setdefault(
-                    fm_name,
-                    {
-                        "name": fm_name,
-                        "resource_type": getattr(fm, "resource_type", "model"),
-                        "schema": fm.schema_name,
-                        "database": fm.database,
-                    },
-                )
-                affected_columns.append(
-                    {
-                        "model": fm_name,
-                        "column": "(row-set)",
-                        "transformation_type": "filter",
-                        # The predicate condition the changed column appears in — the "why".
-                        "sql_expression": (fm.predicate_lineage or {}).get(
-                            f"{model_name}.{column_name}"
-                        ),
-                        "severity": "filter",
-                        "data_type": None,
-                    }
-                )
-                filter_count += 1
-                for other_name in sorted(fm.downstream):
-                    try:
-                        exposure = self.registry.get_exposure(other_name)
-                    except (ValueError, KeyError):
+            value_columns = {(model_name, column_name)} | {
+                (c["model"], c["column"])
+                for c in affected_columns
+                if c.get("transformation_type") != "filter"
+            }
+            added_filter_models: set = set()
+            for src_model, src_col in sorted(value_columns):
+                src_key = f"{src_model}.{src_col}"
+                for fm_name in sorted(self.registry.get_filter_dependents(src_key)):
+                    if fm_name in value_affected or fm_name in added_filter_models:
                         continue
-                    if not any(e["name"] == exposure.name for e in affected_exposures):
-                        affected_exposures.append(
-                            {
-                                "name": exposure.name,
-                                "type": exposure.type,
-                                "url": exposure.url,
-                                "description": exposure.description,
-                                "owner": exposure.owner,
-                                "depends_on_models": list(exposure.depends_on_models),
-                            }
-                        )
+                    try:
+                        fm = self.registry.get_model(fm_name)
+                    except Exception:
+                        continue
+                    added_filter_models.add(fm_name)
+                    affected_models.setdefault(
+                        fm_name,
+                        {
+                            "name": fm_name,
+                            "resource_type": getattr(fm, "resource_type", "model"),
+                            "schema": fm.schema_name,
+                            "database": fm.database,
+                        },
+                    )
+                    affected_columns.append(
+                        {
+                            "model": fm_name,
+                            "column": "(row-set)",
+                            "transformation_type": "filter",
+                            # The predicate condition the (value-reached) column appears in.
+                            "sql_expression": (fm.predicate_lineage or {}).get(src_key),
+                            "severity": "filter",
+                            "data_type": None,
+                        }
+                    )
+                    filter_count += 1
+                    for other_name in sorted(fm.downstream):
+                        try:
+                            exposure = self.registry.get_exposure(other_name)
+                        except (ValueError, KeyError):
+                            continue
+                        if not any(e["name"] == exposure.name for e in affected_exposures):
+                            affected_exposures.append(
+                                {
+                                    "name": exposure.name,
+                                    "type": exposure.type,
+                                    "url": exposure.url,
+                                    "description": exposure.description,
+                                    "owner": exposure.owner,
+                                    "depends_on_models": list(exposure.depends_on_models),
+                                }
+                            )
 
             reachable = self._dag_reachable_models(model_name)
             confidence = self._impact_confidence(reachable, len(affected_models))
