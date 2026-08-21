@@ -67,6 +67,11 @@ function initGraph(data) {
     drawExposures(g, state, config, dragBehavior);
     const edges = drawEdges(g, data, state, config);
 
+    // Position + draw the "+N more" progressive-disclosure nodes after models
+    // and exposures have their coordinates (positionMoreNodes reads sibling x/y).
+    positionMoreNodes(state, config);
+    drawMoreNodes(g, state, config);
+
     setupInteractions(svg, g, data, state, config, edges);
 
     window.graphState = state;
@@ -177,6 +182,44 @@ function filterGraphByVisibility(state, config) {
 function refitAfterExpansion(state, config) {
     if (state && state.svg && state.g && state.zoom && typeof resetView === 'function') {
         setTimeout(() => resetView(state.svg, state.g, state.zoom, config), 350);
+    }
+}
+
+// Expand a "+N more" node: reveal every collapsed member, drop the badge, then
+// reflow + re-fit using the EXISTING layout machinery (updateLayout / resetView)
+// so newly revealed nodes slot into their level columns and the view re-frames.
+function expandMoreNode(moreNode, state, config) {
+    if (!moreNode || !state || !config) return;
+
+    (moreNode.hidden || []).forEach(name => state.visibleModels.add(name));
+
+    // Remove this badge from state + DOM.
+    state.moreNodes = (state.moreNodes || []).filter(m => m !== moreNode);
+    d3.selectAll('.more-node').filter(d => d && d.id === moreNode.id).remove();
+
+    // Reveal the now-visible nodes and re-run the standard layout/edge update.
+    filterGraphByVisibility(state, config);
+    if (typeof updateLayout === 'function') {
+        updateLayout(state, config, null);
+    }
+
+    // Reposition any remaining badge relative to the reflowed columns.
+    positionMoreNodes(state, config);
+    d3.selectAll('.more-node')
+        .transition()
+        .duration(500)
+        .attr('transform', d => {
+            if (!d || typeof d.x !== 'number' || isNaN(d.x) ||
+                typeof d.y !== 'number' || isNaN(d.y) ||
+                typeof d.height !== 'number' || isNaN(d.height)) {
+                return 'translate(0,0)';
+            }
+            return `translate(${d.x},${d.y - d.height / 2})`;
+        });
+
+    // Re-fit once the reposition transitions settle (mirrors refitAfterExpansion).
+    if (state.svg && state.g && state.zoom && typeof resetView === 'function') {
+        setTimeout(() => resetView(state.svg, state.g, state.zoom, config), 550);
     }
 }
 

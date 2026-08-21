@@ -1271,6 +1271,88 @@ function drawExposures(g, state, config, dragBehavior) {
     });
 }
 
+// Draw the synthetic "+N more" progressive-disclosure nodes. These are neutral,
+// clearly-not-a-model affordances: a dashed muted box carrying an honest count
+// and a "click to expand" hint. Styling lives in graph.css (.more-node) so both
+// light and dark themes follow the CSS variables.
+function drawMoreNodes(g, state, config) {
+    if (!state.moreNodes || state.moreNodes.length === 0) return;
+
+    let layer = g.select('.more-nodes-group');
+    if (layer.empty()) {
+        layer = g.append('g').attr('class', 'more-nodes-group');
+    }
+
+    const groups = layer.selectAll('.more-node')
+        .data(state.moreNodes, d => d.id)
+        .join(
+            enter => {
+                const grp = enter.append('g')
+                    .attr('class', 'more-node')
+                    .style('cursor', 'pointer')
+                    .on('click', function(event, d) {
+                        event.stopPropagation();
+                        if (typeof expandMoreNode === 'function') {
+                            expandMoreNode(d, state, config);
+                        }
+                    });
+
+                grp.append('rect')
+                    .attr('class', 'more-node-box')
+                    .attr('width', config.box.width)
+                    .attr('height', d => d.height)
+                    .attr('rx', 8)
+                    .attr('ry', 8);
+
+                grp.append('text')
+                    .attr('class', 'more-node-count')
+                    .attr('x', config.box.width / 2)
+                    .attr('y', d => d.height / 2 - 5)
+                    .attr('text-anchor', 'middle')
+                    .attr('dominant-baseline', 'middle');
+
+                grp.append('text')
+                    .attr('class', 'more-node-hint')
+                    .attr('x', config.box.width / 2)
+                    .attr('y', d => d.height / 2 + 13)
+                    .attr('text-anchor', 'middle')
+                    .attr('dominant-baseline', 'middle')
+                    .text('click to expand');
+
+                return grp;
+            },
+            update => update,
+            exit => exit.remove()
+        );
+
+    // Honest count + label (singular/plural), refreshed on every draw.
+    groups.select('.more-node-count').text(d => {
+        const n = (d.hidden && d.hidden.length) || 0;
+        const noun = d.kind === 'exposure'
+            ? (n === 1 ? 'exposure' : 'exposures')
+            : (n === 1 ? 'downstream model' : 'downstream models');
+        return `+${n} more ${noun}`;
+    });
+
+    // Native <title> for accessibility / hover.
+    groups.each(function(d) {
+        const sel = d3.select(this);
+        sel.select('title').remove();
+        const n = (d.hidden && d.hidden.length) || 0;
+        const noun = d.kind === 'exposure' ? 'exposures' : 'downstream models';
+        sel.append('title').text(`${n} more ${noun} hidden — click to expand`);
+    });
+
+    groups.attr('transform', d => {
+        if (!d || typeof d.x !== 'number' || isNaN(d.x) ||
+            typeof d.y !== 'number' || isNaN(d.y) ||
+            typeof d.height !== 'number' || isNaN(d.height)) {
+            return 'translate(0,0)';
+        }
+        return `translate(${d.x},${d.y - d.height / 2})`;
+    });
+}
+
 function drawEdges(g, data, state, config) {
     state.models.forEach(model => {
         state.modelEdges.set(model.name, []);

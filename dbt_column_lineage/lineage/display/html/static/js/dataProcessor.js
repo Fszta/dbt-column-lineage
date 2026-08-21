@@ -19,7 +19,9 @@ function createState() {
         },
         visibleModels: new Set(),
         modelDownstream: new Map(),
-        modelUpstream: new Map()
+        modelUpstream: new Map(),
+        // Synthetic "+N more" placeholder nodes for capped fan-out (progressive disclosure).
+        moreNodes: []
     };
 }
 
@@ -154,8 +156,13 @@ function buildModelUpstreamMap(data, state) {
     });
 }
 
-// Initialize visibility: show main model and its direct neighbors
+// Initialize visibility: show main model and its direct neighbors, but CAP the
+// fan-out so a high-degree column stays legible. Anything over the caps in
+// config's GRAPH_NODE_LIMITS is collapsed behind a synthetic "+N more" node
+// (state.moreNodes), which the user can click to reveal the rest.
 function initializeVisibility(data, state) {
+    state.moreNodes = [];
+
     // Find the main model
     const mainModel = state.models.find(m => m.isMain);
     if (!mainModel) {
@@ -165,43 +172,123 @@ function initializeVisibility(data, state) {
         return;
     }
 
+    // Caps (fall back to generous defaults if config const is unavailable).
+    const limits = (typeof GRAPH_NODE_LIMITS !== 'undefined')
+        ? GRAPH_NODE_LIMITS
+        : { maxDownstreamModels: 8, maxExposures: 8 };
+
     // Add main model
     state.visibleModels.add(mainModel.name);
 
     // Find direct upstream and downstream neighbors
-    const mainModelColumns = mainModel.columns.map(col => col.id);
-    const connectedModels = new Set();
+    const mainModelColumns = new Set(mainModel.columns.map(col => col.id));
+    const upstreamModels = new Set();
+    const downstreamModels = new Set();
 
     data.edges.filter(e => e.type === 'lineage').forEach(edge => {
         const sourceNode = state.nodeIndex.get(edge.source);
         const targetNode = state.nodeIndex.get(edge.target);
+        if (!sourceNode || !targetNode) return;
 
-        if (sourceNode && targetNode) {
-            // If source is in main model, target is downstream
-            if (mainModelColumns.includes(edge.source) && targetNode.model !== mainModel.name) {
-                connectedModels.add(targetNode.model);
-            }
-            // If target is in main model, source is upstream
-            if (mainModelColumns.includes(edge.target) && sourceNode.model !== mainModel.name) {
-                connectedModels.add(sourceNode.model);
+        // If source is in main model, target is downstream
+        if (mainModelColumns.has(edge.source) && targetNode.model !== mainModel.name) {
+            downstreamModels.add(targetNode.model);
+        }
+        // If target is in main model, source is upstream
+        if (mainModelColumns.has(edge.target) && sourceNode.model !== mainModel.name) {
+            upstreamModels.add(sourceNode.model);
+        }
+    });
+
+    // Upstream is shown in full — the readability problem is downstream fan-out.
+    upstreamModels.forEach(modelName => state.visibleModels.add(modelName));
+
+    // Downstream MODELS: show the first N (sorted for deterministic order), collapse the rest.
+    const downstreamList = Array.from(downstreamModels).sort();
+    const shownDownstream = downstreamList.slice(0, limits.maxDownstreamModels);
+    const hiddenDownstream = downstreamList.slice(limits.maxDownstreamModels);
+    shownDownstream.forEach(modelName => state.visibleModels.add(modelName));
+    if (hiddenDownstream.length > 0) {
+        state.moreNodes.push({
+            id: '__more_downstream__',
+            kind: 'model',
+            anchor: mainModel.name,
+            siblings: shownDownstream,   // used to position the badge in the same column
+            hidden: hiddenDownstream
+        });
+    }
+
+    // EXPOSURES (incl. row-set dependents): an exposure is a candidate if any of
+    // its source models is currently visible. Cap the candidate set too.
+    const candidateExposures = new Set();
+    data.edges.filter(e => e.type === 'exposure').forEach(edge => {
+        const sourceNode = state.nodeIndex.get(edge.source);
+        const targetNode = state.nodeIndex.get(edge.target);
+        if (sourceNode && targetNode && targetNode.type === 'exposure') {
+            if (state.visibleModels.has(sourceNode.model)) {
+                candidateExposures.add(targetNode.model);
             }
         }
     });
 
-    // Add all connected models
-    connectedModels.forEach(modelName => state.visibleModels.add(modelName));
+    const exposureList = Array.from(candidateExposures).sort();
+    const shownExposures = exposureList.slice(0, limits.maxExposures);
+    const hiddenExposures = exposureList.slice(limits.maxExposures);
+    shownExposures.forEach(name => state.visibleModels.add(name));
+    if (hiddenExposures.length > 0) {
+        state.moreNodes.push({
+            id: '__more_exposures__',
+            kind: 'exposure',
+            anchor: mainModel.name,
+            siblings: shownExposures,
+            hidden: hiddenExposures
+        });
+    }
+}
 
-    // Also check for exposures connected to visible models
-    data.edges.filter(e => e.type === 'exposure').forEach(edge => {
-        const sourceNode = state.nodeIndex.get(edge.source);
-        const targetNode = state.nodeIndex.get(edge.target);
+// Position the synthetic "+N more" nodes just beneath the last shown sibling in
+// their column, so a badge reads clearly as the tail of the group it summarizes.
+// Runs AFTER positionModels (which sets sibling x/y). Kept separate from the
+// level-based layout: these are overlays, not real graph nodes.
+function positionMoreNodes(state, config) {
+    if (!state.moreNodes || state.moreNodes.length === 0) return;
 
-        if (sourceNode && targetNode && targetNode.type === 'exposure') {
-            // If source model is visible, show the exposure
-            if (state.visibleModels.has(sourceNode.model)) {
-                state.visibleModels.add(targetNode.model);
+    const moreHeight = config.box.titleHeight + 20; // compact, clearly smaller than a model
+
+    state.moreNodes.forEach(mn => {
+        mn.height = moreHeight;
+
+        const lookup = mn.kind === 'exposure'
+            ? name => state.exposures.find(e => e && e.name === name)
+            : name => state.models.find(m => m && m.name === name);
+
+        let columnX = null;
+        let maxBottom = -Infinity;
+        (mn.siblings || []).forEach(name => {
+            const obj = lookup(name);
+            if (obj && typeof obj.x === 'number' && !isNaN(obj.x) &&
+                typeof obj.y === 'number' && !isNaN(obj.y)) {
+                columnX = obj.x;
+                const bottom = obj.y + (obj.height || 0) / 2;
+                if (bottom > maxBottom) maxBottom = bottom;
+            }
+        });
+
+        if (columnX === null) {
+            // No visible siblings to anchor to — fall back to one level right of the anchor.
+            const anchor = state.models.find(m => m && m.name === mn.anchor);
+            if (anchor && typeof anchor.x === 'number' && !isNaN(anchor.x)) {
+                columnX = anchor.x + config.box.width + config.layout.xSpacing;
+                maxBottom = (typeof anchor.y === 'number' && !isNaN(anchor.y))
+                    ? anchor.y : config.box.padding;
+            } else {
+                columnX = config.box.padding;
+                maxBottom = config.box.padding;
             }
         }
+
+        mn.x = columnX;
+        mn.y = maxBottom + config.layout.ySpacing + moreHeight / 2;
     });
 }
 
