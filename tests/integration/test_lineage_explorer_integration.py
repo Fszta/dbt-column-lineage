@@ -150,6 +150,53 @@ def test_upstream_lineage_source_columns_point_to_actual_sources(lineage_service
     assert any("raw_countries" in src for src in source_cols)
 
 
+def test_column_nodes_carry_dbt_tests(lineage_service):
+    """Every column node exposes a ``tests`` list; a tested column carries its dbt tests so
+    the explorer can render the "Show tests" indicators without re-parsing artifacts."""
+    explorer = LineageExplorer(host="127.0.0.1", port=8000)
+    explorer.set_lineage_service(lineage_service)
+    explorer.data = explorer.data.__class__()  # fresh graph
+
+    explorer._process_lineage_tree("stg_transactions", "transaction_id")
+    data = explorer.data.model_dump()
+
+    # transaction_id has not_null + unique in the bundled project.
+    node = next(n for n in data["nodes"] if n["id"] == "col_stg_transactions_transaction_id")
+    assert isinstance(node["tests"], list)
+    assert {t["test_name"] for t in node["tests"]} >= {"not_null", "unique"}
+    # Every column node carries a tests list (empty, never None, when untested).
+    for n in data["nodes"]:
+        if n.get("type") == "column":
+            assert isinstance(n.get("tests"), list)
+
+
+def test_column_test_payload_carries_relationships_referenced_side(lineage_service):
+    """A relationships test surfaces its referenced (parent) side in the node payload."""
+    explorer = LineageExplorer(host="127.0.0.1", port=8000)
+    explorer.set_lineage_service(lineage_service)
+
+    tests = explorer._column_tests_payload("stg_transactions", "account_id")
+    rel = next(t for t in tests if t["test_name"] == "relationships")
+    assert rel["referenced_model"] == "stg_accounts"
+    assert rel["referenced_column"] == "account_id"
+
+
+def test_impact_analysis_enriched_with_column_tests(lineage_service):
+    """The impact payload lists the tests covering each affected column, so a reviewer sees
+    which guarantees a change threatens."""
+    explorer = LineageExplorer(host="127.0.0.1", port=8000)
+    explorer.set_lineage_service(lineage_service)
+
+    impact = lineage_service.get_column_impact("stg_transactions", "transaction_id")
+    enriched = explorer._enrich_impact_with_tests(impact)
+
+    affected = enriched["affected_columns"]
+    assert affected, "expected downstream affected columns for a tested key"
+    # Every affected column has a tests list attached.
+    for col in affected:
+        assert isinstance(col.get("tests"), list)
+
+
 def test_rowset_dependents_appear_as_distinct_nodes(lineage_service):
     """A filter-only consumer (flagged_transaction_metrics filters transactions.status in a
     WHERE, never projecting it) must appear as a distinct 'rowset' node with the predicate as
