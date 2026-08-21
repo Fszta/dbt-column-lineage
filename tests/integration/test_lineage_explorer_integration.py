@@ -148,3 +148,25 @@ def test_upstream_lineage_source_columns_point_to_actual_sources(lineage_service
 
     assert "stg_countries.country_name" not in source_cols
     assert any("raw_countries" in src for src in source_cols)
+
+
+def test_rowset_dependents_appear_as_distinct_nodes(lineage_service):
+    """A filter-only consumer (flagged_transaction_metrics filters transactions.status in a
+    WHERE, never projecting it) must appear as a distinct 'rowset' node with the predicate as
+    its note — not be silently absent from the graph."""
+    explorer = LineageExplorer(host="127.0.0.1", port=8000)
+    explorer.set_lineage_service(lineage_service)
+    explorer.data = explorer.data.__class__()  # fresh graph
+
+    explorer._process_lineage_tree("transactions", "status")
+    data = explorer.data.model_dump()
+
+    rowset = [n for n in data["nodes"] if n.get("type") == "rowset"]
+    assert any(
+        n["label"] == "flagged_transaction_metrics" for n in rowset
+    ), "expected flagged_transaction_metrics as a row-set node"
+    node = next(n for n in rowset if n["label"] == "flagged_transaction_metrics")
+    assert node["note"] and "status" in node["note"].lower()
+    assert any(
+        e.get("type") == "rowset" and e["target"] == node["id"] for e in data["edges"]
+    ), "expected a rowset edge into the row-set node"

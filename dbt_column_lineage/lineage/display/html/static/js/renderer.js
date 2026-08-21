@@ -2,6 +2,68 @@
  * Rendering functions for graph visualization
  */
 
+// --- Row-set predicate card -----------------------------------------------------------------
+// A click-opened card showing the FULL predicate a row-set dependent filters on, wrapped and
+// lightly pretty-printed so long window functions stay readable (the hover tooltip is one line).
+
+function _formatPredicate(sql) {
+    // Insert newlines before the main SQL clauses so a long ROW_NUMBER() OVER (...) reads as a
+    // small block instead of one runaway line. Purely cosmetic; the SQL text is unchanged.
+    return (sql || '')
+        .replace(/\s+OVER\s*\(/gi, '\nOVER (')
+        .replace(/\s+PARTITION BY\s+/gi, '\n  PARTITION BY ')
+        .replace(/\s+ORDER BY\s+/gi, '\n  ORDER BY ')
+        .replace(/\s+(AND|OR)\s+/gi, '\n  $1 ')
+        .trim();
+}
+
+function hideRowsetCard() {
+    const card = document.getElementById('rowsetCard');
+    if (card) card.style.display = 'none';
+}
+
+function showRowsetCard(name, note) {
+    const graphContainer = document.getElementById('graph');
+    if (!graphContainer) return;
+
+    let card = document.getElementById('rowsetCard');
+    if (!card) {
+        graphContainer.insertAdjacentHTML(
+            'beforeend',
+            `<div id="rowsetCard" class="model-details-card" style="display:none; top:230px; z-index:260;">
+                <div class="model-details-header">
+                    <div class="model-details-title">
+                        <div class="model-details-title-text">
+                            <h4 id="rowsetCardName"></h4>
+                            <span class="model-details-type" style="color:var(--info)">row-set dependency</span>
+                        </div>
+                    </div>
+                    <button class="model-details-close" id="closeRowsetCard">×</button>
+                </div>
+                <div class="model-details-content">
+                    <div class="model-details-section">
+                        <label>Column used only in this predicate (not projected)</label>
+                        <pre id="rowsetCardPredicate" style="white-space:pre-wrap; word-break:break-word; font-family:var(--font-mono,monospace); font-size:12px; line-height:1.5; background:var(--slate-50,#f7f9fc); border:1px solid var(--border,#e2e8f0); border-radius:6px; padding:10px 12px; margin:6px 0 0; color:var(--text);"></pre>
+                    </div>
+                </div>
+            </div>`
+        );
+        card = document.getElementById('rowsetCard');
+        const closeBtn = document.getElementById('closeRowsetCard');
+        if (closeBtn) closeBtn.addEventListener('click', hideRowsetCard);
+        // Dismiss on outside click (but not when clicking another row-set node, which reopens it).
+        document.addEventListener('click', function (e) {
+            const c = document.getElementById('rowsetCard');
+            if (!c || c.style.display === 'none') return;
+            if (!c.contains(e.target) && !e.target.closest('.is-rowset')) hideRowsetCard();
+        });
+    }
+
+    document.getElementById('rowsetCardName').textContent = name;
+    document.getElementById('rowsetCardPredicate').textContent = _formatPredicate(note);
+    card.style.display = 'block';
+}
+
 // Set up SVG container and markers
 function setupSvg(config) {
     const svg = d3.select('#graph')
@@ -793,6 +855,7 @@ function drawExposures(g, state, config, dragBehavior) {
         let detailRows = 0;
         if (exposureData.type) detailRows++;
         if (exposureData.url) detailRows++;
+        if (exposureData.rowset && exposureData.note) detailRows++;
 
         if (!e.height || isNaN(e.height)) {
             e.height = config.box.titleHeight +
@@ -817,7 +880,7 @@ function drawExposures(g, state, config, dragBehavior) {
         .data(allExposures)
         .enter()
         .append('g')
-        .attr('class', 'exposure model-exposure')
+        .attr('class', d => 'exposure model-exposure' + ((d.exposureData && d.exposureData.rowset) ? ' is-rowset' : ''))
         .attr('data-name', d => d.name)
         .attr('transform', d => {
             if (!d || typeof d.x !== 'number' || isNaN(d.x) ||
@@ -833,6 +896,30 @@ function drawExposures(g, state, config, dragBehavior) {
         })
         .call(dragBehavior);
 
+    // Hovering anywhere over a row-set box shows the FULL predicate (the inline "Filter" line
+    // only shows the head). Handlers live on the whole group and use mouseover/mouseout (which
+    // bubble from every child), with a contains() guard so moving between children doesn't
+    // flicker the tooltip.
+    const rowsetTip = (event, d) =>
+        d && d.exposureData && d.exposureData.rowset && d.exposureData.note
+            ? `Row-set dependency — used only in:\n${d.exposureData.note}`
+            : null;
+    exposureGroups
+        .on('mouseover.rowset', function (event, d) {
+            const text = rowsetTip(event, d);
+            if (text) showTooltip(event, text);
+        })
+        .on('mousemove.rowset', function (event, d) {
+            if (!rowsetTip(event, d)) return;
+            const t = createTooltip();
+            t.style('left', event.pageX + 12 + 'px').style('top', event.pageY - 10 + 'px');
+        })
+        .on('mouseout.rowset', function (event, d) {
+            if (!(d && d.exposureData && d.exposureData.rowset)) return;
+            if (event.relatedTarget && this.contains(event.relatedTarget)) return;
+            hideTooltip();
+        });
+
     const backgroundGroup = exposureGroups.append('g')
         .attr('class', 'exposure-background');
 
@@ -843,8 +930,11 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('rx', 8)
         .attr('ry', 8)
         .style('fill', 'var(--surface)')
-        .style('stroke', 'var(--violet)')
-        .style('stroke-width', 2);
+        .style('stroke', d => (d.exposureData && d.exposureData.rowset) ? 'var(--info)' : 'var(--violet)')
+        .style('stroke-width', 2)
+        // Row-set dependents use the column only in a predicate (not projected): a dashed
+        // blue border signals "indirect / row-set" vs a solid violet exposure box.
+        .style('stroke-dasharray', d => (d.exposureData && d.exposureData.rowset) ? '5 4' : 'none');
 
     const foregroundGroup = exposureGroups.append('g')
         .attr('class', 'exposure-foreground');
@@ -856,7 +946,9 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('x', 1)
         .attr('y', 1)
         .attr('rx', 7)
-        .style('fill', 'color-mix(in srgb, var(--violet) 12%, var(--surface))')
+        .style('fill', d => (d.exposureData && d.exposureData.rowset)
+            ? 'color-mix(in srgb, var(--info) 14%, var(--surface))'
+            : 'color-mix(in srgb, var(--violet) 12%, var(--surface))')
         .style('stroke', 'none');
 
     foregroundGroup.append('svg')
@@ -869,7 +961,7 @@ function drawExposures(g, state, config, dragBehavior) {
         .append('path')
         .attr('d', getModelIcon('exposure'))
         .attr('fill', 'none')
-        .attr('stroke', 'var(--violet)')
+        .attr('stroke', d => (d.exposureData && d.exposureData.rowset) ? 'var(--info)' : 'var(--violet)')
         .attr('stroke-width', '2')
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
@@ -878,19 +970,31 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('class', 'exposure-eyebrow')
         .attr('x', 44)
         .attr('y', config.box.titleHeight / 2 - 6)
-        .style('fill', 'color-mix(in srgb, var(--violet) 60%, var(--text-muted))')
+        .style('fill', d => (d.exposureData && d.exposureData.rowset)
+            ? 'var(--info)'
+            : 'color-mix(in srgb, var(--violet) 60%, var(--text-muted))')
         .style('font-family', 'var(--font-sans)')
         .style('font-size', '8.5px')
         .style('font-weight', '600')
         .style('letter-spacing', '0.09em')
         .style('pointer-events', 'none')
-        .text('EXPOSURE');
+        .text(d => (d.exposureData && d.exposureData.rowset) ? 'ROW-SET' : 'EXPOSURE');
 
     const exposureTitleText = foregroundGroup.append('text')
         .attr('class', 'exposure-title')
         .attr('x', 44)
         .attr('y', config.box.titleHeight / 2 + 10)
+        .style('cursor', d => (d.exposureData && d.exposureData.rowset) ? 'pointer' : null)
         .text(d => d.name)
+        // Row-set title click opens the readable predicate card. Attached to the title text
+        // (not the draggable group) so d3-drag doesn't swallow the click — same pattern as
+        // the model-details card.
+        .on('click', function (event, d) {
+            if (!(d && d.exposureData && d.exposureData.rowset && d.exposureData.note)) return;
+            event.stopPropagation();
+            hideTooltip();
+            showRowsetCard(d.name, d.exposureData.note);
+        })
         .each(function(d) {
             const maxWidth = config.box.width - 56;
             const self = d3.select(this);
@@ -986,7 +1090,7 @@ function drawExposures(g, state, config, dragBehavior) {
                 .attr('transform', `translate(${xPosition}, 0)`)
                 .style('pointer-events', 'none');
 
-            const exposureTypeColor = 'var(--violet)';
+            const exposureTypeColor = exposureData.rowset ? 'var(--info)' : 'var(--violet)';
             tagGroup.append('rect')
                 .attr('rx', 4)
                 .attr('ry', 4)
@@ -1077,7 +1181,86 @@ function drawExposures(g, state, config, dragBehavior) {
 
             yOffset += config.box.columnHeight;
         }
+
+        // Row-set nodes: show the predicate the column appears in (WHERE/JOIN/QUALIFY) as the
+        // "why", truncated with a hover tooltip for the full expression.
+        if (exposureData.rowset && exposureData.note) {
+            const noteRow = detailsGroup.append('g')
+                .attr('class', 'exposure-detail-row rowset-note-row')
+                .attr('transform', `translate(${config.box.padding}, ${yOffset})`);
+
+            noteRow.append('text')
+                .attr('class', 'exposure-detail-label')
+                .attr('x', 12)
+                .attr('y', config.box.columnHeight / 2)
+                .attr('dominant-baseline', 'middle')
+                .attr('fill', '#334155')
+                .attr('font-size', '12px')
+                .text('Filter');
+
+            const noteX = 60;
+            const noteMaxWidth = config.box.width - (config.box.padding * 2) - noteX;
+            const fullNote = exposureData.note;
+            const noteText = noteRow.append('text')
+                .attr('class', 'exposure-detail-value')
+                .attr('x', noteX)
+                .attr('y', config.box.columnHeight / 2)
+                .attr('dominant-baseline', 'middle')
+                .attr('fill', 'var(--text)')
+                .attr('font-family', 'var(--font-mono, monospace)')
+                .attr('font-size', '10.5px')
+                .text(fullNote)
+                .each(function() {
+                    const self = d3.select(this);
+                    let textLength = self.node().getComputedTextLength();
+                    let text = self.text();
+                    while (textLength > noteMaxWidth && text.length > 0) {
+                        text = text.slice(0, -1);
+                        self.text(text + '…');
+                        textLength = self.node().getComputedTextLength();
+                    }
+                });
+
+            // Hover target spans the whole Filter row (label + value) so the full predicate
+            // tooltip is easy to trigger, not just over the truncated text.
+            noteRow.append('rect')
+                .attr('x', 0)
+                .attr('y', 0)
+                .attr('width', config.box.width - (config.box.padding * 2))
+                .attr('height', config.box.columnHeight)
+                .attr('fill', 'transparent')
+                .style('cursor', 'help')
+                .on('mouseenter', function(event) { showTooltip(event, fullNote); })
+                .on('mousemove', function(event) {
+                    const t = createTooltip();
+                    const x = (event.pageX !== undefined) ? event.pageX : (event.clientX + window.scrollX);
+                    const y = (event.pageY !== undefined) ? event.pageY : (event.clientY + window.scrollY);
+                    t.style('left', (x + 10) + 'px').style('top', (y - 10) + 'px');
+                })
+                .on('mouseleave', function() { hideTooltip(); });
+
+            yOffset += config.box.columnHeight;
+        }
     });
+
+    // Whole-box click target for row-set nodes (appended last → on top): clicking anywhere on
+    // the dashed box opens the readable predicate card. A specific element (not the draggable
+    // group), so d3-drag doesn't swallow the click.
+    exposureGroups
+        .filter(d => d && d.exposureData && d.exposureData.rowset && d.exposureData.note)
+        .append('rect')
+        .attr('class', 'rowset-click-target')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', config.box.width)
+        .attr('height', d => d.height)
+        .attr('fill', 'transparent')
+        .style('cursor', 'pointer')
+        .on('click', function (event, d) {
+            event.stopPropagation();
+            hideTooltip();
+            showRowsetCard(d.name, d.exposureData.note);
+        });
 
     state.exposures.forEach(exposure => {
         const exposureCenter = {
