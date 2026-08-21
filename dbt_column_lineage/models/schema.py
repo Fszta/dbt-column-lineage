@@ -1,5 +1,38 @@
+from enum import Enum
+
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Set, Dict, Literal, Any
+
+
+class SemanticChangeKind(str, Enum):
+    """Semantic relationship between a column's base and head defining expression.
+
+    Maps to the roadmap's breaking / non-breaking axis (orthogonal to ``ChangeKind``):
+      - ``EQUIVALENT``      → non-breaking (cosmetic-only; the column is NOT emitted as changed)
+      - ``MEANING_CHANGED`` → breaking (the expression's meaning changed)
+      - ``INDETERMINATE``   → conservative-breaking (could not parse/compare → fail safe)
+    """
+
+    EQUIVALENT = "equivalent"
+    MEANING_CHANGED = "meaning_changed"
+    INDETERMINATE = "indeterminate"
+
+    @property
+    def is_breaking(self) -> bool:
+        """Everything except a proven ``EQUIVALENT`` is treated as breaking (fail-safe)."""
+        return self is not SemanticChangeKind.EQUIVALENT
+
+
+class SemanticDiff(BaseModel):
+    """Result of comparing two SQL expressions for semantic equality.
+
+    ``equal`` is the fast boolean the changeset uses to decide whether to emit a column;
+    ``kind`` is the roadmap classification; ``reason`` is a short human string for display.
+    """
+
+    equal: bool
+    kind: SemanticChangeKind
+    reason: str
 
 
 class ColumnLineage(BaseModel):
