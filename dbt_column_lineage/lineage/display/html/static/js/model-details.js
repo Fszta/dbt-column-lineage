@@ -30,7 +30,7 @@ const ModelDetailsModule = (function() {
                 <div class="model-details-content">
                     <div class="model-details-section" id="modelDescriptionSection">
                         <label>Description</label>
-                        <p id="modelDetailsDescription">No description available</p>
+                        <div id="modelDetailsDescription" class="markdown-body">No description available</div>
                     </div>
                     <div class="model-details-section" id="modelTagsSection" style="display: none;">
                         <label>Tags</label>
@@ -114,7 +114,7 @@ const ModelDetailsModule = (function() {
         const hasTags = data.tags && data.tags.length > 0;
 
         if (hasDescription) {
-            descEl.textContent = data.description;
+            descEl.innerHTML = renderMarkdown(data.description);
             descSection.style.display = 'block';
         } else {
             descSection.style.display = 'none';
