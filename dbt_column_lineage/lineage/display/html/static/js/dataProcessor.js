@@ -25,6 +25,20 @@ function createState() {
 
 // Process input data to build models and indexes
 function processData(data, state) {
+    // Normalize row-set (filter/JOIN/QUALIFY) dependents into the exposure family: they are
+    // leaf consumer nodes hanging off a column, exactly like exposures, so they reuse the same
+    // positioning/edge/visibility pipeline. A flag on exposure_data lets the renderer style them
+    // distinctly (dashed "ROW-SET" box) and surface the predicate as a note.
+    data.nodes.forEach(node => {
+        if (node.type === 'rowset') {
+            node.type = 'exposure';
+            node.exposure_data = { type: 'row-set', rowset: true, note: node.note || '' };
+        }
+    });
+    data.edges.forEach(edge => {
+        if (edge.type === 'rowset') edge.type = 'exposure';
+    });
+
     // Index nodes for quick lookup
     data.nodes.forEach(node => {
         state.nodeIndex.set(node.id, node);
@@ -377,6 +391,7 @@ function positionModels(state, config) {
         let detailRows = 0;
         if (exposureData.type) detailRows++;
         if (exposureData.url) detailRows++;
+        if (exposureData.rowset && exposureData.note) detailRows++;
 
         exposure.height = config.box.titleHeight +
                           (detailRows * config.box.columnHeight) +
@@ -437,6 +452,7 @@ function positionModels(state, config) {
                     let detailRows = 0;
                     if (exposureData.type) detailRows++;
                     if (exposureData.url) detailRows++;
+                    if (exposureData.rowset && exposureData.note) detailRows++;
 
                     item.height = config.box.titleHeight +
                                   (detailRows * config.box.columnHeight) +

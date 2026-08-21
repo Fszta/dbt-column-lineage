@@ -115,6 +115,8 @@ def cli(
                     display = TextDisplay()
 
                 display.display_column_info(column)
+                if isinstance(display, JsonDisplay):
+                    display.set_model_description(model.description)
 
                 if selector.upstream:
                     upstream_refs = service._get_upstream_lineage(selector.model, selector.column)

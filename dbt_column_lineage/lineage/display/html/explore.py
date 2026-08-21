@@ -31,6 +31,9 @@ class GraphNode(BaseModel):
     is_main: bool = False
     resource_type: Optional[str] = None
     is_key: bool = False
+    # For row-set (filter/join/QUALIFY) dependents: the predicate the upstream column appears
+    # in — the "why" behind a node that consumes the column without projecting its value.
+    note: Optional[str] = None
 
 
 class GraphEdge(BaseModel):
@@ -122,6 +125,8 @@ class LineageExplorer:
                             node["display_name"] = part
                             node["columns"] = model_data.get("columns", [])
                             node["resource_type"] = model_data["resource_type"]
+                            if "description" in model_data:
+                                node["description"] = model_data["description"]
                             if "exposure_data" in model_data:
                                 node["exposure_data"] = model_data["exposure_data"]
 
@@ -163,7 +168,7 @@ class LineageExplorer:
                     path_parts = [model_name_for_path]
 
                 columns = [
-                    {"name": col_name, "type": col.data_type}
+                    {"name": col_name, "type": col.data_type, "description": col.description}
                     for col_name, col in model.columns.items()
                 ]
 
@@ -172,6 +177,7 @@ class LineageExplorer:
                     "model_name": model_registry_key,
                     "columns": columns,
                     "resource_type": resource_type,
+                    "description": getattr(model, "description", None),
                 }
 
                 insert_into_tree(model_tree_root, path_parts, model_data_payload)
@@ -319,9 +325,60 @@ class LineageExplorer:
             self._enrich_nodes_with_metadata([upstream_refs, downstream_refs])
             self._add_processed_data(upstream_refs, "upstream", main_node_id)
             self._add_processed_data(downstream_refs, "downstream")
+            self._add_rowset_dependents()
 
         except Exception as e:
             logger.error(f"Error processing lineage for {start_model}.{start_column}: {e}")
+
+    def _add_rowset_dependents(self) -> None:
+        """Add row-set (filter/join/QUALIFY) dependents as distinct nodes.
+
+        A model can depend on a column without ever projecting its value — it uses it only in
+        a WHERE / JOIN ON / HAVING / QUALIFY (incl. a window ORDER BY). Column-value lineage
+        (and therefore the graph so far) misses these, yet the column change shifts their
+        row-set. We surface each such consumer as one ``rowset`` node hanging off the
+        value-carrying column it filters on, carrying the predicate text as its ``note``.
+        """
+        if not self.lineage_service:
+            return
+        registry = self.lineage_service.registry
+
+        # Models already shown as value nodes — don't duplicate them as row-set nodes.
+        value_models = {n["model"] for n in self.data.nodes if n.get("type") == "column"}
+        # Snapshot the value column nodes now, so we iterate a stable list while appending.
+        column_nodes = [n for n in self.data.nodes if n.get("type") == "column"]
+        added: set = set()
+
+        for node in column_nodes:
+            src_key = f"{node['model']}.{node['label']}"
+            try:
+                dependents = sorted(registry.get_filter_dependents(src_key))
+            except Exception:
+                continue
+            for dep_model in dependents:
+                if dep_model in value_models or dep_model in added:
+                    continue
+                added.add(dep_model)
+                try:
+                    dep = registry.get_model(dep_model)
+                    note = (getattr(dep, "predicate_lineage", {}) or {}).get(src_key)
+                    resource_type = getattr(dep, "resource_type", "model")
+                except Exception:
+                    note, resource_type = None, "model"
+                rowset_id = f"rowset_{dep_model}"
+                self.data.nodes.append(
+                    GraphNode(
+                        id=rowset_id,
+                        label=dep_model,
+                        type="rowset",
+                        model=dep_model,
+                        resource_type=resource_type,
+                        note=note,
+                    ).model_dump()
+                )
+                self.data.edges.append(
+                    GraphEdge(source=node["id"], target=rowset_id, type="rowset").model_dump()
+                )
 
     def _enrich_nodes_with_metadata(
         self, refs_list: List[Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]]

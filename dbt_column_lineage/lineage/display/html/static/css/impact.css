@@ -1335,6 +1335,15 @@
     margin-bottom: 6px;
 }
 
+/* dbt-authored docs shown as muted triage context on impacted columns/models. */
+.column-card-description,
+.model-card-description {
+    margin: 6px 0 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-light);
+}
+
 .exposure-url {
     font-size: 11px;
     margin-bottom: 6px;

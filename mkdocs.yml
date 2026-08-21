@@ -81,4 +81,6 @@ nav:
     - Quick Start: getting-started/quickstart.md
   - Features:
     - Impact Analysis: features/impact-analysis.md
+  - Reference:
+    - JSON Output: reference/json-output.md
   - Changelog: changelog.md

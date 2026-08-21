@@ -140,8 +140,17 @@ const ModelDetailsModule = (function() {
         }
 
         card.style.display = 'block';
-        card.style.top = '230px';
         card.style.zIndex = '250';
+        // Both this popover and the Column Relationship Summary are pinned top-right;
+        // stack below the summary when it's visible so they don't collide. Its height
+        // varies (content + collapsed state), so measure it live instead of assuming
+        // a fixed offset.
+        const summary = document.getElementById('relationshipSummaryCard');
+        if (summary && getComputedStyle(summary).display !== 'none') {
+            card.style.top = Math.round(summary.getBoundingClientRect().bottom + 12) + 'px';
+        } else {
+            card.style.top = '230px';
+        }
     }
 
     function hideCard() {

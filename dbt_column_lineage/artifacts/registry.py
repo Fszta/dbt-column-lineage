@@ -191,10 +191,41 @@ class ModelRegistry:
 
                 node = self._manifest_reader._find_node(model_name)
                 if node:
-                    model.description = node.get("description")
                     model.tags = node.get("tags", [])
         except Exception as e:
             raise RegistryError(f"Failed to apply dependencies: {e}")
+
+    def _apply_descriptions(self, models: Dict[str, Model]) -> None:
+        """Populate model and column descriptions from the dbt-authored docs.
+
+        The *manifest* is the primary source: dbt records the docs a person wrote in
+        ``schema.yml`` at ``nodes.<id>.description`` (model) and
+        ``nodes.<id>.columns.<name>.description`` (column). The catalog's column
+        ``description`` is the warehouse comment (often empty), so the manifest wins
+        and the catalog value — already loaded onto the column — is kept only as a
+        fallback. An empty/None manifest description never clobbers an existing value.
+
+        Runs *after* lineage parsing so columns materialised from compiled SQL for
+        catalog-missing models (see :meth:`_apply_column_lineage`) are covered too.
+        """
+        for model_name, model in models.items():
+            node = self._manifest_reader._find_node(model_name)
+            if not node:
+                continue
+
+            manifest_model_desc = node.get("description")
+            if manifest_model_desc:
+                model.description = manifest_model_desc
+
+            manifest_columns = node.get("columns", {}) or {}
+            desc_by_column = {
+                name.lower(): (col_data or {}).get("description")
+                for name, col_data in manifest_columns.items()
+            }
+            for col_name, column in model.columns.items():
+                manifest_desc = desc_by_column.get(col_name)
+                if manifest_desc:
+                    column.description = manifest_desc
 
     def _load_exposures(self) -> Dict[str, Exposure]:
         """Load exposures from manifest."""
@@ -456,6 +487,7 @@ class ModelRegistry:
             models = self._initialize_models()
             self._apply_dependencies(models)
             self._process_lineage(models)
+            self._apply_descriptions(models)
             exposures = self._load_exposures()
             self._build_test_index()
             self._state = RegistryState(models=models, exposures=exposures, is_loaded=True)

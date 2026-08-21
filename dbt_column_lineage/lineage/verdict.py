@@ -20,9 +20,8 @@ from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
 from dbt_column_lineage.models.schema import BreakFinding, TestNode
 
 # Change kinds that can orphan a test by making the column disappear. A rename is emitted by
-# the changeset builder as REMOVED(old) + ADDED(new), so REMOVED already covers it; RENAMED
-# is handled too for any caller that produces it directly.
-_COLUMN_GONE_KINDS = (ChangeKind.REMOVED, ChangeKind.RENAMED)
+# the changeset builder as REMOVED(old) + ADDED(new), so REMOVED already covers it.
+_COLUMN_GONE_KINDS = (ChangeKind.REMOVED,)
 
 
 def _column_missing_in_head(head: ModelRegistry, model: str, column: str) -> bool:

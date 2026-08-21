@@ -23,10 +23,12 @@ models:
       tags: ['PII']
     columns:
       - name: account_id
-        description: "Primary key of the account."
+        description: "Unique identifier for the account, cast to integer from the raw source id."
         data_tests:
           - not_null
           - unique
+      - name: account_holder
+        description: "Name of the account holder."
       - name: country_id
         description: "Country the account is registered in."
         data_tests:

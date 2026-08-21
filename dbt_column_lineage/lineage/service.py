@@ -581,6 +581,7 @@ class LineageService:
                             "resource_type": getattr(downstream_model, "resource_type", "model"),
                             "schema": downstream_model.schema_name,
                             "database": downstream_model.database,
+                            "description": downstream_model.description,
                         }
 
                     for col_name, lineage in columns.items():
@@ -608,6 +609,7 @@ class LineageService:
                                 "sql_expression": lineage.sql_expression,
                                 "severity": "critical" if is_critical else "low_impact",
                                 "data_type": col_obj.data_type if col_obj else None,
+                                "description": col_obj.description if col_obj else None,
                             }
                         )
 
@@ -672,6 +674,7 @@ class LineageService:
                             "resource_type": getattr(fm, "resource_type", "model"),
                             "schema": fm.schema_name,
                             "database": fm.database,
+                            "description": fm.description,
                         },
                     )
                     affected_columns.append(
@@ -683,6 +686,7 @@ class LineageService:
                             "sql_expression": (fm.predicate_lineage or {}).get(src_key),
                             "severity": "filter",
                             "data_type": None,
+                            "description": None,
                         }
                     )
                     filter_count += 1
@@ -726,6 +730,25 @@ class LineageService:
             logger.error(f"Error in impact analysis for {model_name}.{column_name}: {e}")
             raise
 
+    @staticmethod
+    def _lookup_column_description(
+        registry: Any, model_name: str, column_name: str
+    ) -> Optional[str]:
+        """The dbt-authored description of a column, or None if it can't be resolved.
+
+        Guarded so a stub service without a real registry simply yields no description
+        rather than erroring (mirrors the ``getattr(self, "registry", None)`` guard used
+        for the confidence block).
+        """
+        if registry is None:
+            return None
+        try:
+            model = registry.get_model(model_name)
+        except Exception:
+            return None
+        column = model.columns.get(column_name)
+        return column.description if column else None
+
     def get_changeset_impact(
         self,
         changes: List["ColumnChange"],
@@ -761,6 +784,13 @@ class LineageService:
             if change.kind == ChangeKind.REMOVED and base_service is not None:
                 service = base_service
 
+            # The changed column's own dbt docs — "what X is" — so a reviewer sees the
+            # meaning of what changed, not just its name. Sourced from whichever side
+            # still has the column (base for a removed column, head otherwise).
+            change_description = LineageService._lookup_column_description(
+                getattr(service, "registry", None), change.model, change.column
+            )
+
             try:
                 impact = service.get_column_impact(change.model, change.column)
             except Exception as e:
@@ -769,7 +799,9 @@ class LineageService:
                     f"({change.kind.value}): {e}"
                 )
                 unresolved += 1
-                by_change.append({**change.to_dict(), "resolved": False})
+                by_change.append(
+                    {**change.to_dict(), "resolved": False, "description": change_description}
+                )
                 continue
 
             for model in impact["affected_models"]:
@@ -786,7 +818,14 @@ class LineageService:
             for exposure in impact["affected_exposures"]:
                 affected_exposures[exposure["name"]] = exposure
 
-            by_change.append({**change.to_dict(), "resolved": True, "summary": impact["summary"]})
+            by_change.append(
+                {
+                    **change.to_dict(),
+                    "resolved": True,
+                    "summary": impact["summary"],
+                    "description": change_description,
+                }
+            )
 
         deduped_columns = [affected_columns[key] for key in sorted(affected_columns)]
         critical_count = sum(1 for c in deduped_columns if c["severity"] == "critical")

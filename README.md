@@ -152,7 +152,7 @@ exposures. Use `--format dot` for Graphviz.
 
 The `impact` command derives the *set* of changed columns for a branch and reports one
 consolidated blast radius, ranked by severity:
-**`removed` > `type_changed` > `logic_changed` > `renamed` > `added`**.
+**`removed` > `type_changed` > `logic_changed` > `added`**.
 
 ```bash
 # Reliable two-manifest diff (base branch vs. current)

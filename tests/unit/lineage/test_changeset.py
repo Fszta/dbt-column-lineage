@@ -111,7 +111,6 @@ def _impact(models, columns, exposures):
 def test_change_kind_priority_ordering():
     order = [
         ChangeKind.ADDED,
-        ChangeKind.RENAMED,
         ChangeKind.LOGIC_CHANGED,
         ChangeKind.TYPE_CHANGED,
         ChangeKind.REMOVED,

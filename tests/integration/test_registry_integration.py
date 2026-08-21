@@ -653,16 +653,35 @@ def test_cte_chain_column_resolves_to_base_model_not_cte_alias(registry):
     # Derived column: reads status + amount through two passthrough CTEs.
     executed_tables = source_tables("executed_amount")
     assert executed_tables, "executed_amount should have resolved upstream columns"
-    assert executed_tables & cte_aliases == set(), (
-        f"CTE aliases leaked into lineage: {executed_tables & cte_aliases}"
-    )
-    assert executed_tables == {"stg_transactions"}, (
-        f"executed_amount should resolve to stg_transactions, got {executed_tables}"
-    )
+    assert (
+        executed_tables & cte_aliases == set()
+    ), f"CTE aliases leaked into lineage: {executed_tables & cte_aliases}"
+    assert executed_tables == {
+        "stg_transactions"
+    }, f"executed_amount should resolve to stg_transactions, got {executed_tables}"
 
     # Direct passthrough column resolves the same way.
     tid_tables = source_tables("transaction_id")
-    assert tid_tables & cte_aliases == set(), (
-        f"CTE aliases leaked into lineage: {tid_tables & cte_aliases}"
-    )
+    assert (
+        tid_tables & cte_aliases == set()
+    ), f"CTE aliases leaked into lineage: {tid_tables & cte_aliases}"
     assert tid_tables == {"stg_transactions"}
+
+
+def test_descriptions_loaded_from_manifest(registry):
+    """Model and column descriptions authored in schema.yml flow onto the registry.
+
+    The manifest is the source of truth for dbt-authored docs; the bundled test
+    project sets a model description and two column descriptions on ``stg_accounts``.
+    """
+    model = registry.get_model("stg_accounts")
+
+    assert model.description
+    assert "account data" in model.description.lower()
+
+    account_id = model.columns["account_id"]
+    assert account_id.description == (
+        "Unique identifier for the account, cast to integer from the raw source id."
+    )
+    account_holder = model.columns["account_holder"]
+    assert account_holder.description == "Name of the account holder."
