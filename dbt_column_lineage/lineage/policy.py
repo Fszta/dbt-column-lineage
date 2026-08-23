@@ -551,6 +551,14 @@ class PolicyEngine:
                     continue
 
                 hit, b_add, t_add, notes = self._apply_actions(rule, subject, trace)
+                # mark a hit that fired via a fail-safe UNKNOWN resolution (a blocking rule
+                # firing on an undecidable predicate under fail_closed) rather than a proven TRUE
+                # match — the headline trust signal in ``policy test``. Applies identically to
+                # change- and aggregate-scope rules; semantic-default hits (added below) and
+                # override caps leave it False.
+                if _is_unknown(result):
+                    hit.fired_on_unknown = True
+                    hit.unknown_cause = "error" if result is Tri.UNKNOWN_ERROR else "missing"
                 hits.append(hit)
                 build_set |= b_add
                 test_set |= t_add

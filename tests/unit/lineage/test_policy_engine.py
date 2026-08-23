@@ -694,6 +694,101 @@ def test_on_error_fail_open_still_blocks_on_missing_meta_fail_closed():
     assert verdict.blocks()
 
 
+# --- fired_on_unknown trust signal on RuleHit ---------------------------
+
+
+def test_fired_on_unknown_true_on_missing_meta_fail_closed_block():
+    """A blocking rule firing via a fail-safe UNKNOWN (missing meta) is marked fired_on_unknown."""
+    policy = parse_policy(
+        {
+            "version": 1,
+            "defaults": {"on_missing_meta": "fail_closed"},
+            "rules": [
+                {
+                    "id": "naive",
+                    "predicate": {"meta": {"key": "pii", "op": "eq", "value": True}},
+                    "action": [{"type": "block"}],
+                }
+            ],
+        }
+    )
+    # pii absent -> eq on a missing key -> UNKNOWN_MISSING -> blocking rule fires via fail-safe.
+    verdict = _engine(
+        policy, FakeRegistry(model_meta={"m": {}}), _impact(_resolved("m", "c"))
+    ).evaluate([_change("m", "c", semantic=SemanticChangeKind.MEANING_CHANGED)])
+    assert verdict.blocks()
+    assert len(verdict.hits) == 1
+    assert verdict.hits[0].fired_on_unknown is True
+    assert verdict.hits[0].unknown_cause == "missing"
+
+
+def test_fired_on_unknown_error_cause_on_type_mismatch():
+    """A blocking rule firing via a type error (UNKNOWN_ERROR) records unknown_cause='error'."""
+    policy = _one_meta_rule("roles", "subset_of", ["A", "B"])  # subset_of on a scalar -> error
+    verdict = _engine(
+        policy, FakeRegistry(model_meta={"m": {"roles": "ADMIN"}}), _impact(_resolved("m", "c"))
+    ).evaluate([_change("m", "c", semantic=SemanticChangeKind.MEANING_CHANGED)])
+    assert verdict.blocks()
+    assert verdict.hits[0].fired_on_unknown is True
+    assert verdict.hits[0].unknown_cause == "error"
+
+
+def test_fired_on_unknown_false_on_proven_true_match():
+    """A rule that fired on a proven TRUE match leaves fired_on_unknown False."""
+    policy = parse_policy(
+        {
+            "version": 1,
+            "rules": [
+                {
+                    "id": "proven",
+                    "predicate": {"meta": {"key": "pii", "op": "is_true"}},
+                    "action": [{"type": "block"}],
+                }
+            ],
+        }
+    )
+    registry = FakeRegistry(column_meta={("m", "c"): {"pii": True}})
+    verdict = _engine(policy, registry, _impact(_resolved("m", "c"))).evaluate(
+        [_change("m", "c", semantic=SemanticChangeKind.MEANING_CHANGED)]
+    )
+    assert verdict.blocks()
+    assert verdict.hits[0].fired_on_unknown is False
+    assert verdict.hits[0].unknown_cause is None
+
+
+def test_skip_and_fail_open_produce_no_fired_hit():
+    """Neither skip nor fail_open should manufacture a fired hit on UNKNOWN."""
+    for knob in ("skip", "fail_open"):
+        policy = parse_policy(
+            {
+                "version": 1,
+                "defaults": {"on_missing_meta": knob},
+                "rules": [
+                    {
+                        "id": "r",
+                        "predicate": {"meta": {"key": "pii", "op": "eq", "value": True}},
+                        "action": [{"type": "block"}],
+                    }
+                ],
+            }
+        )
+        verdict = _engine(
+            policy, FakeRegistry(model_meta={"m": {}}), _impact(_resolved("m", "c"))
+        ).evaluate([_change("m", "c", semantic=SemanticChangeKind.MEANING_CHANGED)])
+        assert verdict.hits == []
+
+
+def test_builtin_semantic_default_hit_is_not_fired_on_unknown():
+    """A builtin semantic-default hit is always proven, never fired_on_unknown."""
+    policy = parse_policy({"version": 1, "defaults": {"on_indeterminate": "block"}, "rules": []})
+    verdict = _engine(policy, FakeRegistry(), _impact(_resolved("m", "c"))).evaluate(
+        [_change("m", "c", semantic=SemanticChangeKind.INDETERMINATE)]
+    )
+    assert verdict.blocks()
+    assert verdict.hits[0].rule_id == "builtin:on_indeterminate"
+    assert verdict.hits[0].fired_on_unknown is False
+
+
 # --- reach: mechanism filter + exposures + min_count ------------------------
 
 
