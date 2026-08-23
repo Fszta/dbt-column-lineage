@@ -1,3 +1,9 @@
+## [0.16.1](https://github.com/Fszta/dbt-column-lineage/compare/v0.16.0...v0.16.1) (2026-08-23)
+
+### Bug Fixes
+
+* **semantic-diff:** stop reporting NULL-unsound boolean rewrites as equivalent ([b0dd07d](https://github.com/Fszta/dbt-column-lineage/commit/b0dd07db3e35862113b79ee658d96a47d05f9563))
+
 ## [0.16.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.15.0...v0.16.0) (2026-08-23)
 
 ### Features
