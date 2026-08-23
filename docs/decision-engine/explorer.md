@@ -13,7 +13,7 @@ new surfaces, point it at a changeset the same way the `impact` command does. Th
 
 ```bash
 # Two-manifest diff — the reliable source
-dbt-col-lineage --explore \
+parrant --explore \
   --base-manifest base/manifest.json --base-catalog base/catalog.json \
   --policy policy.yml \
   --metabase metabase_lineage.json

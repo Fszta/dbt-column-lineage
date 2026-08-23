@@ -1,10 +1,10 @@
 # Quick Start
 
-This guide will help you get started with DBT Column Lineage in just a few minutes.
+This guide will help you get started with Parrant in just a few minutes.
 
 ## Prerequisites
 
-Before using DBT Column Lineage, you need to generate dbt artifacts:
+Before using Parrant, you need to generate dbt artifacts:
 
 ```bash
 cd your-dbt-project
@@ -29,13 +29,13 @@ This creates two files in your `target/` directory:
 Launch the interactive web interface:
 
 ```bash
-dbt-col-lineage --explore
+parrant --explore
 ```
 
 If your artifacts are in a custom location:
 
 ```bash
-dbt-col-lineage --explore \
+parrant --explore \
     --manifest path/to/manifest.json \
     --catalog path/to/catalog.json \
     --port 8080  # Optional, defaults to 8000

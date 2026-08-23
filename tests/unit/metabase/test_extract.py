@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from dbt_column_lineage.metabase.artifact import (
+from parrant.metabase.artifact import (
     MetabaseArtifactError,
     dump_metabase_lineage,
     load_metabase_lineage,
 )
-from dbt_column_lineage.metabase.client import MetabaseClient
-from dbt_column_lineage.metabase.extract import ExtractConfig, coverage_ratio, run_extract
+from parrant.metabase.client import MetabaseClient
+from parrant.metabase.extract import ExtractConfig, coverage_ratio, run_extract
 from tests.unit.metabase._fixtures import FakeSession, load_recorded
 
 DIM_ACCOUNTS = "analytics.marts_finance.dim_accounts"

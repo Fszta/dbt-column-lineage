@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dbt_column_lineage.metabase.resolvers import CardResolver
-from dbt_column_lineage.metabase.warehouse_meta import CardCorpus, WarehouseMeta
+from parrant.metabase.resolvers import CardResolver
+from parrant.metabase.warehouse_meta import CardCorpus, WarehouseMeta
 from tests.unit.metabase._fixtures import load_recorded
 
 DIM_ACCOUNTS = "analytics.marts_finance.dim_accounts"

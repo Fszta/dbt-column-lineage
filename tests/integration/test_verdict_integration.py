@@ -9,9 +9,9 @@ BREAK-TEST findings and the verdict must be BLOCK.
 import json
 from pathlib import Path
 
-from dbt_column_lineage.lineage.changeset import ChangesetBuilder
-from dbt_column_lineage.lineage.service import LineageService
-from dbt_column_lineage.lineage.verdict import classify_provable_breaks, decide_verdict
+from parrant.lineage.changeset import ChangesetBuilder
+from parrant.lineage.service import LineageService
+from parrant.lineage.verdict import classify_provable_breaks, decide_verdict
 
 # A staging model that carries not_null/unique tests in the fixture (see the tests added to
 # models/staging/models.yml) and whose columns are therefore provable-break candidates.
@@ -74,7 +74,7 @@ def test_no_break_when_nothing_removed(dbt_artifacts):
 def test_filter_only_changeset_is_review_not_safe(dbt_artifacts):
     """A row-set (filter) change must carry filter_count in the changeset summary so the
     JSON verdict agrees with the markdown banner (regression: filter_count was missing)."""
-    from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
+    from parrant.lineage.changeset import ChangeKind, ColumnChange
 
     svc = LineageService(Path(dbt_artifacts["catalog_path"]), Path(dbt_artifacts["manifest_path"]))
     # transactions.status is used ONLY in a WHERE in flagged_transaction_metrics (row-set).
@@ -96,8 +96,8 @@ def test_meaning_change_on_leaf_column_is_review_not_safe(dbt_artifacts):
     semantic axis fed the verdict, that read as SAFE even though the derivation's meaning
     changed. It must now escalate to REVIEW purely on the semantic classification.
     """
-    from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
-    from dbt_column_lineage.models.schema import SemanticChangeKind
+    from parrant.lineage.changeset import ChangeKind, ColumnChange
+    from parrant.models.schema import SemanticChangeKind
 
     svc = LineageService(Path(dbt_artifacts["catalog_path"]), Path(dbt_artifacts["manifest_path"]))
     changes = [

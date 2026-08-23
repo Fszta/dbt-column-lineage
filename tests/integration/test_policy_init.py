@@ -12,10 +12,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dbt_column_lineage.lineage.policy import evaluate_policy, parse_policy
-from dbt_column_lineage.lineage.policy_init import emit_policy_yaml, run_policy_init, scan_project
-from dbt_column_lineage.lineage.service import LineageService
-from dbt_column_lineage.models.schema import GateDecision
+from parrant.lineage.policy import evaluate_policy, parse_policy
+from parrant.lineage.policy_init import emit_policy_yaml, run_policy_init, scan_project
+from parrant.lineage.service import LineageService
+from parrant.models.schema import GateDecision
 
 
 @pytest.fixture
@@ -98,7 +98,7 @@ def test_emit_points_at_policy_test(bundled_scan):
 
 
 def test_run_policy_init_writes_file(dbt_artifacts, tmp_path):
-    out = tmp_path / "dbt-col-lineage.policy.yml"
+    out = tmp_path / "parrant.policy.yml"
     text = run_policy_init(
         manifest=str(dbt_artifacts["manifest_path"]),
         catalog=str(dbt_artifacts["catalog_path"]),
@@ -113,7 +113,7 @@ def test_run_policy_init_writes_file(dbt_artifacts, tmp_path):
 
 
 def test_run_policy_init_refuses_overwrite_without_force(dbt_artifacts, tmp_path):
-    out = tmp_path / "dbt-col-lineage.policy.yml"
+    out = tmp_path / "parrant.policy.yml"
     out.write_text("version: 1\nrules: []\n")
     with pytest.raises(FileExistsError):
         run_policy_init(
@@ -129,7 +129,7 @@ def test_run_policy_init_refuses_overwrite_without_force(dbt_artifacts, tmp_path
 
 
 def test_run_policy_init_force_overwrites(dbt_artifacts, tmp_path):
-    out = tmp_path / "dbt-col-lineage.policy.yml"
+    out = tmp_path / "parrant.policy.yml"
     out.write_text("stale\n")
     text = run_policy_init(
         manifest=str(dbt_artifacts["manifest_path"]),
@@ -144,7 +144,7 @@ def test_run_policy_init_force_overwrites(dbt_artifacts, tmp_path):
 
 
 def test_run_policy_init_stdout_never_writes(dbt_artifacts, tmp_path):
-    out = tmp_path / "dbt-col-lineage.policy.yml"
+    out = tmp_path / "parrant.policy.yml"
     text = run_policy_init(
         manifest=str(dbt_artifacts["manifest_path"]),
         catalog=str(dbt_artifacts["catalog_path"]),

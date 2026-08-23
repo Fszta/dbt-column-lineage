@@ -21,9 +21,9 @@ already clear from the request:
    - `agent` — judgment-heavy, multi-step, may branch (e.g. `change-safety-review`).
    - `helper` — a precondition/utility other skills call (e.g. `refresh-artifacts`).
 3. **The question it answers** in the user's words ("what breaks if…", "where does…").
-4. **CLI surface it wraps** — the exact `dbt-col-lineage` command(s) and which JSON/
+4. **CLI surface it wraps** — the exact `parrant` command(s) and which JSON/
    Markdown fields it reads. Verify the flags against the current CLI
-   (`poetry run dbt-col-lineage --help`), not memory.
+   (`poetry run parrant --help`), not memory.
 5. **Sibling disambiguation** — which existing skill is it most likely confused with,
    and how does its description draw the line?
 

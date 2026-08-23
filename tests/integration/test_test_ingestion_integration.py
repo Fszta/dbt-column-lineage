@@ -5,8 +5,8 @@ These drive the actual ``dbt_test_project`` artifacts produced by ``dbt docs gen
 shape rather than a hand-written approximation.
 """
 
-from dbt_column_lineage.artifacts.manifest import ManifestReader
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from parrant.artifacts.manifest import ManifestReader
+from parrant.artifacts.registry import ModelRegistry
 
 
 def test_manifest_contains_test_nodes(dbt_artifacts):

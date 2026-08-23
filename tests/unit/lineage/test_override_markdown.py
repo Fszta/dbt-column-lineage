@@ -1,6 +1,6 @@
 """Markdown rendering of the override section + the policy-hit suppression note."""
 
-from dbt_column_lineage.lineage.display.markdown import (
+from parrant.lineage.display.markdown import (
     _policy_hit_line,
     _render_overrides_section,
     render_changeset_markdown,

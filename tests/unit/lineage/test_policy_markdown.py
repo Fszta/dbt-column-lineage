@@ -5,7 +5,7 @@ decision (block first), surfaces the selective build/test sets and notify intent
 re-lists the downstream blast radius (the impact section owns that).
 """
 
-from dbt_column_lineage.lineage.display.markdown import render_changeset_markdown
+from parrant.lineage.display.markdown import render_changeset_markdown
 
 _BASE_REPORT = {
     "changeset": {"total_changes": 1, "by_kind": {"logic_changed": 1}},

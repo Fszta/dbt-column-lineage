@@ -1,6 +1,6 @@
 ---
 name: check-explorer
-description: Launch the dbt-col-lineage interactive HTML explorer against the bundled test project and verify the UI actually works end-to-end — API endpoints return well-formed data, the D3 graph renders, and the column-lineage + Analyze Impact flows respond. Use when the user asks to "check/verify/QA the explorer", "did my change break the UI?", "does the graph still render?", or after editing anything under dbt_column_lineage/lineage/display/ (explore.py, templates/, static/js/, static/css/). This is a dev/contributor QA skill — distinct from the product `explore-lineage` skill, which only *opens* the explorer for an end user and does no verification.
+description: Launch the parrant interactive HTML explorer against the bundled test project and verify the UI actually works end-to-end — API endpoints return well-formed data, the D3 graph renders, and the column-lineage + Analyze Impact flows respond. Use when the user asks to "check/verify/QA the explorer", "did my change break the UI?", "does the graph still render?", or after editing anything under parrant/lineage/display/ (explore.py, templates/, static/js/, static/css/). This is a dev/contributor QA skill — distinct from the product `explore-lineage` skill, which only *opens* the explorer for an end user and does no verification.
 ---
 
 # Check explorer (dev QA)
@@ -33,7 +33,7 @@ port collision is the usual cause.
 
 ## 2. API smoke-tests (always run these)
 
-The explorer exposes these routes (see `dbt_column_lineage/lineage/display/html/explore.py`).
+The explorer exposes these routes (see `parrant/lineage/display/html/explore.py`).
 Assert each returns `200` and well-formed JSON:
 
 | Endpoint | What to assert |

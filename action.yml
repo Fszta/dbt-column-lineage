@@ -1,4 +1,4 @@
-name: "dbt Column Lineage Impact"
+name: "Parrant"
 description: >-
   Post a column-level blast-radius report as a sticky PR comment and optionally
   gate the check on impact severity.
@@ -40,7 +40,7 @@ inputs:
   policy:
     description: >-
       Path to a policy.yml for the metadata-agnostic policy engine. When set (or a
-      ./dbt-col-lineage.policy.yml exists), the report gains a 'policy_verdict' block and
+      ./parrant.policy.yml exists), the report gains a 'policy_verdict' block and
       'fail-on: policy' gates on it. A present-but-invalid file fails the run loudly.
     required: false
     default: ""
@@ -63,7 +63,7 @@ inputs:
     default: "3.11"
   version:
     description: >-
-      Override how dbt-col-lineage is installed. Empty (default) installs the
+      Override how parrant is installed. Empty (default) installs the
       source bundled with this action ref, so the tool always matches the tag you
       pin (e.g. @v0.8.0 runs the 0.8.0 code). Set to a PyPI version spec
       (e.g. "0.8.0") to install from PyPI instead.
@@ -121,11 +121,11 @@ runs:
         cache: pip
         cache-dependency-path: ${{ github.action_path }}/pyproject.toml
 
-    - name: Install dbt-col-lineage
+    - name: Install parrant
       shell: bash
       run: |
         if [ -n "${{ inputs.version }}" ]; then
-          pip install "dbt-col-lineage==${{ inputs.version }}"
+          pip install "parrant==${{ inputs.version }}"
         else
           # $GITHUB_ACTION_PATH is this repo checked out at the pinned ref, so
           # installing it means the CLI always matches the tag the caller pinned.
@@ -149,4 +149,4 @@ runs:
         [ -n "${{ inputs.adapter }}" ] && args+=(--adapter "${{ inputs.adapter }}")
         [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
         [ "${{ inputs.no-overrides }}" = "true" ] && args+=(--no-overrides)
-        dbt-col-lineage "${args[@]}"
+        parrant "${args[@]}"

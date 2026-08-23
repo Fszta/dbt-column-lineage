@@ -8,9 +8,9 @@ two test lookups (``get_column_tests`` / ``get_tests_referencing``).
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 
-from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
-from dbt_column_lineage.lineage.verdict import classify_provable_breaks, decide_verdict
-from dbt_column_lineage.models.schema import BreakFinding, SemanticChangeKind, TestNode
+from parrant.lineage.changeset import ChangeKind, ColumnChange
+from parrant.lineage.verdict import classify_provable_breaks, decide_verdict
+from parrant.models.schema import BreakFinding, SemanticChangeKind, TestNode
 
 
 @dataclass
@@ -278,8 +278,8 @@ def test_verdict_omitting_changes_is_backward_compatible():
 
 # --- overrides: decide_verdict + applied/ineffective override records ----
 
-from dbt_column_lineage.models.schema import OverrideDirective, OverrideVerb  # noqa: E402
-from dbt_column_lineage.lineage.verdict import (  # noqa: E402
+from parrant.models.schema import OverrideDirective, OverrideVerb  # noqa: E402
+from parrant.lineage.verdict import (  # noqa: E402
     applied_overrides,
     ineffective_overrides,
     unexcused_break_count,
@@ -321,7 +321,7 @@ def test_allow_change_cannot_downgrade_a_provable_break():
 def test_allow_break_beats_allow_change_precedence_stays_review():
     # Two pragmas on the same break column: hard (allow-break) wins -> demoted to review,
     # never safe, never block.
-    from dbt_column_lineage.lineage.changeset import resolve_overrides
+    from parrant.lineage.changeset import resolve_overrides
 
     hard = 'select\n  -- lineage:allow-change column=customer_id reason="soft"\n  -- lineage:allow-break column=customer_id reason="hard"\n  x\n'
     change = _removed_change()

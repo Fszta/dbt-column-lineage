@@ -47,7 +47,7 @@ Metabase API, resolves every card down to warehouse `schema.table.column`, attac
 dashboards each card appears on, and writes the snapshot.
 
 ```bash
-dbt-col-lineage metabase-extract \
+parrant metabase-extract \
   --metabase-url https://metabase.example.com \
   --metabase-api-key "$METABASE_API_KEY" \
   --database-id 2 \
@@ -153,7 +153,7 @@ Feed the snapshot to the impact run. Metabase dashboards that read a changed col
 via its dbt downstream) surface as **exposure-kind reach**, matchable by a policy `reach` rule.
 
 ```bash
-dbt-col-lineage impact \
+parrant impact \
   --manifest target/manifest.json --catalog target/catalog.json \
   --base-manifest base/manifest.json --base-catalog base/catalog.json \
   --metabase metabase_lineage.json \
@@ -164,7 +164,7 @@ A present-but-invalid snapshot fails loudly; a missing one degrades gracefully t
 
 !!! note "The GitHub Action doesn't wire `--metabase`"
     The composite action exposes `policy` but not `metabase`. To gate on cross-boundary reach in
-    CI, invoke the CLI directly in a step (`dbt-col-lineage impact --metabase … --policy … --fail-on policy`)
+    CI, invoke the CLI directly in a step (`parrant impact --metabase … --policy … --fail-on policy`)
     after fetching the snapshot, rather than using the action's inputs.
 
 ## Writing a cross-boundary policy rule

@@ -6,10 +6,10 @@ rage-blocks on a `meta` key your models don't carry.
 
 !!! tip "Start with `policy init`, not a blank file"
     ```bash
-    dbt-col-lineage policy init --manifest target/manifest.json --catalog target/catalog.json
+    parrant policy init --manifest target/manifest.json --catalog target/catalog.json
     ```
     `policy init` reads your manifest + catalog and writes a heavily-commented
-    `./dbt-col-lineage.policy.yml` keyed only to signals it confirmed exist — the structural
+    `./parrant.policy.yml` keyed only to signals it confirmed exist — the structural
     rules below arrive enabled, and every dbt-`meta` key you actually use arrives as a commented
     template prefixed with its real coverage. This page is the reference for the recipes it emits
     and a few more you can graft in. The generated file is **yours** — edit it freely.
@@ -18,7 +18,7 @@ rage-blocks on a `meta` key your models don't carry.
     Before you flip any rule from `warn` to `block` — or uncomment a `meta`-keyed template —
     replay it over your recent history:
     ```bash
-    dbt-col-lineage policy test --last 20 --policy dbt-col-lineage.policy.yml
+    parrant policy test --last 20 --policy parrant.policy.yml
     ```
     This shows what each rule **would** have done and, the headline column, how many firings were
     driven by a fail-safe `UNKNOWN` rather than a proven match. A rule that blocks mostly via

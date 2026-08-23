@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parrant</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/graph.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/explore.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/impact.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/policy.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/model-details.css') }}">
+    <script>
+        // Apply saved theme before first paint (no flash, correct graph colors on first render)
+        (function () {
+            try {
+                var t = localStorage.getItem('dbtcl-theme');
+                if (t === 'dark' || t === 'light') {
+                    document.documentElement.setAttribute('data-theme', t);
+                }
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="github-header">
+                <a href="https://github.com/Fszta/parrant" target="_blank" rel="noopener noreferrer" class="github-link">
+                    <svg class="github-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    <span>View on GitHub</span>
+                    <svg class="external-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                </a>
+                <button id="themeToggle" class="theme-toggle-btn" type="button" title="Toggle light / dark theme" aria-label="Toggle theme">
+                    <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+                    <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                </button>
+            </div>
+            {% if explore_mode %}
+            <div class="explore-panel">
+                <h3>
+                    <span class="explore-brand-mark">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d=" 12h14M13 6l6 6-6 6"></path></svg>
+                    </span>
+                    Explore lineage
+                </h3>
+                <div class="search-bar-container" id="searchBarContainer">
+                    <input type="text" id="modelSearchInput" placeholder="Search models...">
+                    <button type="button" class="search-clear-btn" id="searchClearBtn" title="Clear search">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <div id="model-tree-container">
+                </div>
+                <div class="explore-panel-actions">
+                    <div class="selected-model-context" id="selectedModelContext" style="display: none;">
+                        <span class="selected-model-context-label">Selected model</span>
+                        <span class="selected-model-context-name" id="selectedModelContextName"></span>
+                    </div>
+                    <div class="column-selector">
+                        <label for="columnSelect">Column:</label>
+                        <div class="custom-select disabled" id="columnSelectWrapper">
+                            <div class="custom-select-trigger" id="columnSelectTrigger">
+                                <span class="custom-select-value"><span class="option-text">Select a model first</span></span>
+                                <svg class="custom-select-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </div>
+                            <div class="custom-select-options" id="columnSelectOptions">
+                                <div class="column-search-container">
+                                    <input type="text" id="columnSearchInput" class="column-search-input" placeholder="Search columns..." autocomplete="off">
+                                    <svg class="column-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                </div>
+                                <div class="custom-select-options-list" id="columnSelectOptionsList">
+                                    <div class="custom-select-option" data-value=""><span class="option-text">Select a column</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <select id="columnSelect" disabled style="display: none;">
+                            <option value="">Select a model first</option>
+                        </select>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="loadLineage" disabled>Load Lineage</button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <!-- Impact Analysis Panel -->
+            <div id="impactAnalysisPanel" class="impact-panel" style="display: none;">
+                <div class="impact-panel-resize-handle" id="impactPanelResizeHandle"></div>
+                <div class="impact-panel-header">
+                    <div class="header-content">
+                        <h3>Impact Analysis</h3>
+                        <p class="header-subtitle">What happens if I change this column?</p>
+                    </div>
+                    <button id="closeImpactPanel" class="close-button">×</button>
+                </div>
+                <div id="impactAnalysisContent" class="impact-panel-content">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="controls">
+                <h3>Controls</h3>
+                <button id="zoomIn">Zoom In</button>
+                <button id="zoomOut">Zoom Out</button>
+                <button id="resetView">Reset View</button>
+                <button id="relayout">Re-layout</button>
+                <label class="control-toggle" for="showTestsToggle" title="Show dbt tests (not_null, unique, relationships, ...) on tested columns">
+                    <input type="checkbox" id="showTestsToggle">
+                    <span class="control-toggle-label">
+                        <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d=".5 0.5 L9 2.1 V5.1 C9 7.9 7 9.8 4.5 10.5 C2 9.8 0 7.9 0 5.1 V2.1 Z"></path>
+                            <path d=".4 5.3 L4 6.9 L6.8 3.7"></path>
+                        </svg>
+                        Show tests
+                    </span>
+                </label>
+            </div>
+        </div>
+        <div id="graph">
+            <div id="graphEmptyState" class="graph-empty-state">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3L3 7.5V16.5L12 21L21 16.5V7.5L12 3Z"/>
+                        <path d="M12 12L21 7.5M12 12L3 7.5M12 12V21"/>
+                    </svg>
+                </div>
+                <h3>What breaks if you change a column?</h3>
+                <p>Pick a model from the tree, choose a column, and load its lineage to trace the blast radius.</p>
+                <div class="empty-state-hint">
+                    <span><code>+model.col</code> upstream</span>
+                    <span><code>model.col+</code> downstream</span>
+                    <span><code>model.col</code> both</span>
+                </div>
+            </div>
+            <div id="relationshipSummaryCard" class="relationship-summary-card" style="display: none;">
+                <div class="relationship-summary-header" id="toggleRelationshipSummary">
+                    <div class="relationship-summary-title">
+                        <span class="relationship-summary-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                                <circle cx="12" cy="12" r="5"></circle>
+                            </svg>
+                        </span>
+                        <div>
+                            <h4>Column Relationship Summary</h4>
+                            <p class="relationship-summary-subtitle">Relationship overview for this column</p>
+                        </div>
+                    </div>
+                    <button class="relationship-summary-toggle" id="collapseRelationshipSummaryCard">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="18 15 12 9 6 15"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                <div class="relationship-summary-content" id="relationshipSummaryContent">
+                    <div class="relationship-summary-metrics" id="relationshipSummaryMetrics">
+                        <!-- Metrics will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            <div id="impactAnalysisCard" class="impact-analysis-card" style="display: none;">
+                <div class="impact-card-compact">
+                    <span class="impact-card-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 16v-4M12 8h.01"></path>
+                        </svg>
+                    </span>
+                    <span class="impact-card-label">See what's affected if this column changed</span>
+                    <button id="loadImpactAnalysisFromCard" class="impact-card-button-compact">
+                        Analyze Impact
+                    </button>
+                    <button class="impact-card-close-compact" id="closeImpactAnalysisCard">×</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', path='/vendor/d3.v7.min.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/config.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/dataProcessor.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/utils.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/renderer.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/interactions.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/graph.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/explore.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/policy.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/impact.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/model-details.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/app.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const initialData = {{ data | tojson }};
+            const isExploreMode = {% if explore_mode %}true{% else %}false{% endif %};
+            window.app.init(initialData, isExploreMode);
+
+            // Theme toggle
+            const toggle = document.getElementById('themeToggle');
+            if (toggle) {
+                const currentTheme = function () {
+                    return document.documentElement.getAttribute('data-theme') || 'light';
+                };
+                toggle.addEventListener('click', function () {
+                    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', next);
+                    try { localStorage.setItem('dbtcl-theme', next); } catch (e) {}
+                    // Keep the D3 graph palette in sync for subsequent interactions
+                    if (window.graphConfig && typeof resolveGraphColors === 'function') {
+                        window.graphConfig.colors = resolveGraphColors();
+                    }
+                });
+            }
+
+            // "Show tests" toggle — reveals dbt-test indicators in the graph and the tests
+            // covering each column in the impact panel. Default OFF; choice persisted.
+            const testsToggle = document.getElementById('showTestsToggle');
+            if (testsToggle) {
+                let saved = false;
+                try { saved = localStorage.getItem('dbtcl-show-tests') === '1'; } catch (e) {}
+                const applyTestsState = function (on) {
+                    window.__showTests = on;
+                    document.body.classList.toggle('show-tests', on);
+                };
+                testsToggle.checked = saved;
+                applyTestsState(saved);
+                testsToggle.addEventListener('change', function () {
+                    const on = testsToggle.checked;
+                    applyTestsState(on);
+                    try { localStorage.setItem('dbtcl-show-tests', on ? '1' : '0'); } catch (e) {}
+                    // Re-render the graph so column badges reserve/release their space cleanly.
+                    if (window.__lastGraphData && typeof initGraph === 'function') {
+                        const inst = initGraph(window.__lastGraphData);
+                        // setGraphInstance shares the closure var behind the explore
+                        // controller's graphInstanceRef, so this keeps both in sync.
+                        if (window.app && window.app.setGraphInstance) {
+                            window.app.setGraphInstance(inst);
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

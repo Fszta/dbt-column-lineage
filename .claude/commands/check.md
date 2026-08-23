@@ -5,7 +5,7 @@ description: Pre-push gate — run format, type-check, and tests; report and fix
 Run the full local quality gate for this repo, in order, and stop to report if a step fails.
 
 1. **Format** — `poetry run format` (black + ruff). If it reformats files, note which.
-2. **Type check** — `poetry run type-check` (mypy over `dbt_column_lineage` and `tests`).
+2. **Type check** — `poetry run type-check` (mypy over `parrant` and `tests`).
 3. **Tests** — `poetry run test` (all tiers). If you only touched one layer and want a
    faster loop, you may run the matching tier instead (`test-unit` / `test-integration` /
    `test-e2e`) — but run the full suite before declaring the gate green.

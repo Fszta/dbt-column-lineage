@@ -1,7 +1,7 @@
 [project]
-name = "dbt-col-lineage"
+name = "parrant"
 version = "0.17.0"
-description = "Impact analysis for dbt projects using column-level data lineage"
+description = "Parrant — the offline pre-merge column-impact gate for dbt: parry the breaking changes, warrant the safe ones"
 authors = [
     {name = "Fszta"}
 ]
@@ -19,7 +19,9 @@ dependencies = [
 ]
 
 [tool.poetry.scripts]
-dbt-col-lineage = "dbt_column_lineage.cli.main:main"
+parrant = "parrant.cli.main:main"
+# Compatibility alias (removed in a future major): warns to stderr, then delegates to `parrant`.
+dbt-col-lineage = "parrant.cli.main:main_legacy"
 test = "scripts.run_tests:run_tests"
 test-unit = "scripts.run_tests:run_tests_unit"
 test-integration = "scripts.run_tests:run_tests_integration"
@@ -83,8 +85,8 @@ module = [
 ignore_missing_imports = true
 
 [tool.poetry]
-name = "dbt-col-lineage"
+name = "parrant"
 packages = [
-    {include = "dbt_column_lineage"}
+    {include = "parrant"}
 ]
 license = "MIT"

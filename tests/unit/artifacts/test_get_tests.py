@@ -8,7 +8,7 @@ top-level ``column_name`` and ``attached_node``, plus ``test_metadata.name`` /
 
 import json
 
-from dbt_column_lineage.artifacts.manifest import ManifestReader
+from parrant.artifacts.manifest import ManifestReader
 
 
 def _generic_test_node(name, model, column, extra_kwargs=None, extra_deps=None):

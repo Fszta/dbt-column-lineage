@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Set
 
 import pytest
 
-from dbt_column_lineage.lineage.changeset import (
+from parrant.lineage.changeset import (
     ChangeKind,
     ChangesetBuilder,
     ColumnChange,
@@ -18,9 +18,9 @@ from dbt_column_lineage.lineage.changeset import (
     build_git_changeset,
     scope_changes_to_models,
 )
-from dbt_column_lineage.models.schema import SemanticChangeKind
-from dbt_column_lineage.lineage.display.markdown import render_changeset_markdown
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.models.schema import SemanticChangeKind
+from parrant.lineage.display.markdown import render_changeset_markdown
+from parrant.lineage.service import LineageService
 
 
 # --- stubs -----------------------------------------------------------------
@@ -339,7 +339,7 @@ def test_builder_no_lineage_fallback_tags_all_indeterminate():
 
 
 def test_git_changeset_fallback_tags_indeterminate(monkeypatch):
-    from dbt_column_lineage.lineage import changeset
+    from parrant.lineage import changeset
 
     monkeypatch.setattr(
         changeset,
@@ -543,7 +543,7 @@ def test_markdown_empty_changeset():
     md = render_changeset_markdown(report)
     assert "No column changes" in md
     # attribution footer present even on the empty report
-    assert "github.com/Fszta/dbt-column-lineage" in md
+    assert "github.com/Fszta/parrant" in md
 
 
 def test_markdown_explain_renders_reason_and_expressions():
@@ -592,8 +592,8 @@ def test_markdown_appends_attribution_footer():
     )
     md = render_changeset_markdown(report)
     # one subtle, linked credit line at the end of the comment body
-    assert "— lineage by [dbt-col-lineage](https://github.com/Fszta/dbt-column-lineage)" in md
-    assert md.count("github.com/Fszta/dbt-column-lineage") == 1
+    assert "— lineage by [parrant](https://github.com/Fszta/parrant)" in md
+    assert md.count("github.com/Fszta/parrant") == 1
 
 
 def test_markdown_lists_exposures_first_and_blast_table():
@@ -910,7 +910,7 @@ def _registry_with_paths():
 
 
 def test_git_changed_models_maps_files_to_models(monkeypatch):
-    from dbt_column_lineage.lineage import changeset
+    from parrant.lineage import changeset
 
     monkeypatch.setattr(
         changeset,
@@ -942,11 +942,11 @@ if __name__ == "__main__":
 
 # --- override resolution -------------------------------------------------
 
-from dbt_column_lineage.lineage.changeset import (  # noqa: E402
+from parrant.lineage.changeset import (  # noqa: E402
     OverrideResolution,
     resolve_overrides,
 )
-from dbt_column_lineage.models.schema import OverrideVerb  # noqa: E402
+from parrant.models.schema import OverrideVerb  # noqa: E402
 
 
 def _lc(model, column):
@@ -1042,7 +1042,7 @@ def test_build_git_changeset_collects_stale_and_warnings():
             return 'select\n  -- lineage:allow-foo reason="x"\n  -- lineage:allow-change column=ghost reason="dead"\n  total\n'
 
     reg = _GitReg()
-    import dbt_column_lineage.lineage.changeset as cs
+    import parrant.lineage.changeset as cs
 
     orig = cs.git_changed_models
     cs.git_changed_models = lambda head, git_base, repo_dir=None, git_head="HEAD": {"orders"}

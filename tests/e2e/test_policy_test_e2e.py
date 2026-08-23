@@ -1,4 +1,4 @@
-"""End-to-end: the installed ``dbt-col-lineage policy test`` console script backtests a policy
+"""End-to-end: the installed ``parrant policy test`` console script backtests a policy
 over the real repo's recent git history against the bundled dbt project.
 
 Runs the actual entry point as a subprocess (not the in-process runner) so the CLI wiring,
@@ -15,7 +15,7 @@ _POLICY = str(REPO_ROOT / "tests" / "resources" / "policies" / "block_on_removed
 
 def _run(args):
     return subprocess.run(
-        ["poetry", "run", "dbt-col-lineage", "policy", "test", *args],
+        ["poetry", "run", "parrant", "policy", "test", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

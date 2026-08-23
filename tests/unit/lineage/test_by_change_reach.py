@@ -10,8 +10,8 @@ that the resolved entries now carry ``reached_models`` / ``reached_exposures`` /
 
 import json
 
-from dbt_column_lineage.lineage.changeset import ChangesetBuilder
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.lineage.changeset import ChangesetBuilder
+from parrant.lineage.service import LineageService
 
 
 def _catalog_node(name, columns):

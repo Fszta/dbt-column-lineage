@@ -9,7 +9,7 @@ import json
 
 from click.testing import CliRunner
 
-from dbt_column_lineage.cli.main import impact
+from parrant.cli.main import impact
 
 
 def test_impact_json_includes_verdict_keys(dbt_artifacts):

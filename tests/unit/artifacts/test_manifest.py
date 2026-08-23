@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from dbt_column_lineage.artifacts.manifest import ManifestReader
+from parrant.artifacts.manifest import ManifestReader
 
 
 @pytest.fixture

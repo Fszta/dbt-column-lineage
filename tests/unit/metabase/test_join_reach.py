@@ -5,13 +5,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from dbt_column_lineage.metabase.join import build_relation_index, normalize_relation
-from dbt_column_lineage.metabase.reach import (
+from parrant.metabase.join import build_relation_index, normalize_relation
+from parrant.metabase.reach import (
     MetabaseReach,
     build_reach_confidence,
     dashboard_reach_name,
 )
-from dbt_column_lineage.models.schema import (
+from parrant.models.schema import (
     MetabaseCard,
     MetabaseColumnRef,
     MetabaseCoverage,

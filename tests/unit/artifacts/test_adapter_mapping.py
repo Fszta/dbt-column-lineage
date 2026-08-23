@@ -4,8 +4,8 @@ import logging
 
 import pytest
 
-import dbt_column_lineage.artifacts.adapter_mapping as adapter_mapping
-from dbt_column_lineage.artifacts.adapter_mapping import (
+import parrant.artifacts.adapter_mapping as adapter_mapping
+from parrant.artifacts.adapter_mapping import (
     ADAPTER_TO_DIALECT,
     normalize_adapter,
 )

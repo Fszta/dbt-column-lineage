@@ -16,7 +16,7 @@ The chain the vocabulary describes, in order:
 
 ## 1. Change kinds — *what* changed about a column
 
-**Code:** `ChangeKind` (`dbt_column_lineage/lineage/changeset.py`) · **JSON:** `by_change[].kind`,
+**Code:** `ChangeKind` (`parrant/lineage/changeset.py`) · **JSON:** `by_change[].kind`,
 `change.kind` in a policy predicate.
 
 | Value (`kind`) | Definition | Breaking by construction? |

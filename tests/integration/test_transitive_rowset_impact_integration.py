@@ -15,7 +15,7 @@ even though the predicate is on int_txn_dates' column, not the stg one.
 
 from pathlib import Path
 
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.lineage.service import LineageService
 
 _CONSUMER = "latest_txn_per_account"
 

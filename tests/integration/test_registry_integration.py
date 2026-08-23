@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from parrant.artifacts.registry import ModelRegistry
 
 
 @pytest.fixture
@@ -354,7 +354,7 @@ def test_exposures_as_downstream_dependencies(registry):
 
 def test_impact_analysis(registry, dbt_artifacts):
     """Test impact analysis for a column - what would break if the column is modified."""
-    from dbt_column_lineage.lineage.service import LineageService
+    from parrant.lineage.service import LineageService
     from pathlib import Path
 
     service = LineageService(

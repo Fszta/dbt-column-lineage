@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-_PKG = Path(__file__).resolve().parents[3] / "dbt_column_lineage" / "metabase"
+_PKG = Path(__file__).resolve().parents[3] / "parrant" / "metabase"
 _CONSUME_MODULES = ["artifact.py", "join.py", "reach.py"]
 
 
@@ -41,10 +41,10 @@ def test_importing_reach_does_not_load_the_client():
     # credentialed client module.
     code = (
         "import sys\n"
-        "import dbt_column_lineage.metabase.artifact\n"
-        "import dbt_column_lineage.metabase.join\n"
-        "import dbt_column_lineage.metabase.reach\n"
-        "assert 'dbt_column_lineage.metabase.client' not in sys.modules, "
+        "import parrant.metabase.artifact\n"
+        "import parrant.metabase.join\n"
+        "import parrant.metabase.reach\n"
+        "assert 'parrant.metabase.client' not in sys.modules, "
         "'client leaked into the offline consume path'\n"
         "print('ok')\n"
     )

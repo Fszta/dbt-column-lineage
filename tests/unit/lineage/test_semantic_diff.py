@@ -7,12 +7,12 @@ Fixture style = inline SQL fragment string pairs (matches the pure-function unit
 
 import pytest
 
-from dbt_column_lineage.lineage.semantic_diff import (
+from parrant.lineage.semantic_diff import (
     _UNPARSEABLE_PREFIX,
     canonical_key,
     compare_expressions,
 )
-from dbt_column_lineage.models.schema import SemanticChangeKind
+from parrant.models.schema import SemanticChangeKind
 
 _DIALECT = "snowflake"
 

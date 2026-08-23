@@ -11,7 +11,7 @@ Usage:
 
 Prints the Markdown section to stdout. Env (optional, with sensible fallbacks):
     GITHUB_SERVER_URL   default https://github.com
-    GITHUB_REPOSITORY   default Fszta/dbt-column-lineage
+    GITHUB_REPOSITORY   default Fszta/parrant
 """
 import os
 import re
@@ -44,7 +44,7 @@ def main() -> int:
     prev_tag = re.sub(r"-\d+-g[0-9a-f]+$", "", prev_tag)
 
     server = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
-    repo = os.environ.get("GITHUB_REPOSITORY", "Fszta/dbt-column-lineage")
+    repo = os.environ.get("GITHUB_REPOSITORY", "Fszta/parrant")
     repo_url = f"{server}/{repo}"
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 

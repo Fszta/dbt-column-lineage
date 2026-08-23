@@ -1,7 +1,7 @@
 import pytest
-from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
-from dbt_column_lineage.artifacts.registry import ModelRegistry
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.lineage.display.html.explore import LineageExplorer
+from parrant.artifacts.registry import ModelRegistry
+from parrant.lineage.service import LineageService
 from pathlib import Path
 
 
