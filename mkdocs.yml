@@ -96,6 +96,7 @@ nav:
     - Guides:
       - Semantic Categorization: decision-engine/semantic-categorization.md
       - Policy Gate: decision-engine/policy-gate.md
+      - Policy Recipes: decision-engine/policy-recipes.md
       - Cross-boundary (Metabase): decision-engine/metabase.md
       - Explorer: decision-engine/explorer.md
     - Glossary: decision-engine/glossary.md
