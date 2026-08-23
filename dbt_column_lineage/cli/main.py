@@ -917,6 +917,82 @@ def policy_test(
     sys.exit(code)
 
 
+@policy_group.command("init")
+@click.option(
+    "--manifest",
+    type=click.Path(exists=True),
+    default="target/manifest.json",
+    help="Path to the dbt manifest to scan (defaults to target/manifest.json — run dbt first).",
+)
+@click.option(
+    "--catalog",
+    type=click.Path(exists=True),
+    default="target/catalog.json",
+    help="Path to the dbt catalog to scan (defaults to target/catalog.json — run dbt first).",
+)
+@click.option("--adapter", help="Override sqlglot dialect (e.g., tsql, snowflake, bigquery).")
+@click.option(
+    "-o",
+    "--output",
+    default="./dbt-col-lineage.policy.yml",
+    show_default=True,
+    help="Where to write the generated policy (the path load_policy auto-resolves).",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite an existing policy file at --output instead of refusing.",
+)
+@click.option(
+    "--stdout",
+    is_flag=True,
+    help="Print the generated policy to stdout instead of writing a file (never touches disk).",
+)
+def policy_init(
+    manifest: str,
+    catalog: str,
+    adapter: Optional[str],
+    output: str,
+    force: bool,
+    stdout: bool,
+) -> None:
+    """Scaffold a safe-by-construction starter policy from your manifest + catalog.
+
+    Reads the artifacts once and emits a heavily-commented ``policy.yml`` keyed only to signals
+    the scan confirmed exist: it enables ``provable-break-block`` when column-targeted tests are
+    found and ``exposure-guard`` when exposures are found, and offers every discovered dbt-meta
+    key as a COMMENTED template with real coverage. The result runs green on day one (no
+    rage-block). Refuses to overwrite an existing file without ``--force``; ``--stdout`` prints
+    instead of writing.
+    """
+    from dbt_column_lineage.lineage.policy_init import run_policy_init
+
+    try:
+        text = run_policy_init(
+            manifest=manifest,
+            catalog=catalog,
+            adapter=adapter,
+            output=output,
+            force=force,
+            stdout=stdout,
+        )
+    except FileExistsError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    if stdout:
+        click.echo(text)
+    else:
+        click.echo(
+            f"Wrote {output}. It enables only safe-by-construction structural rules, so it runs "
+            "green today — run `dbt-col-lineage policy test --last 20` before flipping any rule "
+            "to block or uncommenting a meta template."
+        )
+
+
 def _relation_name_resolver(registry: Any):
     """Build a ``model_name -> manifest relation_name`` callable for the Metabase join.
 
