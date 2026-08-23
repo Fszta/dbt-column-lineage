@@ -938,3 +938,119 @@ def test_scope_changes_empty_when_no_overlap():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# --- override resolution -------------------------------------------------
+
+from dbt_column_lineage.lineage.changeset import (  # noqa: E402
+    OverrideResolution,
+    resolve_overrides,
+)
+from dbt_column_lineage.models.schema import OverrideVerb  # noqa: E402
+
+
+def _lc(model, column):
+    return ColumnChange(model=model, column=column, kind=ChangeKind.LOGIC_CHANGED)
+
+
+def test_resolve_overrides_column_scope_attaches():
+    sql = 'select\n  -- lineage:allow-change column=total reason="ok"\n  total\n'
+    changes = [_lc("orders", "total"), _lc("orders", "other")]
+    resolved, stale, warnings = resolve_overrides({"orders": sql}, changes)
+    assert stale == [] and warnings == []
+    by_col = {c.column: c for c in resolved}
+    assert by_col["total"].override is not None
+    assert by_col["total"].override.verb is OverrideVerb.ALLOW_CHANGE
+    assert by_col["other"].override is None
+
+
+def test_resolve_overrides_model_scope_attaches_to_all():
+    sql = '-- lineage:allow-change reason="whole model intended"\nselect total, other from t\n'
+    changes = [_lc("orders", "total"), _lc("orders", "other")]
+    resolved, stale, _warn = resolve_overrides({"orders": sql}, changes)
+    assert stale == []
+    assert all(c.override is not None and c.override.scope == "model" for c in resolved)
+
+
+def test_resolve_overrides_model_scope_with_no_changes_is_stale():
+    sql = '-- lineage:allow-change reason="nothing here"\nselect a from t\n'
+    resolved, stale, _warn = resolve_overrides({"orders": sql}, [])
+    assert resolved == []
+    assert len(stale) == 1
+    assert stale[0]["scope"] == "model"
+
+
+def test_resolve_overrides_explicit_column_not_in_changeset_is_stale():
+    sql = 'select\n  -- lineage:allow-change column=ghost reason="dead"\n  total\n'
+    changes = [_lc("orders", "total")]
+    resolved, stale, _warn = resolve_overrides({"orders": sql}, changes)
+    assert resolved[0].override is None
+    assert len(stale) == 1
+    assert stale[0]["column"] == "ghost"
+
+
+def test_resolve_overrides_warnings_prefixed_with_model():
+    sql = 'select\n  -- lineage:allow-foo reason="x"\n  total\n'
+    _resolved, _stale, warnings = resolve_overrides({"orders": sql}, [_lc("orders", "total")])
+    assert len(warnings) == 1
+    assert warnings[0].startswith("orders:")
+
+
+def test_resolve_overrides_missing_sql_is_noop():
+    resolved, stale, warnings = resolve_overrides({"orders": None}, [_lc("orders", "total")])
+    assert resolved[0].override is None
+    assert stale == [] and warnings == []
+
+
+def test_resolve_overrides_case_insensitive_column_match():
+    sql = 'select\n  -- lineage:allow-change column=TOTAL reason="ok"\n  total\n'
+    resolved, stale, _warn = resolve_overrides({"orders": sql}, [_lc("orders", "total")])
+    assert resolved[0].override is not None
+    assert stale == []
+
+
+def test_changeset_builder_honor_overrides_flag():
+    # A logic change whose head compiled SQL carries a pragma is tagged; --no-overrides skips it.
+    base = _FakeRegistry(
+        {"orders": _Model({"total": _LinCol(lineage=[_Lin({"a"}, "derived", "a + b")])})},
+        compiled={"orders": "select a + b as total"},
+    )
+    head_sql = (
+        'select\n  -- lineage:allow-change column=total reason="intended"\n  a + c as total\n'
+    )
+    head = _FakeRegistry(
+        {"orders": _Model({"total": _LinCol(lineage=[_Lin({"a"}, "derived", "a + c")])})},
+        compiled={"orders": head_sql},
+    )
+    on = ChangesetBuilder(base, head, honor_overrides=True).build()
+    assert len(on) == 1 and on[0].override is not None
+
+    off = ChangesetBuilder(base, head, honor_overrides=False).build()
+    assert len(off) == 1 and off[0].override is None
+
+
+def test_build_git_changeset_collects_stale_and_warnings():
+    class _GitReg:
+        def __init__(self):
+            self._m = {"orders": _Model({"total": _Col("int")})}
+            self._m["orders"].resource_path = "models/orders.sql"
+
+        def get_models(self):
+            return self._m
+
+        def get_compiled_sql(self, name):
+            return 'select\n  -- lineage:allow-foo reason="x"\n  -- lineage:allow-change column=ghost reason="dead"\n  total\n'
+
+    reg = _GitReg()
+    import dbt_column_lineage.lineage.changeset as cs
+
+    orig = cs.git_changed_models
+    cs.git_changed_models = lambda head, git_base, repo_dir=None: {"orders"}
+    try:
+        collect = OverrideResolution()
+        changes = cs.build_git_changeset(reg, "origin/main", collect=collect)
+    finally:
+        cs.git_changed_models = orig
+    assert len(changes) == 1
+    assert len(collect.warnings) == 1  # unknown verb
+    assert len(collect.stale) == 1  # column=ghost not in changeset
