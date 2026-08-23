@@ -121,6 +121,9 @@ def write_github_outputs(report: Dict[str, Any]) -> bool:
         "provable_breaks": int(summary.get("provable_break_count", 0)),
         "verdict": str(report.get("verdict", "")),
         "tripped_level": highest_tripped_level(summary),
+        # number of honored override pragmas (0 when none). Always emitted so the output
+        # set stays stable-shaped for adopting workflows.
+        "overrides_applied": len(report.get("overrides", []) or []),
     }
     # Additive policy-engine outputs — only when a policy actually ran (report carries
     # a policy_verdict). Absent policy leaves the legacy output set byte-for-byte intact.
