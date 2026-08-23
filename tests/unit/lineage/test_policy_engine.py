@@ -997,3 +997,98 @@ def test_evaluate_policy_convenience_builds_indexes():
     )
     assert verdict.blocks()
     assert ActionKind.BLOCK in verdict.hits[0].actions
+
+
+# --- built-in semantic-severity knobs ---------------------------------------
+
+
+def _defaults_policy(on_meaning_changed=None, on_indeterminate=None):
+    defaults = {}
+    if on_meaning_changed is not None:
+        defaults["on_meaning_changed"] = on_meaning_changed
+    if on_indeterminate is not None:
+        defaults["on_indeterminate"] = on_indeterminate
+    return parse_policy({"version": 1, "defaults": defaults, "rules": []})
+
+
+def test_semantic_knobs_block_meaning_changed_warn_indeterminate():
+    # No hand-written rules: the gate is driven entirely by the two knobs, tuned independently.
+    policy = _fixture("semantic_severity_defaults.yml")
+    engine = _engine(policy, FakeRegistry(), _impact())
+    verdict = engine.evaluate(
+        [
+            _change("a", "x", semantic=SemanticChangeKind.MEANING_CHANGED),
+            _change("b", "y", semantic=SemanticChangeKind.INDETERMINATE),
+        ]
+    )
+    assert verdict.decision is GateDecision.BLOCK  # most-severe-wins across the two
+    ids = {h.rule_id: h.decision for h in verdict.hits}
+    assert ids["builtin:on_meaning_changed"] is GateDecision.BLOCK
+    assert ids["builtin:on_indeterminate"] is GateDecision.WARN
+
+
+def test_semantic_knobs_are_independent_warn_only():
+    # Warn on meaning_changed, say nothing about indeterminate: an indeterminate change alone
+    # then contributes nothing from this axis (independent knobs).
+    policy = _defaults_policy(on_meaning_changed="warn")
+    engine = _engine(policy, FakeRegistry(), _impact())
+    verdict = engine.evaluate([_change(semantic=SemanticChangeKind.INDETERMINATE)])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.hits == []
+
+
+def test_semantic_knobs_unset_by_default_contribute_nothing():
+    policy = _defaults_policy()  # neither knob set
+    engine = _engine(policy, FakeRegistry(), _impact())
+    verdict = engine.evaluate([_change(semantic=SemanticChangeKind.MEANING_CHANGED)])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.hits == []
+
+
+def test_semantic_knobs_allow_value_adds_no_hit():
+    policy = _defaults_policy(on_meaning_changed="allow")
+    engine = _engine(policy, FakeRegistry(), _impact())
+    verdict = engine.evaluate([_change(semantic=SemanticChangeKind.MEANING_CHANGED)])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.hits == []
+
+
+def test_semantic_knobs_ignore_structural_changes():
+    # A removed/added column carries no semantic; the knobs must not fire on it.
+    policy = _fixture("semantic_severity_defaults.yml")
+    engine = _engine(policy, FakeRegistry(), _impact())
+    verdict = engine.evaluate([_change("a", "x", kind=ChangeKind.REMOVED)])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.hits == []
+
+
+def test_semantic_knobs_ignore_equivalent():
+    policy = _fixture("semantic_severity_defaults.yml")
+    engine = _engine(policy, FakeRegistry(), _impact())
+    verdict = engine.evaluate([_change(semantic=SemanticChangeKind.EQUIVALENT)])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.hits == []
+
+
+def test_semantic_knobs_fold_into_user_rules_most_severe_wins():
+    # A user rule warns; the meaning_changed knob blocks; the gate is BLOCK.
+    policy = parse_policy(
+        {
+            "version": 1,
+            "defaults": {"on_meaning_changed": "block"},
+            "rules": [
+                {
+                    "id": "warn-any-logic",
+                    "predicate": {
+                        "change": {"field": "kind", "op": "eq", "value": "logic_changed"}
+                    },
+                    "action": [{"type": "warn"}],
+                }
+            ],
+        }
+    )
+    engine = _engine(policy, FakeRegistry(), _impact())
+    verdict = engine.evaluate([_change(semantic=SemanticChangeKind.MEANING_CHANGED)])
+    assert verdict.decision is GateDecision.BLOCK
+    assert any(h.rule_id == "builtin:on_meaning_changed" for h in verdict.hits)
+    assert any(h.rule_id == "warn-any-logic" for h in verdict.hits)

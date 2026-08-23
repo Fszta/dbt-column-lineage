@@ -50,6 +50,8 @@ version: 1                       # schema version; the engine rejects unknown ma
 defaults:
   on_missing_meta: fail_closed   # fail_closed | fail_open | skip  (default fail_closed)
   on_error: fail_closed          # how operator/type mismatches resolve
+  on_meaning_changed: block      # block | warn | allow — gate a proven meaning change (optional)
+  on_indeterminate: warn         # block | warn | allow — gate an unprovable change  (optional)
 rules:
   - id: my-rule                  # required, unique — appears in the verdict
     description: What this rule protects.
@@ -62,6 +64,41 @@ rules:
 Each rule is evaluated against **every changed column** (`scope: change`, the default), or once
 against the whole changeset (`scope: aggregate`, for project-wide rules). The changed column a
 rule fired on is recorded in the verdict, so the report can say *which* change tripped it.
+
+### Semantic-severity defaults (no rules needed)
+
+`on_meaning_changed` and `on_indeterminate` are built-in knobs that gate the **semantic axis**
+directly — no hand-written rule required. Each maps a column's classification straight to a gate
+contribution:
+
+| Knob | Fires on | Values |
+|---|---|---|
+| `on_meaning_changed` | a column the AST diff proved *changed meaning* (`semantic: meaning_changed`) | `block` · `warn` · `allow` |
+| `on_indeterminate` | a column that *could not be proven safe* (`semantic: indeterminate`) | `block` · `warn` · `allow` |
+
+They exist to be tuned **independently**: a proven-breaking change need not carry the same weight
+as could-not-prove-safe. The common shape is *block the proven one, warn the unprovable one*:
+
+```yaml
+version: 1
+defaults:
+  on_meaning_changed: block
+  on_indeterminate: warn
+# no rules: — the gate is driven entirely by the two knobs
+```
+
+Both default to unset, so a policy that omits them behaves exactly as before. `allow` (or leaving
+a knob unset) contributes nothing. Structural add/remove/type changes carry no semantic and are
+untouched by these knobs — they're governed by provable breaks and your rules. A knob contribution
+folds into the same [most-severe-wins](#how-multiple-rules-combine-into-one-verdict) combination as
+every rule (appearing in the verdict as `builtin:on_meaning_changed` / `builtin:on_indeterminate`),
+so a rule can only ever raise the decision, never lower one.
+
+!!! note "Why not block `meaning_changed` by default?"
+    The no-policy gate deliberately keeps `block` reserved for *provable* test breaks, because the
+    conservative canonicalizer can over-classify a redundant-paren or commutative-reorder rewrite as
+    `meaning_changed`. These knobs are the opt-in for teams that have decided a meaning change should
+    hard-block in their project.
 
 ### Predicates
 

@@ -1,0 +1,10 @@
+# Built-in semantic-severity knobs — gate the semantic axis with NO hand-written rules.
+#
+# A proven meaning change (semantic == meaning_changed) blocks the merge; an unprovable
+# one (semantic == indeterminate) only warns. The two are tuned independently: this is the
+# whole point of splitting the axis — proven-breaking need not carry the same weight as
+# could-not-prove-safe. With no `rules:` at all, the gate is driven entirely by these knobs.
+version: 1
+defaults:
+  on_meaning_changed: block
+  on_indeterminate: warn
