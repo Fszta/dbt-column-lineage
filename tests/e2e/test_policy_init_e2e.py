@@ -1,4 +1,4 @@
-"""End-to-end: the installed ``dbt-col-lineage policy init --stdout`` console script scaffolds a
+"""End-to-end: the installed ``parrant policy init --stdout`` console script scaffolds a
 policy from the bundled dbt project.
 
 Runs the actual entry point as a subprocess (not the in-process runner) so the CLI wiring and
@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 
 def _run(args):
     return subprocess.run(
-        ["poetry", "run", "dbt-col-lineage", "policy", "init", *args],
+        ["poetry", "run", "parrant", "policy", "init", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

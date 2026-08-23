@@ -1,5 +1,5 @@
 """
-Centralized adapter/dialect normalization for dbt-column-lineage.
+Centralized adapter/dialect normalization for parrant.
 
 This module defines a single source of truth for mapping raw dbt adapter
 names to sqlglot dialect names. For example, dbt may report the adapter

@@ -141,8 +141,8 @@ def _not(value: Tri) -> Tri:
 def load_policy(path: Optional[str]) -> Optional[Policy]:
     """Resolve and parse the policy file.
 
-    Resolution order (first found): explicit ``path`` -> ``./dbt-col-lineage.policy.yml`` ->
-    ``[tool.dbt-col-lineage.policy]`` in ``pyproject.toml``. Returns ``None`` when no policy is
+    Resolution order (first found): explicit ``path`` -> ``./parrant.policy.yml`` ->
+    ``./dbt-col-lineage.policy.yml`` (legacy fallback). Returns ``None`` when no policy is
     configured, so the caller falls back to the legacy ``decide_verdict`` gate (backward
     compatible). Raises :class:`PolicyConfigError` on a present-but-invalid file.
     """
@@ -182,16 +182,21 @@ def parse_policy(raw: Any, source: str = "<policy>") -> Policy:
 
 
 def _resolve_policy_path(path: Optional[str]) -> Optional[str]:
-    """First existing path among explicit -> repo default. ``pyproject`` inlining is's job."""
+    """First existing path among explicit -> repo default.
+
+    The default filename is ``parrant.policy.yml``; the legacy ``dbt-col-lineage.policy.yml`` is
+    still auto-resolved as a fallback so projects that adopted the old name keep working.
+    """
     import os
 
     if path:
         if not os.path.exists(path):
             raise PolicyConfigError(f"policy file not found: '{path}'")
         return path
-    default = os.path.join(os.getcwd(), "dbt-col-lineage.policy.yml")
-    if os.path.exists(default):
-        return default
+    for name in ("parrant.policy.yml", "dbt-col-lineage.policy.yml"):
+        default = os.path.join(os.getcwd(), name)
+        if os.path.exists(default):
+            return default
     return None
 
 

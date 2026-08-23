@@ -31,7 +31,7 @@ def main():
 
     service = LineageService(catalog_path, manifest_path)
 
-    print(f"Starting dbt-column-lineage server on port {port}...")
+    print(f"Starting parrant server on port {port}...")
     print(f"Using catalog: {catalog_path}")
     print(f"Using manifest: {manifest_path}")
 

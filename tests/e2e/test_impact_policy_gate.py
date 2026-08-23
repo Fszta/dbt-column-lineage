@@ -1,4 +1,4 @@
-"""End-to-end: the installed ``dbt-col-lineage impact`` console script honours the policy gate.
+"""End-to-end: the installed ``parrant impact`` console script honours the policy gate.
 
 Runs the real entry point as a subprocess (not the in-process CliRunner) so the actual process
 exit code under ``--fail-on policy`` is proven: a BLOCK verdict -> non-zero, a no-change run -> 0.
@@ -48,7 +48,7 @@ def _run(args, env_clean=True):
         for var in ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_REPOSITORY", "GITHUB_EVENT_PATH"):
             env.pop(var, None)
     return subprocess.run(
-        ["poetry", "run", "dbt-col-lineage", "impact", *args],
+        ["poetry", "run", "parrant", "impact", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

@@ -470,7 +470,7 @@ def _build_explore_change_context(
     "policy_path",
     type=click.Path(exists=True),
     help="Path to a policy.yml for the metadata-agnostic policy engine. When resolvable "
-    "(explicit path or ./dbt-col-lineage.policy.yml), the report gains a 'policy_verdict' "
+    "(explicit path or ./parrant.policy.yml), the report gains a 'policy_verdict' "
     "block and --fail-on policy gates on it. A present-but-invalid file fails loudly.",
 )
 @click.option(
@@ -638,7 +638,7 @@ def impact(
         if fail_on == "policy" and policy is None:
             click.echo(
                 "Warning: --fail-on policy needs a resolvable policy (--policy PATH or "
-                "./dbt-col-lineage.policy.yml). None was found, so the gate will never fire.",
+                "./parrant.policy.yml). None was found, so the gate will never fire.",
                 err=True,
             )
 
@@ -934,7 +934,7 @@ def policy_test(
 @click.option(
     "-o",
     "--output",
-    default="./dbt-col-lineage.policy.yml",
+    default="./parrant.policy.yml",
     show_default=True,
     help="Where to write the generated policy (the path load_policy auto-resolves).",
 )
@@ -988,7 +988,7 @@ def policy_init(
     else:
         click.echo(
             f"Wrote {output}. It enables only safe-by-construction structural rules, so it runs "
-            "green today — run `dbt-col-lineage policy test --last 20` before flipping any rule "
+            "green today — run `parrant policy test --last 20` before flipping any rule "
             "to block or uncommenting a meta template."
         )
 

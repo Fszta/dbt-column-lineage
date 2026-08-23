@@ -543,7 +543,7 @@ def test_markdown_empty_changeset():
     md = render_changeset_markdown(report)
     assert "No column changes" in md
     # attribution footer present even on the empty report
-    assert "github.com/Fszta/dbt-column-lineage" in md
+    assert "github.com/Fszta/parrant" in md
 
 
 def test_markdown_explain_renders_reason_and_expressions():
@@ -592,8 +592,8 @@ def test_markdown_appends_attribution_footer():
     )
     md = render_changeset_markdown(report)
     # one subtle, linked credit line at the end of the comment body
-    assert "— lineage by [dbt-col-lineage](https://github.com/Fszta/dbt-column-lineage)" in md
-    assert md.count("github.com/Fszta/dbt-column-lineage") == 1
+    assert "— lineage by [parrant](https://github.com/Fszta/parrant)" in md
+    assert md.count("github.com/Fszta/parrant") == 1
 
 
 def test_markdown_lists_exposures_first_and_blast_table():

@@ -1,4 +1,4 @@
-"""End-to-end: the installed ``dbt-col-lineage impact`` console script honours override pragmas.
+"""End-to-end: the installed ``parrant impact`` console script honours override pragmas.
 
 Runs the real entry point as a subprocess so the actual process exit code is proven: an
 ``allow-break`` pragma acknowledging a provable break clears the ``--fail-on tests`` gate
@@ -62,7 +62,7 @@ def _run(args):
     for var in ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_REPOSITORY", "GITHUB_EVENT_PATH"):
         env.pop(var, None)
     return subprocess.run(
-        ["poetry", "run", "dbt-col-lineage", "impact", *args],
+        ["poetry", "run", "parrant", "impact", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

@@ -23,7 +23,7 @@ _MAX_SQL_CHARS = 400
 
 # Subtle attribution appended to every rendered report so an adopting repo's PRs
 # passively surface where the analysis came from. Kept to one muted line.
-_CREDIT_LINE = "<sub>— lineage by [dbt-col-lineage](https://github.com/Fszta/dbt-column-lineage)</sub>"  # noqa: E501
+_CREDIT_LINE = "<sub>— lineage by [parrant](https://github.com/Fszta/parrant)</sub>"
 
 # Machine kinds → words a reviewer reads without a glossary.
 _KIND_LABELS = {

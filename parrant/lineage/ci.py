@@ -28,7 +28,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Hidden HTML comment identifying our PR comment so re-runs update it in place.
-COMMENT_MARKER = "<!-- dbt-col-lineage:impact -->"
+COMMENT_MARKER = "<!-- parrant:impact -->"
 
 _DEFAULT_API = "https://api.github.com"
 _TIMEOUT = 30

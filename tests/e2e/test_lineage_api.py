@@ -28,7 +28,7 @@ def lineage_server(catalog_path: Path, manifest_path: Path, port: int) -> Iterat
             [
                 "poetry",
                 "run",
-                "dbt-col-lineage",
+                "parrant",
                 "--explore",
                 "--catalog",
                 str(catalog_path),
