@@ -564,7 +564,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('viewBox', '0 0 24 24');
 
     toggleIcon.append('path')
-.attr('d', ' 9l6 6 6-6')
+.attr('d', 'M6 9l6 6 6-6')
         .attr('stroke', '#64748b')
         .attr('fill', 'none')
         .attr('stroke-width', 2)
@@ -938,7 +938,7 @@ function drawColumns(nodes, state, config, onColumnClick) {
                     .attr('stroke-linecap', 'round')
                     .attr('stroke-linejoin', 'round')
                     .attr('transform', `translate(${iconX}, ${iconTop})`)
-.attr('d', '.5 0 L9 1.6 V4.6 C9 7.4 7 9.3 4.5 10 C2 9.3 0 7.4 0 4.6 V1.6 Z.4 4.8 L4 6.4 L6.8 3.2');
+.attr('d', 'M4.5 0 L9 1.6 V4.6 C9 7.4 7 9.3 4.5 10 C2 9.3 0 7.4 0 4.6 V1.6 Z M2.4 4.8 L4 6.4 L6.8 3.2');
 
                 badgeGroup.append('text')
                     .attr('class', 'column-test-badge-count')
