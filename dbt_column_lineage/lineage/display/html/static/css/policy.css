@@ -1,0 +1,402 @@
+/* ============================================================================
+   Policy panel — the metadata-agnostic gate decision surface.
+   Encoding (DESIGN.md amber-once + red-for-block):
+     block = red (var(--error)) — the ONE escalation above amber
+     warn  = amber (var(--accent)) — shares the single caution axis
+     allow = neutral slate + an indigo (var(--primary)) check
+   Flat surfaces, hairline dividers, mono eyebrows/rule-ids, no gradients.
+   ========================================================================== */
+
+.policy-eyebrow {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* --- Pinned verdict banner (top of the Impact panel) -------------------- */
+.policy-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    margin: 0 0 14px 0;
+    cursor: pointer;
+    flex-wrap: wrap;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.policy-banner:hover {
+    box-shadow: 0 1px 6px var(--shadow);
+}
+
+.policy-banner:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+.policy-banner-icon {
+    display: inline-flex;
+    align-items: center;
+}
+
+.policy-banner-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.policy-banner-verdict {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+}
+
+.policy-banner-detail {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+}
+
+.policy-banner-cta {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+/* Decision chrome — shared by banner, rule cards, panel header. */
+.policy-block {
+    background: color-mix(in srgb, var(--error) 11%, var(--surface));
+    border-color: color-mix(in srgb, var(--error) 45%, transparent);
+}
+
+.policy-block .policy-banner-icon,
+.policy-block .policy-banner-verdict {
+    color: color-mix(in srgb, var(--error) 78%, var(--text));
+}
+
+.policy-warn {
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.policy-warn .policy-banner-icon,
+.policy-warn .policy-banner-verdict {
+    color: color-mix(in srgb, var(--accent-dark) 80%, var(--text));
+}
+
+.policy-allow {
+    background: var(--surface-2);
+    border-color: var(--border);
+}
+
+.policy-allow .policy-banner-icon {
+    color: var(--primary);
+}
+
+.policy-allow .policy-banner-verdict {
+    color: var(--text-secondary);
+}
+
+/* --- Full panel (overlay) ---------------------------------------------- */
+.policy-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 6vh 16px;
+    background: color-mix(in srgb, var(--slate-900) 42%, transparent);
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+}
+
+.policy-panel {
+    width: 560px;
+    max-width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 60px var(--shadow);
+    overflow: hidden;
+}
+
+.policy-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.policy-panel-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.policy-panel-icon {
+    display: inline-flex;
+    align-items: center;
+}
+
+.policy-panel-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.policy-panel-header.policy-block .policy-panel-icon {
+    color: color-mix(in srgb, var(--error) 78%, var(--text));
+}
+
+.policy-panel-header.policy-warn .policy-panel-icon {
+    color: color-mix(in srgb, var(--accent-dark) 80%, var(--text));
+}
+
+.policy-panel-header.policy-allow .policy-panel-icon {
+    color: var(--primary);
+}
+
+.policy-panel-title {
+    margin: 2px 0 0 0;
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text);
+}
+
+.policy-panel-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-muted);
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+}
+
+.policy-panel-close:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.policy-panel-body {
+    padding: 18px 20px 22px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.policy-panel-summary {
+    margin: 0 0 16px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.policy-section {
+    margin-top: 18px;
+}
+
+.policy-section > .policy-eyebrow {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.policy-empty {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* Fired-rule card — flat, hairline, mono rule-id eyebrow. */
+.policy-rule-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: var(--surface);
+}
+
+.policy-rule-card.policy-block {
+    border-left: 3px solid var(--error);
+}
+
+.policy-rule-card.policy-warn {
+    border-left: 3px solid var(--accent);
+}
+
+.policy-rule-card.policy-allow {
+    border-left: 3px solid var(--primary);
+}
+
+.policy-rule-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.policy-rule-id {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.policy-rule-decision {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+}
+
+.policy-rule-decision.policy-block {
+    color: color-mix(in srgb, var(--error) 80%, var(--text));
+}
+
+.policy-rule-decision.policy-warn {
+    color: color-mix(in srgb, var(--accent-dark) 82%, var(--text));
+}
+
+.policy-rule-decision.policy-allow {
+    color: var(--primary);
+}
+
+.policy-rule-subject,
+.policy-rule-reach {
+    margin-top: 8px;
+}
+
+.policy-rule-subject .policy-eyebrow,
+.policy-rule-reach .policy-eyebrow {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.policy-rule-subject code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--primary);
+    background: var(--ring-soft);
+    padding: 1px 7px;
+    border-radius: 5px;
+}
+
+.policy-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.policy-chip {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+}
+
+.policy-rule-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.policy-action {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    border: 1px dashed var(--border-strong);
+    padding: 1px 7px;
+    border-radius: 5px;
+}
+
+/* Build / test sets + copy buttons. */
+.policy-sets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+@media (max-width: 520px) {
+    .policy-sets {
+        grid-template-columns: 1fr;
+    }
+}
+
+.policy-set-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.policy-copy-btn {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--primary);
+    background: none;
+    border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    padding: 2px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.policy-copy-btn:hover {
+    background: var(--ring-soft);
+}
+
+.policy-copy-btn.is-copied {
+    color: var(--success);
+    border-color: color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+/* Notifications. */
+.policy-notification {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.policy-channel {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--primary);
+}
+
+.policy-target {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-secondary);
+}
+
+.policy-message {
+    color: var(--text-muted);
+    flex: 1;
+    min-width: 0;
+}

@@ -78,6 +78,9 @@ function initGraph(data) {
     positionMoreNodes(state, config);
     drawMoreNodes(g, state, config);
 
+    // the dbt / BI boundary rule (no-op unless Metabase dashboards were reached).
+    drawBoundaryBand(g, state, config);
+
     setupInteractions(svg, g, data, state, config, edges);
 
     window.graphState = state;

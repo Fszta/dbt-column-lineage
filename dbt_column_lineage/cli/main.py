@@ -68,6 +68,39 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
     "--adapter",
     help="Override sqlglot dialect (e.g., tsql, snowflake, bigquery). If set, ignores adapter from manifest.",
 )
+@click.option(
+    "--base-manifest",
+    "base_manifest",
+    type=click.Path(exists=True),
+    help="(--explore only) Base manifest.json for a two-manifest diff. When provided, the "
+    "explorer surfaces the change context: semantic categorization, the policy verdict "
+    "(with --policy), and cross-boundary Metabase reach (with --metabase).",
+)
+@click.option(
+    "--base-catalog",
+    "base_catalog",
+    type=click.Path(exists=True),
+    help="(--explore only) Base catalog.json paired with --base-manifest. Defaults to a "
+    "catalog.json next to --base-manifest when present.",
+)
+@click.option(
+    "--git-base",
+    "git_base",
+    help="(--explore only) Git ref for a git-diff changeset when no --base-manifest is given.",
+)
+@click.option(
+    "--policy",
+    "policy_path",
+    type=click.Path(),
+    help="(--explore only) Path to a policy.yml so the explorer can show the policy verdict.",
+)
+@click.option(
+    "--metabase",
+    "metabase_path",
+    type=click.Path(),
+    help="(--explore only) Path to a metabase_lineage.json so the explorer can surface "
+    "cross-boundary dashboard reach. Consumed OFFLINE — no Metabase credentials.",
+)
 def cli(
     select: str,
     explore: bool,
@@ -77,6 +110,11 @@ def cli(
     output: str,
     port: int,
     adapter: Optional[str],
+    base_manifest: Optional[str],
+    base_catalog: Optional[str],
+    git_base: Optional[str],
+    policy_path: Optional[str],
+    metabase_path: Optional[str],
 ) -> None:
     """DBT Column Lineage - Generate column-level lineage for DBT models."""
     if not select and not explore:
@@ -94,6 +132,29 @@ def cli(
             click.echo(f"Starting explore mode server on port {port}...")
             lineage_explorer = LineageExplorer(port=port)
             lineage_explorer.set_lineage_service(service)
+            # when a changeset source (and optionally a policy / Metabase artifact) is
+            # supplied, precompute the changeset report ONCE and hand it to the explorer so
+            # every panel can surface the product signals. Absent => pure-explore mode.
+            change_report = _build_explore_change_context(
+                service,
+                adapter=adapter,
+                base_manifest=base_manifest,
+                base_catalog=base_catalog,
+                git_base=git_base,
+                policy_path=policy_path,
+                metabase_path=metabase_path,
+            )
+            if change_report is not None:
+                lineage_explorer.set_change_context(change_report)
+                click.echo(
+                    "Change context loaded: "
+                    f"{len(change_report.get('by_change', []))} changed column(s)"
+                    + (
+                        f", policy={change_report['policy_verdict'].get('decision')}"
+                        if change_report.get("policy_verdict")
+                        else ""
+                    )
+                )
             lineage_explorer.start()
             return
 
@@ -170,6 +231,115 @@ def cli(
         sys.exit(1)
 
 
+def _build_explore_change_context(
+    head_service: LineageService,
+    *,
+    adapter: Optional[str],
+    base_manifest: Optional[str],
+    base_catalog: Optional[str],
+    git_base: Optional[str],
+    policy_path: Optional[str],
+    metabase_path: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """Assemble the changeset report the explorer surfaces, or ``None`` when no change
+    source was supplied (pure-explore mode).
+
+    Mirrors the ``impact`` command's report assembly but is self-contained so it never
+    perturbs that gate path. Reuses the same library primitives (changeset build, changeset
+    impact with optional Metabase reach, provable breaks, policy evaluation) so the explorer
+    shows exactly what the CI gate would.
+    """
+    if not base_manifest and not git_base:
+        return None
+
+    base_service: Optional[LineageService] = None
+    if base_manifest:
+        resolved_base_catalog = base_catalog
+        if not resolved_base_catalog:
+            candidate = Path(base_manifest).parent / "catalog.json"
+            if candidate.exists():
+                resolved_base_catalog = str(candidate)
+        if not resolved_base_catalog:
+            click.echo(
+                "Error: --base-catalog is required for a two-manifest diff "
+                "(no catalog.json found next to --base-manifest).",
+                err=True,
+            )
+            sys.exit(1)
+        base_service = LineageService(
+            Path(resolved_base_catalog), Path(base_manifest), adapter=adapter
+        )
+        builder = ChangesetBuilder(base_service.registry, head_service.registry)
+        changes = builder.build()
+        source = "two-manifest"
+    elif git_base:
+        changes = build_git_changeset(head_service.registry, git_base)
+        source = f"git-diff ({git_base})"
+    else:
+        # Unreachable given the guard above, but keeps the changeset source well-typed.
+        return None
+
+    # Policy + Metabase are optional overlays on the change context.
+    from dbt_column_lineage.lineage.policy import evaluate_policy, load_policy
+
+    policy = load_policy(policy_path)
+
+    metabase_reach = None
+    metabase_lineage = None
+    if metabase_path:
+        from dbt_column_lineage.metabase.artifact import load_metabase_lineage
+        from dbt_column_lineage.metabase.join import build_relation_index
+        from dbt_column_lineage.metabase.reach import MetabaseReach
+
+        metabase_lineage = load_metabase_lineage(metabase_path)
+        if metabase_lineage is not None:
+            relation_index = build_relation_index(
+                head_service.registry, _relation_name_resolver(head_service.registry)
+            )
+            metabase_reach = MetabaseReach.build(metabase_lineage, relation_index)
+
+    aggregated = head_service.get_changeset_impact(
+        changes, base_service=base_service, metabase=metabase_reach
+    )
+    report = build_changeset_report(source, changes, aggregated)
+    report["coverage"] = head_service.get_coverage().model_dump()
+
+    breaks = classify_provable_breaks(
+        changes,
+        head_service.registry,
+        base_service.registry if base_service else None,
+    )
+    report["provable_breaks"] = [b.model_dump() for b in breaks]
+    summary_obj = report.get("summary", {})
+    summary: Dict[str, Any] = summary_obj if isinstance(summary_obj, dict) else {}
+    report["verdict"] = decide_verdict(breaks, summary)
+
+    if policy is not None:
+        verdict = evaluate_policy(
+            changes,
+            aggregated,
+            head_service.registry,
+            policy,
+            breaks,
+            metabase_reach=metabase_reach,
+        )
+        report["policy_verdict"] = verdict.model_dump(mode="json")
+
+    if metabase_lineage is not None:
+        from dbt_column_lineage.metabase.reach import build_reach_confidence
+
+        reached_dashboards = [
+            exposure
+            for exposure in aggregated.get("affected_exposures", [])
+            if exposure.get("source") == "metabase"
+        ]
+        report["metabase"] = build_reach_confidence(
+            metabase_lineage, reached_dashboards
+        ).model_dump()
+
+    return report
+
+
 @click.command()
 @click.option(
     "--manifest",
@@ -221,11 +391,30 @@ def cli(
 )
 @click.option(
     "--fail-on",
-    type=click.Choice(["none", "tests", "exposures", "critical", "any"]),
+    type=click.Choice(["none", "tests", "exposures", "critical", "any", "policy"]),
     default="none",
     help="Severity gate for --ci: fail (exit 1) when the impact reaches this level. "
     "'tests' fails only on a provable break (a dbt test the change orphans) — the "
-    "safe level to block on. Defaults to 'none' (warn only, never block).",
+    "safe level to block on. 'policy' fails when the metadata-agnostic policy engine "
+    "returns a BLOCK verdict (needs a resolvable --policy). Defaults to 'none' "
+    "(warn only, never block).",
+)
+@click.option(
+    "--policy",
+    "policy_path",
+    type=click.Path(exists=True),
+    help="Path to a policy.yml for the metadata-agnostic policy engine. When resolvable "
+    "(explicit path or ./dbt-col-lineage.policy.yml), the report gains a 'policy_verdict' "
+    "block and --fail-on policy gates on it. A present-but-invalid file fails loudly.",
+)
+@click.option(
+    "--metabase",
+    "metabase_path",
+    type=click.Path(exists=True),
+    help="Path to a metabase_lineage.json artifact (from `metabase-extract`). When supplied, "
+    "the impact reach is extended PAST dbt's edge: Metabase dashboards that read a changed "
+    "column (directly or via its downstream) surface as exposure-kind reach, matchable by a "
+    "policy `reach: {kind: exposure}` rule. Consumed OFFLINE — no Metabase credentials.",
 )
 @click.option(
     "--github-token",
@@ -253,6 +442,8 @@ def impact(
     adapter: Optional[str],
     ci: bool,
     fail_on: str,
+    policy_path: Optional[str],
+    metabase_path: Optional[str],
     github_token: Optional[str],
     repo: Optional[str],
     pr_number: Optional[int],
@@ -265,6 +456,32 @@ def impact(
     """
     try:
         head_service = LineageService(Path(catalog), Path(manifest), adapter=adapter)
+
+        # Resolve the policy up front so a present-but-broken file fails LOUDLY (the
+        # PolicyConfigError propagates to the outer handler -> exit 1) rather than being
+        # mistaken for "no policy". None means no policy configured -> legacy behaviour.
+        from dbt_column_lineage.lineage.policy import evaluate_policy, load_policy
+
+        policy = load_policy(policy_path)
+
+        # Cross-boundary Metabase reach: load the offline artifact and build the
+        # relation-joined reach index up front. A present-but-invalid artifact fails LOUDLY
+        # (MetabaseArtifactError -> outer handler -> exit 1); a missing/None one degrades to
+        # dbt-only reach. This path imports ONLY the artifact reader + join/reach — never the
+        # credentialed Metabase client (the offline guardrail is structural,).
+        metabase_reach = None
+        metabase_lineage = None
+        if metabase_path:
+            from dbt_column_lineage.metabase.artifact import load_metabase_lineage
+            from dbt_column_lineage.metabase.join import build_relation_index
+            from dbt_column_lineage.metabase.reach import MetabaseReach
+
+            metabase_lineage = load_metabase_lineage(metabase_path)
+            if metabase_lineage is not None:
+                relation_index = build_relation_index(
+                    head_service.registry, _relation_name_resolver(head_service.registry)
+                )
+                metabase_reach = MetabaseReach.build(metabase_lineage, relation_index)
 
         base_service: Optional[LineageService] = None
         changes: List[ColumnChange]
@@ -330,7 +547,18 @@ def impact(
                 err=True,
             )
 
-        aggregated = head_service.get_changeset_impact(changes, base_service=base_service)
+        # Same warn-and-no-fire pattern as --fail-on tests above: asking to gate on the
+        # policy engine without a resolvable policy can never block, so say so plainly.
+        if fail_on == "policy" and policy is None:
+            click.echo(
+                "Warning: --fail-on policy needs a resolvable policy (--policy PATH or "
+                "./dbt-col-lineage.policy.yml). None was found, so the gate will never fire.",
+                err=True,
+            )
+
+        aggregated = head_service.get_changeset_impact(
+            changes, base_service=base_service, metabase=metabase_reach
+        )
         report = build_changeset_report(source, changes, aggregated)
         report["coverage"] = head_service.get_coverage().model_dump()
         report["structural_checks_available"] = structural_checks_available
@@ -355,6 +583,39 @@ def impact(
             "unattributable_tests": head_service.registry.get_unattributable_test_count(),
         }
 
+        # Policy engine: additive and metadata-agnostic. When a policy resolved, evaluate
+        # the consumer's rules over the changeset + its reach + arbitrary dbt meta and attach the
+        # full PolicyVerdict as report["policy_verdict"] (the flagship machine-facing surface).
+        # decide_verdict above stays untouched as the no-policy fallback (backward compatible).
+        if policy is not None:
+            verdict = evaluate_policy(
+                changes,
+                aggregated,
+                head_service.registry,
+                policy,
+                breaks,
+                metabase_reach=metabase_reach,
+            )
+            # mode="json" so enums (GateDecision, ActionKind) serialize to their string values —
+            # the report is JSON-dumped and also rendered by markdown, both of which expect plain
+            # strings (a raw model_dump() leaves enum members and renders as "GateDecision.BLOCK").
+            report["policy_verdict"] = verdict.model_dump(mode="json")
+
+        # Cross-boundary honesty block: when the Metabase artifact was joined, attach
+        # the reach-confidence (snapshot staleness + column-precise vs table-only) so a
+        # fail-closed block driven by a stale/coarse snapshot reads as such.
+        if metabase_lineage is not None:
+            from dbt_column_lineage.metabase.reach import build_reach_confidence
+
+            reached_dashboards = [
+                exposure
+                for exposure in aggregated.get("affected_exposures", [])
+                if exposure.get("source") == "metabase"
+            ]
+            report["metabase"] = build_reach_confidence(
+                metabase_lineage, reached_dashboards
+            ).model_dump()
+
         if format == "json":
             click.echo(json.dumps(report, indent=2, sort_keys=False))
         else:
@@ -369,6 +630,29 @@ def impact(
     # (exit 1) is a normal outcome we don't want to mask as "Error: 1".
     if ci:
         _run_ci(report, fail_on, github_token, repo, pr_number)
+
+
+def _relation_name_resolver(registry: Any):
+    """Build a ``model_name -> manifest relation_name`` callable for the Metabase join.
+
+    The SQLGlot provider IS-A ``ModelRegistry``, which owns the manifest reader; ``relation_name``
+    is dbt's authoritative physical identifier (honours ``alias``/``identifier``), so we prefer it
+    over ``Model.name`` for the warehouse join. Guarded: a backend without a manifest reader (or a
+    node without ``relation_name``) yields ``None`` and the join falls back to the model's
+    ``(database, schema, name)``.
+    """
+    reader = getattr(registry, "_manifest_reader", None)
+    if reader is None or not hasattr(reader, "_find_node"):
+        return None
+
+    def _resolve(model_name: str) -> Optional[str]:
+        node = reader._find_node(model_name)
+        if not node:
+            return None
+        relation_name = node.get("relation_name")
+        return relation_name if isinstance(relation_name, str) else None
+
+    return _resolve
 
 
 def _run_ci(
@@ -412,8 +696,17 @@ def _run_ci(
             # gate — report it and still apply the severity policy.
             click.echo(f"CI mode: failed to post PR comment: {exc}", err=True)
 
+    # Reconstruct the PolicyVerdict (dumped into the report) so the POLICY gate can read
+    # .blocks(). Only consulted under --fail-on policy; every other gate ignores it.
+    policy_verdict = None
+    raw_verdict = report.get("policy_verdict")
+    if isinstance(raw_verdict, dict):
+        from dbt_column_lineage.models.schema import PolicyVerdict
+
+        policy_verdict = PolicyVerdict.model_validate(raw_verdict)
+
     fail_on = FailOn(fail_on_value)
-    exit_code = gate_exit_code(report.get("summary", {}), fail_on)
+    exit_code = gate_exit_code(report.get("summary", {}), fail_on, policy_verdict)
     if exit_code != 0:
         click.echo(
             f"CI gate '--fail-on {fail_on.value}' tripped — failing the check.",
@@ -428,6 +721,12 @@ def main() -> None:
     argv = sys.argv[1:]
     if argv and argv[0] == "impact":
         impact.main(args=argv[1:], prog_name="dbt-col-lineage impact")
+    elif argv and argv[0] == "metabase-extract":
+        # Imported lazily so the credentialed Metabase client is only loaded when the
+        # extract subcommand is actually invoked — the offline gate path never imports it.
+        from dbt_column_lineage.metabase import cli as metabase_extract
+
+        metabase_extract.main(args=argv[1:], prog_name="dbt-col-lineage metabase-extract")
     else:
         cli()
 

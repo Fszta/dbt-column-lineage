@@ -1,4 +1,4 @@
-from typing import Dict, Union, Set, List, Any, Optional, Mapping, TYPE_CHECKING
+from typing import Dict, Tuple, Union, Set, List, Any, Optional, Mapping, TYPE_CHECKING
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
@@ -37,12 +37,22 @@ class GraphNode(BaseModel):
     # dbt tests (not_null / unique / relationships / ...) declared on this column — the
     # guardrails a reviewer wants to see at a glance. Empty list = untested; None until enriched.
     tests: Optional[List[Dict[str, Any]]] = None
+    # change-context marks (append-only; None in pure-explore mode → today's payload
+    # byte-for-byte). ``semantic`` is the AST-diff class of a CHANGED column node
+    # (equivalent|meaning_changed|indeterminate); ``breaking`` is the fail-safe convenience
+    # (anything not proven equivalent, plus removed/type_changed); ``boundary`` tags a node
+    # that sits past the dbt edge (e.g. "metabase") for the graph's BI band.
+    semantic: Optional[str] = None
+    breaking: Optional[bool] = None
+    boundary: Optional[str] = None
 
 
 class GraphEdge(BaseModel):
     source: str
     target: str
     type: str = "lineage"
+    # the single amber blast-path edge — set when the edge leaves a breaking column.
+    breaking: Optional[bool] = None
 
 
 class GraphData(BaseModel):
@@ -65,7 +75,172 @@ class LineageExplorer:
         self._start_model: Optional[str] = None
         self._start_column: Optional[str] = None
 
+        # change context (optional). Populated by ``set_change_context`` with the
+        # already-computed changeset report (semantic per changed column, policy verdict,
+        # cross-boundary Metabase reach, coverage honesty). All None here => pure-explore
+        # mode, and every endpoint renders exactly today's payload.
+        self._change_report: Optional[Dict[str, Any]] = None
+        self._policy_verdict: Optional[Dict[str, Any]] = None
+        self._policy_decision: Optional[str] = None
+        self._metabase_coverage: Optional[Dict[str, Any]] = None
+        # (model, column) -> {"semantic": str|None, "breaking": bool} for the CHANGED columns.
+        self._change_by_column: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        # name -> full metabase exposure entry (source/precision/via_cards/meta).
+        self._metabase_exposures: Dict[str, Dict[str, Any]] = {}
+        # (model, column) -> the metabase dashboards THIS change reaches, each as
+        # {name, via_columns, precision} so per-change reach stays column-precise (F4).
+        self._metabase_reach_by_change: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+
         self._setup_templates_and_routes()
+
+    @staticmethod
+    def _is_breaking(kind: Optional[str], semantic: Optional[str]) -> bool:
+        """Fail-safe breaking flag for a changed column.
+
+        Everything is breaking except a purely additive column or a proven-equivalent
+        logic change: ``removed`` / ``type_changed`` break structurally; a logic change
+        breaks unless its semantic is ``equivalent``; an unknown/``indeterminate`` semantic
+        is treated as breaking (never render "unknown" as "safe").
+        """
+        if kind == "added":
+            return False
+        return semantic != "equivalent"
+
+    def set_change_context(self, report: Optional[Dict[str, Any]]) -> None:
+        """Attach an already-computed changeset report so the explorer can surface the
+        product signals (semantic categorization, policy verdict, Metabase reach, coverage).
+
+        Strictly additive: passing ``None`` (or omitting the call) leaves the explorer in
+        pure-explore mode where every endpoint renders exactly today's payload. The report
+        shape is ``build_changeset_report(...)`` + ``policy_verdict`` / ``metabase`` blocks
+        as assembled by the ``impact`` CLI command — this method only indexes it, never
+        recomputes lineage.
+        """
+        # Reset so a second call fully replaces the prior context.
+        self._change_report = report
+        self._policy_verdict = None
+        self._policy_decision = None
+        self._metabase_coverage = None
+        self._change_by_column = {}
+        self._metabase_exposures = {}
+        self._metabase_reach_by_change = {}
+        if not report:
+            return
+
+        verdict = report.get("policy_verdict")
+        if isinstance(verdict, dict):
+            self._policy_verdict = verdict
+            decision = verdict.get("decision")
+            self._policy_decision = decision if isinstance(decision, str) else None
+
+        metabase = report.get("metabase")
+        if isinstance(metabase, dict):
+            self._metabase_coverage = metabase
+
+        for entry in report.get("affected_exposures", []) or []:
+            if isinstance(entry, dict) and entry.get("source") == "metabase":
+                name = entry.get("name")
+                if isinstance(name, str):
+                    self._metabase_exposures[name] = entry
+
+        for change in report.get("by_change", []) or []:
+            if not isinstance(change, dict):
+                continue
+            model = change.get("model")
+            column = change.get("column")
+            if not isinstance(model, str) or not isinstance(column, str):
+                continue
+            key = (model, column)
+            self._change_by_column[key] = {
+                "semantic": change.get("semantic"),
+                "breaking": self._is_breaking(change.get("kind"), change.get("semantic")),
+            }
+            reached = [
+                {
+                    "name": exposure.get("name"),
+                    "via_columns": exposure.get("via_columns") or [],
+                    "precision": exposure.get("precision"),
+                }
+                for exposure in change.get("reached_exposures", []) or []
+                if isinstance(exposure, dict) and exposure.get("name") in self._metabase_exposures
+            ]
+            if reached:
+                self._metabase_reach_by_change[key] = reached
+
+    def _change_mark(self, model: Any, column: Any) -> Optional[Dict[str, Any]]:
+        """The semantic/breaking mark for ``model.column`` if it is a changed column."""
+        if not isinstance(model, str) or not isinstance(column, str):
+            return None
+        return self._change_by_column.get((model, column))
+
+    def _enrich_impact_with_change_context(
+        self, impact_data: Dict[str, Any], model: str, column: str
+    ) -> Dict[str, Any]:
+        """Fold the change-context signals onto a single-column impact payload.
+
+        Additive and guarded: with no change context (pure-explore mode) or a non-dict
+        payload (an error), the payload is returned untouched. Decorates each downstream
+        affected column with its ``semantic`` / ``breaking`` class when it is itself a
+        changed column, marks the subject column, appends the Metabase dashboards this
+        change reaches (with precision / via_cards / meta), and attaches the whole-change
+        ``policy_verdict``.
+        """
+        if not isinstance(impact_data, dict) or self._change_report is None:
+            return impact_data
+
+        for affected in impact_data.get("affected_columns", []):
+            if not isinstance(affected, dict):
+                continue
+            mark = self._change_mark(affected.get("model"), affected.get("column"))
+            if mark is not None:
+                affected["semantic"] = mark["semantic"]
+                affected["breaking"] = mark["breaking"]
+
+        subject = self._change_by_column.get((model, column))
+        if subject is not None:
+            impact_data["subject_semantic"] = subject["semantic"]
+            impact_data["subject_breaking"] = subject["breaking"]
+
+        # Append the Metabase dashboards THIS change reaches — column-accurate (read from the
+        # change's own reached set), never a blanket dump of every dashboard in the run.
+        exposures = impact_data.setdefault("affected_exposures", [])
+        if isinstance(exposures, list):
+            present = {e.get("name") for e in exposures if isinstance(e, dict)}
+            for reached in self._metabase_reach_by_change.get((model, column), []):
+                name = reached.get("name")
+                if not isinstance(name, str):
+                    continue
+                base = self._metabase_exposures.get(name)
+                if base is None:
+                    continue
+                # Per-change scoped copy: precisely which column(s) of this dashboard THIS
+                # change touches (F4), not the union across the whole PR that the global
+                # exposure entry carries.
+                entry = dict(base)
+                entry["via_columns"] = reached.get("via_columns") or []
+                if reached.get("precision"):
+                    entry["precision"] = reached["precision"]
+                if name in present:
+                    # Already listed (dbt side): merge the cross-boundary provenance fields.
+                    for existing in exposures:
+                        if isinstance(existing, dict) and existing.get("name") == name:
+                            existing.update(entry)
+                            break
+                else:
+                    exposures.append(entry)
+                    present.add(name)
+
+        # The policy verdict is CHANGE-SCOPED: it is the whole-change gate decision, and it
+        # only means something for a column that is actually part of the reviewed change.
+        # Merely *exploring* a column is not making a change and carries no verdict — attaching
+        # the global verdict to any selected column would misread "I'm inspecting this column"
+        # as "a change to it blocks". Surface an explicit membership flag so the
+        # UI can say "not part of this change" instead of showing a stale global block.
+        impact_data["subject_in_changeset"] = subject is not None
+        if subject is not None and self._policy_verdict is not None:
+            impact_data["policy_verdict"] = self._policy_verdict
+
+        return impact_data
 
     def _setup_templates_and_routes(self) -> None:
         """Setup templates, static files, and routes."""
@@ -89,7 +264,22 @@ class LineageExplorer:
         async def get_coverage() -> Dict[str, Any]:
             if not self.lineage_service:
                 return {"error": "Lineage service not initialized"}
-            return self.lineage_service.get_coverage().model_dump()
+            coverage = self.lineage_service.get_coverage().model_dump()
+            # Cross-boundary honesty: when a Metabase artifact was joined, append its
+            # reach-confidence block so the coverage footer can be honest about BI reach too.
+            # Absent when the feature is off → backward compatible.
+            if self._metabase_coverage is not None:
+                coverage["metabase"] = self._metabase_coverage
+            return coverage
+
+        @self.app.get("/api/policy-verdict")
+        async def get_policy_verdict() -> Dict[str, Any]:
+            # Change-wide decision (block/warn/allow), independent of the selected column.
+            # ``{"decision": None}`` when no policy resolved / no changeset — the frontend
+            # treats that as "feature not active" and renders nothing new.
+            if self._policy_verdict is not None:
+                return self._policy_verdict
+            return {"decision": None}
 
         @self.app.get("/api/models")
         async def get_models() -> List[Dict[str, Any]]:
@@ -235,6 +425,14 @@ class LineageExplorer:
                         # Carry the confidence block alongside the summary metrics so the
                         # relationship summary card can surface it next to the tiles.
                         summary["confidence"] = impact_data.get("confidence")
+                        # thread the whole-change policy decision so the summary card can
+                        # show a pip (and the graph its subject ring) without a second fetch.
+                        # CHANGE-SCOPED: only when the explored column is itself
+                        # part of the reviewed change — otherwise the graph would ring an
+                        # arbitrary explored column with the global verdict. Only added when a
+                        # policy resolved → pure-explore payload stays byte-for-byte unchanged.
+                        if self._policy_decision is not None and self._change_mark(model, column):
+                            summary["policy_decision"] = self._policy_decision
                         self.data.impact_summary = summary
                     else:
                         self.data.impact_summary = None
@@ -286,7 +484,8 @@ class LineageExplorer:
                     return {"error": f"Column '{column}' not found in model '{model}'"}
 
                 impact_data = self.lineage_service.get_column_impact(model, column)
-                return self._enrich_impact_with_tests(impact_data)
+                impact_data = self._enrich_impact_with_tests(impact_data)
+                return self._enrich_impact_with_change_context(impact_data, model, column)
             except ValueError as e:
                 # Handle specific value errors (e.g., model/column not found)
                 logger.warning(f"Impact analysis error for {model}.{column}: {e}")
@@ -330,9 +529,183 @@ class LineageExplorer:
             self._add_processed_data(downstream_refs, "downstream")
             self._add_rowset_dependents()
             self._attach_column_tests()
+            self._annotate_nodes_with_semantic()
+            self._annotate_boundary_nodes()
 
         except Exception as e:
             logger.error(f"Error processing lineage for {start_model}.{start_column}: {e}")
+
+    def _annotate_nodes_with_semantic(self) -> None:
+        """Mark changed column nodes (and their outgoing edges) with the semantic class.
+
+        A single post-pass keeps the many node/edge creation sites untouched. No-op in
+        pure-explore mode (empty change context) → the graph payload is unchanged.
+        """
+        if not self._change_by_column:
+            return
+        breaking_ids: Set[str] = set()
+        for node in self.data.nodes:
+            if node.get("type") != "column":
+                continue
+            mark = self._change_mark(node.get("model"), node.get("label"))
+            if mark is None:
+                continue
+            node["semantic"] = mark["semantic"]
+            node["breaking"] = mark["breaking"]
+            if mark["breaking"]:
+                breaking_ids.add(node["id"])
+        # The blast-path edge (DESIGN.md's one warm edge): an edge leaving a breaking column.
+        for edge in self.data.edges:
+            if edge.get("source") in breaking_ids:
+                edge["breaking"] = True
+
+    @staticmethod
+    def _boundary_exposure_data(entry: Dict[str, Any]) -> Dict[str, Any]:
+        """The graph ``exposure_data`` payload for a reached Metabase dashboard node."""
+        exposure_data: Dict[str, Any] = {
+            "boundary": "metabase",
+            "type": entry.get("type") or "dashboard",
+        }
+        if entry.get("precision") is not None:
+            exposure_data["precision"] = entry.get("precision")
+        if entry.get("via_cards") is not None:
+            exposure_data["via_cards"] = entry.get("via_cards")
+        # F4: the column-precise chain (which dbt column -> card field the change hits), so the
+        # dashboard node/card can name the affected field instead of the whole board.
+        if entry.get("via_columns"):
+            exposure_data["via_columns"] = entry.get("via_columns")
+        meta = entry.get("meta")
+        if isinstance(meta, dict) and meta.get("tier") is not None:
+            exposure_data["tier"] = meta.get("tier")
+        if entry.get("url"):
+            exposure_data["url"] = entry.get("url")
+        return exposure_data
+
+    def _annotate_boundary_nodes(self) -> None:
+        """Surface reached Metabase dashboards as graph nodes past the dbt/BI boundary.
+
+        Two passes, both no-ops without a joined Metabase artifact (``_metabase_exposures``
+        empty) → the graph payload is byte-for-byte today's:
+
+        1. **Tag** any exposure node whose name already matches a joined dashboard
+           (``boundary="metabase"`` + provenance folded into ``exposure_data``).
+        2. **Inject** the dashboards THIS explored change reaches but that the registry
+           lineage walk never produced as nodes (they come from the cross-boundary reach
+           join, not dbt's own graph). Each is anchored to the exact terminal dbt column the
+           card reads when that column is carried on the reach entry (``via_columns``, F4) and
+           its node exists in the graph — so the dashboard fans out of the precise field it
+           consumes. Falls back to the downstream mart-leaf columns (then the main node) when
+           no column-precise anchor is available (a table-grain reach).
+        """
+        if not self._metabase_exposures:
+            return
+
+        # Pass 1 — tag exposure nodes the registry already emitted that are dashboards.
+        present_exposure_names: Set[str] = set()
+        for node in self.data.nodes:
+            if node.get("type") != "exposure":
+                continue
+            label = node.get("label")
+            if label is None:
+                continue
+            present_exposure_names.add(label)
+            entry = self._metabase_exposures.get(label) or self._metabase_exposures.get(
+                node.get("model") or ""
+            )
+            if entry is None:
+                continue
+            node["boundary"] = "metabase"
+            exposure_data = node.get("exposure_data")
+            if not isinstance(exposure_data, dict):
+                exposure_data = {}
+                node["exposure_data"] = exposure_data
+            exposure_data.update(self._boundary_exposure_data(entry))
+
+        # Pass 2 — inject the dashboards this change reaches that aren't graph nodes yet.
+        reached = self._metabase_reach_by_change.get(
+            (self._start_model or "", self._start_column or "")
+        )
+        if not reached:
+            return
+
+        leaf_anchors = self._downstream_mart_leaf_ids()
+        if not leaf_anchors:
+            main = self.data.main_node
+            leaf_anchors = [main] if isinstance(main, str) else []
+        if not leaf_anchors:
+            return
+
+        # All column-node ids currently in the graph, so a column-precise anchor can be
+        # validated before use (fall back to the mart-leaf heuristic when the exact node
+        # isn't laid out).
+        node_ids = {n.get("id") for n in self.data.nodes if isinstance(n, dict)}
+
+        for reached_entry in reached:
+            name = reached_entry.get("name")
+            if not isinstance(name, str) or name in present_exposure_names:
+                continue
+            base = self._metabase_exposures.get(name)
+            if base is None:
+                continue
+            entry = dict(base)
+            via_columns = reached_entry.get("via_columns") or []
+            entry["via_columns"] = via_columns
+            if reached_entry.get("precision"):
+                entry["precision"] = reached_entry["precision"]
+            node_id = f"exposure_{name}"
+            self.data.nodes.append(
+                GraphNode(
+                    id=node_id,
+                    label=name,
+                    type="exposure",
+                    model=name,
+                    resource_type="exposure",
+                    boundary="metabase",
+                ).model_dump()
+            )
+            # Attach exposure_data (dict, not a GraphNode field) after construction.
+            self.data.nodes[-1]["exposure_data"] = self._boundary_exposure_data(entry)
+            present_exposure_names.add(name)
+            # Anchor to the exact terminal column node(s) the card reads (F4) when present;
+            # else the mart-leaf heuristic. Dedupe so one column doesn't draw two edges.
+            precise = [
+                f"col_{v['model']}_{v['column']}"
+                for v in via_columns
+                if isinstance(v, dict) and v.get("model") and v.get("column")
+            ]
+            anchors = [a for a in dict.fromkeys(precise) if a in node_ids] or leaf_anchors
+            for anchor_id in anchors:
+                self.data.edges.append(
+                    GraphEdge(source=anchor_id, target=node_id, type="exposure").model_dump()
+                )
+
+    def _downstream_mart_leaf_ids(self) -> List[str]:
+        """The terminal downstream dbt-model columns — targets of a lineage edge that are not
+        themselves a source of one — where the blast path exits into the BI layer. Snapshots
+        and sources are excluded so a dashboard fans out of the marts, not a raw table."""
+        lineage_sources: Set[str] = set()
+        lineage_targets: Set[str] = set()
+        for edge in self.data.edges:
+            if edge.get("type", "lineage") != "lineage":
+                continue
+            source = edge.get("source")
+            target = edge.get("target")
+            if source is not None:
+                lineage_sources.add(source)
+            if target is not None:
+                lineage_targets.add(target)
+        by_id = {n.get("id"): n for n in self.data.nodes}
+        leaves: List[str] = []
+        for node_id in lineage_targets:
+            if node_id in lineage_sources:
+                continue
+            node = by_id.get(node_id)
+            if node is None or node.get("type") != "column":
+                continue
+            if node.get("resource_type") in ("snapshot", "source", "seed"):
+                continue
+            leaves.append(node_id)
+        return sorted(leaves)
 
     @staticmethod
     def _serialize_test(test: TestNode) -> Dict[str, Any]:

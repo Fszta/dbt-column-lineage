@@ -1,17 +1,20 @@
 from typing import Dict, Set, Optional, Any, Union
 from graphviz import Digraph  # type: ignore  # missing stubs for graphviz
 from dbt_column_lineage.models.schema import Column, ColumnLineage
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from dbt_column_lineage.lineage.provider import LineageProvider
 from dbt_column_lineage.lineage.display.base import LineageStaticDisplay
 
+
 class DotDisplay(LineageStaticDisplay):
-    def __init__(self, output_file: str = "lineage.dot", registry: Optional[ModelRegistry] = None):
-        self.dot = Digraph(comment='Column Lineage')
-        self.dot.attr(rankdir='LR')
-        self.dot.attr('node', fontname='Helvetica')
-        self.dot.attr('edge', fontname='Helvetica')
-        self.dot.attr(nodesep='1.0')
-        self.dot.attr(ranksep='1.0')
+    def __init__(
+        self, output_file: str = "lineage.dot", registry: Optional[LineageProvider] = None
+    ):
+        self.dot = Digraph(comment="Column Lineage")
+        self.dot.attr(rankdir="LR")
+        self.dot.attr("node", fontname="Helvetica")
+        self.dot.attr("edge", fontname="Helvetica")
+        self.dot.attr(nodesep="1.0")
+        self.dot.attr(ranksep="1.0")
         self.output_file = output_file
         self.models: Dict[str, Any] = {}
         self.registry = registry
@@ -23,10 +26,12 @@ class DotDisplay(LineageStaticDisplay):
     def display_column_info(self, column: Column) -> None:
         self._add_column_to_model(column.model_name, column.name, column.data_type)
 
-    def _add_column_to_model(self, model_name: str, col_name: str, data_type: Optional[str] = None) -> None:
+    def _add_column_to_model(
+        self, model_name: str, col_name: str, data_type: Optional[str] = None
+    ) -> None:
         if model_name not in self.model_columns:
             self.model_columns[model_name] = {}
-        
+
         if not data_type and self.registry:
             model = self.registry.get_model(model_name)
             if col_name in model.columns:
@@ -35,26 +40,29 @@ class DotDisplay(LineageStaticDisplay):
         parts = [col_name]
         if data_type:
             parts.append(f"type: {data_type}")
-            
-        self.model_columns[model_name][col_name] = '\n'.join(parts)
+
+        self.model_columns[model_name][col_name] = "\n".join(parts)
 
     def _create_model_subgraph(self, model_name: str, is_main: bool = False) -> None:
         if model_name not in self.models:
-            with self.dot.subgraph(name=f'cluster_{model_name}') as cluster:
-                cluster.attr(label=model_name, style='filled', 
-                           color='lightblue' if is_main else 'lightgreen',
-                           fontname='Helvetica Bold')
-                
+            with self.dot.subgraph(name=f"cluster_{model_name}") as cluster:
+                cluster.attr(
+                    label=model_name,
+                    style="filled",
+                    color="lightblue" if is_main else "lightgreen",
+                    fontname="Helvetica Bold",
+                )
+
                 columns = self.model_columns.get(model_name, {})
                 for col_name, label in columns.items():
                     cluster.node(
-                        f'{model_name}.{col_name}',
+                        f"{model_name}.{col_name}",
                         label,
-                        shape='box',
-                        style='filled',
-                        fillcolor='white'
+                        shape="box",
+                        style="filled",
+                        fillcolor="white",
                     )
-                
+
                 self.models[model_name] = cluster
 
     def _add_edge(self, from_ref: str, to_ref: str) -> None:
@@ -63,11 +71,16 @@ class DotDisplay(LineageStaticDisplay):
             self.dot.edge(from_ref, to_ref)
             self.edges.add(edge)
 
-    def _process_model_chain(self, current_model_name: str, current_col_name: str, 
-                           model_refs: Dict[str, Dict[str, ColumnLineage]], processed: Optional[Set[str]] = None) -> None:
+    def _process_model_chain(
+        self,
+        current_model_name: str,
+        current_col_name: str,
+        model_refs: Dict[str, Dict[str, ColumnLineage]],
+        processed: Optional[Set[str]] = None,
+    ) -> None:
         if self.registry is None:
             return
-        
+
         if processed is None:
             processed = set()
 
@@ -80,35 +93,43 @@ class DotDisplay(LineageStaticDisplay):
             for col_name, lineage in columns.items():
                 if any(src == current_ref for src in lineage.source_columns):
                     model = self.registry.get_model(model_name)
-                    data_type = model.columns[col_name].data_type if col_name in model.columns else None
-                    
+                    data_type = (
+                        model.columns[col_name].data_type if col_name in model.columns else None
+                    )
+
                     self._add_column_to_model(model_name, col_name, data_type=data_type)
-                    self._add_edge(current_ref, f'{model_name}.{col_name}')
+                    self._add_edge(current_ref, f"{model_name}.{col_name}")
                     self._process_model_chain(model_name, col_name, model_refs, processed)
 
     def _add_refs(self, refs: Dict[str, Dict[str, ColumnLineage]], direction: str) -> None:
         if not refs:
             return
 
-        model_refs = {k: v for k, v in refs.items() if k not in ('sources', 'direct_refs')}
-        
-        if direction == 'downstream':
+        model_refs = {k: v for k, v in refs.items() if k not in ("sources", "direct_refs")}
+
+        if direction == "downstream":
             self._process_model_chain(self.main_model, self.main_column, model_refs)
 
         for model_name in self.model_columns:
             self._create_model_subgraph(model_name, model_name == self.main_model)
 
     def display_upstream(self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]) -> None:
-        model_refs = {k: v for k, v in refs.items()
-                     if k not in ('sources', 'direct_refs') and isinstance(v, dict)}
-        self._add_refs(model_refs, direction='upstream')
+        model_refs = {
+            k: v
+            for k, v in refs.items()
+            if k not in ("sources", "direct_refs") and isinstance(v, dict)
+        }
+        self._add_refs(model_refs, direction="upstream")
 
     def display_downstream(
         self, refs: Dict[str, Union[Dict[str, ColumnLineage], Set[str]]]
     ) -> None:
-        model_refs = {k: v for k, v in refs.items()
-                     if k not in ('exposures', 'sources', 'direct_refs') and isinstance(v, dict)}
-        self._add_refs(model_refs, direction='downstream')
+        model_refs = {
+            k: v
+            for k, v in refs.items()
+            if k not in ("exposures", "sources", "direct_refs") and isinstance(v, dict)
+        }
+        self._add_refs(model_refs, direction="downstream")
 
     def save(self) -> None:
-        self.dot.render(self.output_file, view=True, format='png')
+        self.dot.render(self.output_file, view=True, format="png")

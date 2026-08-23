@@ -214,8 +214,10 @@ body.show-tests .column-test-guardrails {
     min-width: 0;
 }
 
-/* Confidence badge — can the impact list be trusted as complete? Partial confidence
-   uses RED (not the orange/amber reserved for transformations) so the two never clash. */
+/* Confidence badge — can the impact list be trusted as complete? On the amber-once
+   axis, a partial (lower-bound) analysis is a CAUTION → amber, sharing the one caution
+   slot with semantic-breaking and warn-verdict. Full = de-emphasized neutral + an indigo
+   check (the good news is "nothing missing"). Red is reserved for a policy BLOCK. */
 .confidence-badge {
     display: block;
     padding: 8px 12px;
@@ -275,15 +277,32 @@ body.show-tests .column-test-guardrails {
 }
 
 .confidence-full {
-    background: color-mix(in srgb, var(--success) 12%, var(--surface));
-    border-color: color-mix(in srgb, var(--success) 45%, transparent);
-    color: color-mix(in srgb, var(--success) 68%, var(--text));
+    background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+    border-color: color-mix(in srgb, var(--primary) 32%, transparent);
+    color: color-mix(in srgb, var(--primary) 58%, var(--text));
+}
+
+.confidence-full .confidence-badge-icon {
+    color: var(--primary);
 }
 
 .confidence-partial {
-    background: color-mix(in srgb, var(--error) 12%, var(--surface));
-    border-color: color-mix(in srgb, var(--error) 45%, transparent);
-    color: color-mix(in srgb, var(--error) 72%, var(--text));
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: color-mix(in srgb, var(--accent-dark) 78%, var(--text));
+}
+
+/* When a block/warn policy verdict owns the primary spark, the confidence badge steps
+   down so two cautions don't stack — muted slate, no amber fill. */
+.confidence-muted .confidence-badge {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-muted);
+    opacity: 0.85;
+}
+
+.confidence-muted .confidence-badge-icon {
+    color: var(--text-muted);
 }
 
 /* "Why? Show the N model-level-only models" disclosure trigger. */
@@ -2026,4 +2045,263 @@ body.show-tests .column-test-guardrails {
         min-width: 0;
         white-space: normal;
     }
+}
+
+/* ============================================================================
+ — semantic categorization, cross-boundary reach, confidence pip.
+   Amber discipline: breaking / warn / partial-confidence all share the ONE amber
+   "caution" axis (var(--accent)); red (var(--error)) is reserved for a policy BLOCK;
+   proven-equivalent reads de-emphasized neutral + an indigo (var(--primary)) check.
+   ========================================================================== */
+
+/* The shared amber caution dot — reused by the breaking chip and per-column badge. */
+.semantic-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Hero chip: the SUBJECT column's own verdict (this change is breaking / equivalent). */
+.impact-breaking-chip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 13px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.impact-breaking-chip .impact-breaking-chip-label {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.impact-breaking-chip .impact-breaking-chip-detail {
+    color: var(--text-secondary);
+    font-size: 12.5px;
+}
+
+.impact-breaking-chip.impact-breaking {
+    background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+    border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.impact-breaking-chip.impact-breaking .impact-breaking-chip-label {
+    color: color-mix(in srgb, var(--accent-dark) 80%, var(--text));
+}
+
+.impact-breaking-chip.impact-equivalent {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-muted);
+}
+
+.impact-breaking-chip.impact-equivalent svg {
+    color: var(--primary);
+}
+
+.impact-breaking-chip.impact-equivalent .impact-breaking-chip-label {
+    color: var(--text-secondary);
+}
+
+/* Neutral note for a column that isn't part of the reviewed change. Muted
+   slate, no new hue — it reads as "nothing to decide here", never as a verdict. */
+.impact-not-in-change {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    margin: 0 0 12px 0;
+    font-size: 13px;
+}
+
+.impact-not-in-change svg {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+}
+
+/* Per-column semantic badge on the column cards. */
+.semantic-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.semantic-badge.semantic-breaking {
+    background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+    color: color-mix(in srgb, var(--accent-dark) 82%, var(--text));
+    border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.semantic-badge.semantic-equivalent {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+
+.semantic-badge.semantic-equivalent svg {
+    color: var(--primary);
+}
+
+/* Cross-boundary Metabase dashboard card — a distinct "outside the dbt edge" variant.
+   Stays in the exposure indigo family (no new hue); the eyebrow + boundary carry it. */
+.exposure-card-metabase {
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+    background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+}
+
+.exposure-boundary-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+/* The monochrome Metabase logomark inherits the eyebrow colour (indigo family), never the
+   Metabase brand blue — keeps DESIGN.md's single-hue rule. */
+.exposure-boundary-eyebrow .metabase-logo {
+    flex: 0 0 auto;
+    color: var(--primary);
+}
+
+.exposure-card-metabase .mb-tier {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--primary);
+    background: var(--ring-soft);
+    padding: 2px 7px;
+    border-radius: 5px;
+}
+
+.mb-reach-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.mb-precision {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    padding: 1px 7px;
+    border-radius: 5px;
+}
+
+.mb-precision-column {
+    color: var(--primary);
+    background: var(--ring-soft);
+}
+
+/* Honest about degraded reach: a table-only dashboard reads muted (mirrors coverage). */
+.mb-precision-table {
+    color: var(--text-muted);
+    background: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+}
+
+.mb-via-cards {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* F4: the exact dashboard field(s) a change hits. Column-precise, so it reads in the
+   indigo accent family (same as mb-precision-column), never a new hue. */
+.mb-fields-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 7px;
+}
+
+.mb-fields-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.mb-field {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 1px 7px;
+    border-radius: 5px;
+    background: var(--ring-soft);
+}
+
+.mb-field code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--primary);
+}
+
+.mb-field-role {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+/* compact confidence pip beside the Related-Exposures tile on the summary card. */
+.summary-confidence-pip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.summary-confidence-pip.pip-full {
+    color: var(--primary);
+}
+
+.summary-confidence-pip.pip-partial {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Second (Metabase) coverage footer line reuses the coverage-line muted treatment. */
+.coverage-line-metabase {
+    margin-top: 4px;
 }
