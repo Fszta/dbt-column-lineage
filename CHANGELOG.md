@@ -1,3 +1,9 @@
+## [0.17.1](https://github.com/Fszta/parrant/compare/v0.17.0...v0.17.1) (2026-08-23)
+
+### Features
+
+* **explorer:** rebrand the explorer UI to Parrant ([48b82b0](https://github.com/Fszta/parrant/commit/48b82b0f56072587c40a1e714b6137c2bebc54dd))
+
 ## [0.17.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.16.1...v0.17.0) (2026-08-23)
 
 ### Features
