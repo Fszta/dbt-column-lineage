@@ -2,30 +2,62 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://fszta.github.io/dbt-column-lineage/</loc>
-         <lastmod>2026-08-21</lastmod>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
          <loc>https://fszta.github.io/dbt-column-lineage/changelog/</loc>
-         <lastmod>2026-08-21</lastmod>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/explorer/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/glossary/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/metabase/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/overview/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/policy-gate/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/semantic-categorization/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/gotchas/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/guardrails/</loc>
+         <lastmod>2026-08-23</lastmod>
+    </url>
+    <url>
+         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/how-it-works/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
          <loc>https://fszta.github.io/dbt-column-lineage/features/impact-analysis/</loc>
-         <lastmod>2026-08-21</lastmod>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
          <loc>https://fszta.github.io/dbt-column-lineage/getting-started/installation/</loc>
-         <lastmod>2026-08-21</lastmod>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
          <loc>https://fszta.github.io/dbt-column-lineage/getting-started/quickstart/</loc>
-         <lastmod>2026-08-21</lastmod>
-    </url>
-    <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/proposals/the-verdict-test-aware-impact/</loc>
-         <lastmod>2026-08-21</lastmod>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
          <loc>https://fszta.github.io/dbt-column-lineage/reference/json-output/</loc>
-         <lastmod>2026-08-21</lastmod>
+         <lastmod>2026-08-23</lastmod>
     </url>
 </urlset>

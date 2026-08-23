@@ -12,31 +12,31 @@
         <meta name="author" content="Fszta">
       
       
-        <link rel="canonical" href="https://fszta.github.io/dbt-column-lineage/features/impact-analysis/">
+        <link rel="canonical" href="https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/how-it-works/">
       
       
-        <link rel="prev" href="../../getting-started/quickstart/">
+        <link rel="prev" href="../../overview/">
       
       
-        <link rel="next" href="../../decision-engine/overview/">
+        <link rel="next" href="../guardrails/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/favicon.svg">
+      <link rel="icon" href="../../../assets/favicon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Impact Analysis - DBT Column Lineage</title>
+        <title>How it works - DBT Column Lineage</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/custom.css">
+      <link rel="stylesheet" href="../../../stylesheets/custom.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#impact-analysis" class="md-skip">
+        <a href="#how-it-works-the-mental-model" class="md-skip">
           Skip to content
         </a>
       
@@ -90,9 +90,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="DBT Column Lineage" class="md-header__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
+    <a href="../../.." title="DBT Column Lineage" class="md-header__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
       
-  <img src="../../assets/logo.svg" alt="logo">
+  <img src="../../../assets/logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Impact Analysis
+              How it works
             
           </span>
         </div>
@@ -222,7 +222,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href="../../.." class="md-tabs__link">
         
   
   
@@ -243,11 +243,31 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../getting-started/installation/" class="md-tabs__link">
+        <a href="../../../getting-started/installation/" class="md-tabs__link">
           
   
   
   Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../features/impact-analysis/" class="md-tabs__link">
+          
+  
+  
+  Features
 
         </a>
       </li>
@@ -265,27 +285,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
-          
-  
-  
-  Features
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../../decision-engine/overview/" class="md-tabs__link">
+        <a href="../../overview/" class="md-tabs__link">
           
   
   
@@ -305,7 +305,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../reference/json-output/" class="md-tabs__link">
+        <a href="../../../reference/json-output/" class="md-tabs__link">
           
   
   
@@ -323,7 +323,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../changelog/" class="md-tabs__link">
+      <a href="../../../changelog/" class="md-tabs__link">
         
   
   
@@ -360,9 +360,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="DBT Column Lineage" class="md-nav__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
+    <a href="../../.." title="DBT Column Lineage" class="md-nav__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
       
-  <img src="../../assets/logo.svg" alt="logo">
+  <img src="../../../assets/logo.svg" alt="logo">
 
     </a>
     DBT Column Lineage
@@ -389,7 +389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -470,7 +470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -498,7 +498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/quickstart/" class="md-nav__link">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -506,6 +506,95 @@
     
   
     Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../features/impact-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Impact Analysis
   
 
     
@@ -551,17 +640,17 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
     
   
-    Features
+    Decision Engine
   
 
     
@@ -572,12 +661,97 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Features
+    Decision Engine
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
   
 
           </label>
@@ -606,7 +780,7 @@
   <span class="md-ellipsis">
     
   
-    Impact Analysis
+    How it works
   
 
     
@@ -624,7 +798,7 @@
   <span class="md-ellipsis">
     
   
-    Impact Analysis
+    How it works
   
 
     
@@ -650,10 +824,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#the-one-idea-diff-cheaply-rebuild-selectively" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        The one idea: diff cheaply, rebuild selectively
       
     </span>
   </a>
@@ -661,44 +835,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-use" class="md-nav__link">
+  <a href="#the-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How to Use
+        The pipeline
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#understanding-the-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Understanding the Results
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#in-ci-github-action" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        In CI (GitHub Action)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="In CI (GitHub Action)">
+    <nav class="md-nav" aria-label="The pipeline">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#outputs" class="md-nav__link">
+  <a href="#1-changeset-what-changed" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outputs
+        1. Changeset — what changed?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-semantic-categorization-did-the-output-actually-move" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Semantic categorization — did the output actually move?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-lineage-reach-what-does-it-touch-and-how" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Lineage reach — what does it touch, and how?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-cross-boundary-reach-does-it-reach-a-dashboard-past-dbts-edge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Cross-boundary reach — does it reach a dashboard past dbt's edge?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-policy-verdict-given-my-rules-what-should-happen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Policy → verdict — given my rules, what should happen?
       
     </span>
   </a>
@@ -711,10 +907,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#use-cases" class="md-nav__link">
+  <a href="#a-verdict-is-a-decision-with-a-next-step" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Use Cases
+        A verdict is a decision with a next step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-it-on-one-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See it on one PR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
       
     </span>
   </a>
@@ -730,67 +948,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Decision Engine
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Decision Engine
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -798,117 +955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decision-engine/overview/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Concepts
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Concepts
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../decision-engine/concepts/how-it-works/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    How it works
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../decision-engine/concepts/guardrails/" class="md-nav__link">
+      <a href="../guardrails/" class="md-nav__link">
         
   
   
@@ -936,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decision-engine/concepts/gotchas/" class="md-nav__link">
+      <a href="../gotchas/" class="md-nav__link">
         
   
   
@@ -978,10 +1025,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -990,7 +1040,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
         
           
-          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="">
             
   
   
@@ -1026,7 +1076,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decision-engine/semantic-categorization/" class="md-nav__link">
+      <a href="../../semantic-categorization/" class="md-nav__link">
         
   
   
@@ -1054,7 +1104,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decision-engine/policy-gate/" class="md-nav__link">
+      <a href="../../policy-gate/" class="md-nav__link">
         
   
   
@@ -1082,7 +1132,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decision-engine/metabase/" class="md-nav__link">
+      <a href="../../metabase/" class="md-nav__link">
         
   
   
@@ -1110,7 +1160,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decision-engine/explorer/" class="md-nav__link">
+      <a href="../../explorer/" class="md-nav__link">
         
   
   
@@ -1146,7 +1196,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decision-engine/glossary/" class="md-nav__link">
+      <a href="../../glossary/" class="md-nav__link">
         
   
   
@@ -1235,7 +1285,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/json-output/" class="md-nav__link">
+      <a href="../../../reference/json-output/" class="md-nav__link">
         
   
   
@@ -1270,7 +1320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../changelog/" class="md-nav__link">
+      <a href="../../../changelog/" class="md-nav__link">
         
   
   
@@ -1310,114 +1360,97 @@
   
 
 
-<h1 id="impact-analysis">Impact Analysis</h1>
-<p><strong>The core feature of DBT Column Lineage</strong> - understand the downstream effects of changing a column before you make the change.</p>
-<h2 id="overview">Overview</h2>
-<p>Impact Analysis is the primary reason to use DBT Column Lineage. It helps you answer the critical question: <strong>"What happens if I change this column?"</strong></p>
-<p>Column-level lineage is the tool that enables this analysis. By tracking how data flows through your transformations at the column level, we can show you exactly what will be affected when you modify a column.</p>
-<p>When you select a column in the Interactive Explorer, you can analyze its impact across your entire dbt project. This feature shows you:</p>
-<ul>
-<li><strong>Which models and columns</strong> depend on this column</li>
-<li><strong>Which transformations</strong> (SUM, CASE, etc.) use this column and may need review</li>
-<li><strong>Which dashboards and exposures</strong> will be impacted</li>
-</ul>
-<h2 id="how-to-use">How to Use</h2>
-<ol>
-<li>
-<p>Start the Interactive Explorer:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dbt-col-lineage<span class="w"> </span>--explore
-</code></pre></div></p>
-</li>
-<li>
-<p>Select a model and column from the sidebar</p>
-</li>
-<li>
-<p>Load the lineage graph</p>
-</li>
-<li>
-<p>Click <strong>"Analyze Impact"</strong> in the card that appears on the graph</p>
-</li>
-<li>
-<p>Review the impact analysis panel that opens on the right</p>
-</li>
-</ol>
-<h2 id="understanding-the-results">Understanding the Results</h2>
-<p>The impact analysis categorizes columns into:</p>
-<ul>
-<li><strong>Requires Review</strong>: Columns with transformations (derived columns) that may break if the source column changes</li>
-<li><strong>Pass-through Columns</strong>: Direct references that will automatically propagate changes</li>
-<li><strong>Affected Models</strong>: All models in the dependency chain</li>
-<li><strong>Affected Exposures</strong>: Dashboards and reports that may be impacted</li>
-</ul>
-<p><img alt="Impact Analysis Screenshot" src="../../assets/impact-analysis.png" />
-<em>Impact Analysis panel showing column dependencies and transformations</em></p>
-<h2 id="in-ci-github-action">In CI (GitHub Action)</h2>
-<p>Run the same impact analysis on every pull request. The action diffs the base- and
-head-branch dbt artifacts and posts a sticky column-level blast-radius comment on the PR.
-See the <a href="https://github.com/Fszta/dbt-column-lineage/blob/main/docs/examples/impact-pr-check.yml">copy-paste workflow</a>
-to wire it up.</p>
-<h3 id="outputs">Outputs</h3>
-<p>The action exposes the impact result so later workflow steps can react to it:</p>
-<table>
-<thead>
-<tr>
-<th>Output</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>affected_models</code></td>
-<td>Number of downstream models whose output is affected by the change.</td>
-</tr>
-<tr>
-<td><code>affected_columns</code></td>
-<td>Number of downstream columns affected.</td>
-</tr>
-<tr>
-<td><code>affected_exposures</code></td>
-<td>Number of business-facing exposures (dashboards/apps) affected.</td>
-</tr>
-<tr>
-<td><code>provable_breaks</code></td>
-<td>Number of dbt tests the change orphans (will fail on the next <code>dbt build</code>).</td>
-</tr>
-<tr>
-<td><code>verdict</code></td>
-<td>Overall ruling — <code>safe</code>, <code>review</code>, or <code>block</code>.</td>
-</tr>
-<tr>
-<td><code>tripped_level</code></td>
-<td>Highest severity band reached — <code>none</code>, <code>any</code>, <code>critical</code>, <code>exposures</code>, or <code>tests</code>.</td>
-</tr>
-</tbody>
-</table>
-<p>Give the action an <code>id</code> and read <code>steps.&lt;id&gt;.outputs.*</code> in a later step:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Column-level impact assessment</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">impact</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Fszta/dbt-column-lineage@v0</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">          </span><span class="nt">manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/manifest.json</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">          </span><span class="nt">catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/catalog.json</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">          </span><span class="nt">base-manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/manifest.json</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">          </span><span class="nt">base-catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/catalog.json</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">          </span><span class="nt">fail-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Warn on exposure impact</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">steps.impact.outputs.tripped_level == 'exposures'</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo "::warning::This PR affects ${{ steps.impact.outputs.affected_exposures }} exposure(s)"</span>
+<h1 id="how-it-works-the-mental-model">How it works — the mental model</h1>
+<p>Read this before the how-to guides. It explains <em>what the decision engine is doing and why</em>, so
+the verdicts it produces make sense (and so you don't misread them — see <a href="../gotchas/">Things to
+know</a>).</p>
+<h2 id="the-one-idea-diff-cheaply-rebuild-selectively">The one idea: diff cheaply, rebuild selectively</h2>
+<p>A dbt project's DAG is large; most pull requests touch a tiny part of it. The cost of assessing a
+change — CI runs, rebuilds, reviewer attention — should scale with the change's <strong>true blast
+radius</strong>, not with the size of the DAG.</p>
+<p>So the engine starts from the <em>diff</em> (what actually changed between two versions of your project)
+and works outward only as far as the change genuinely reaches. Everything below is in service of
+that: measure the real impact precisely, then act only where it matters.</p>
+<p>It does this <strong>offline, from artifacts only</strong> — it reads your compiled dbt files
+(<code>manifest.json</code>, <code>catalog.json</code>) and never runs dbt or connects to your warehouse. A pull request
+becomes a decision without spinning up any infrastructure.</p>
+<h2 id="the-pipeline">The pipeline</h2>
+<pre class="mermaid"><code>flowchart TD
+    A["base + head artifacts"] --&gt; B["changeset&lt;br/&gt;changed columns"]
+    B --&gt; S["1 · semantic categorization&lt;br/&gt;did the output move?"]
+    B --&gt; R["2 · lineage reach&lt;br/&gt;what it touches, and how"]
+    B --&gt; X["3 · cross-boundary reach&lt;br/&gt;BI dashboards (Metabase today)"]
+    S --&gt; P["4 · policy engine&lt;br/&gt;your rules"]
+    R --&gt; P
+    X --&gt; P
+    P --&gt; V["5 · verdict: block / warn / allow&lt;br/&gt;+ selective build / test sets&lt;br/&gt;+ notifications"]</code></pre>
+<p>Each stage answers one question:</p>
+<h3 id="1-changeset-what-changed">1. Changeset — <em>what changed?</em></h3>
+<p>Diff the base- and head-branch artifacts into a list of changed columns, each tagged with a
+<strong><a href="../../glossary/#1-change-kinds-what-changed-about-a-column">change kind</a></strong>
+(<code>added</code> / <code>removed</code> / <code>type_changed</code> / <code>logic_changed</code>).</p>
+<h3 id="2-semantic-categorization-did-the-output-actually-move">2. Semantic categorization — <em>did the output actually move?</em></h3>
+<p>For a <code>logic_changed</code> column, the engine compares the base and head SQL <strong>expressions</strong> and decides
+whether the column's output is provably the same (<code>equivalent</code>), provably different
+(<code>meaning_changed</code>), or unprovable (<code>indeterminate</code>). This is what lets it say <em>"this refactor is a
+no-op, don't block it"</em> — and, just as important, <em>"I can't prove this is safe, so treat it as breaking."</em>
+See <a href="../../semantic-categorization/">Semantic categorization</a>.</p>
+<blockquote>
+<p>It classifies the <strong>expression</strong>, not the data. "Will the values on real rows actually differ?"
+is a different (warehouse-level) question — see <a href="../guardrails/">Guardrails</a>.</p>
+</blockquote>
+<h3 id="3-lineage-reach-what-does-it-touch-and-how">3. Lineage reach — <em>what does it touch, and how?</em></h3>
+<p>The engine walks column-level lineage to find the downstream models, columns, and exposures the
+change reaches — and <em>how</em> it propagates (the value is <strong>recomputed</strong>, used in a <strong>filter/join</strong>,
+or <strong>passed through</strong>). That "how" is the
+<a href="../../glossary/#32-mechanisms-how-the-change-propagates">mechanism</a>, and it's what makes a rebuild
+<em>selective</em>: you can rebuild only the descendants that actually recompute the value.</p>
+<h3 id="4-cross-boundary-reach-does-it-reach-a-dashboard-past-dbts-edge">4. Cross-boundary reach — <em>does it reach a dashboard past dbt's edge?</em></h3>
+<p>dbt lineage stops at dbt's edge. Optionally, the engine follows impact one hop further, into your
+<strong>BI layer</strong> — a reached dashboard surfaces as just another downstream <strong>exposure</strong>, matched by the
+same policy rules. The reach model is <strong>BI-tool-agnostic</strong>: <strong>Metabase is the first supported
+connector</strong>, and because a dashboard is just an exposure, adding another BI tool is a new extractor,
+not new policy surface. See <a href="../../metabase/">Cross-boundary</a>.</p>
+<h3 id="5-policy-verdict-given-my-rules-what-should-happen">5. Policy → verdict — <em>given my rules, what should happen?</em></h3>
+<p>Your <strong>policy</strong> (rules you author) reads all of the above and produces a <strong>verdict</strong>:
+<code>block</code> / <code>warn</code> / <code>allow</code>, plus a selective <strong>build set</strong> and <strong>test set</strong>, plus <strong>notifications</strong>
+to route. The tool ships the <em>engine</em>; <strong>you</strong> ship the <em>rules</em>. See <a href="../../policy-gate/">Policy gate</a>.</p>
+<h2 id="a-verdict-is-a-decision-with-a-next-step">A verdict is a decision with a next step</h2>
+<p>The output isn't just "here is the blast radius" — it's <em>"here is the decision, and here is exactly
+what to rebuild"</em>. And a <code>block</code> is never a dead end: it's a <strong><code>block-until</code></strong>. Because the gate is
+stateless and re-runs on every push, a block <strong>clears itself</strong> the moment the change stops tripping
+the rule — revert it, prove it equivalent, evolve the consumer to absorb it, or stop it reaching the
+flagged object. The report states how to clear it.</p>
+<h2 id="see-it-on-one-pr">See it on one PR</h2>
+<p>Concretely: a PR retypes <code>stg_accounts.account_holder</code>. Run the gate offline against the base
+artifacts (this is the whole decision — no dbt run, no warehouse):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dbt-col-lineage<span class="w"> </span>impact<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--manifest<span class="w"> </span>target/manifest.json<span class="w">   </span>--catalog<span class="w"> </span>target/catalog.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--base-manifest<span class="w"> </span>base/manifest.json<span class="w"> </span>--base-catalog<span class="w"> </span>base/catalog.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--metabase<span class="w"> </span>metabase_lineage.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--policy<span class="w"> </span>policy.yml<span class="w"> </span>--fail-on<span class="w"> </span>policy
 </code></pre></div>
-<p>The outputs are populated even when <code>fail-on</code> trips the gate, so a downstream step still
-runs on failure with <code>if: always()</code>.</p>
-<h2 id="use-cases">Use Cases</h2>
-<p><strong>Before modifying a column:</strong>
-- Understand which transformations depend on it
-- Identify which dashboards need updates
-- Plan your change strategy</p>
-<p><strong>During refactoring:</strong>
-- Track the blast radius of schema changes
-- Prioritize which models to update first
-- Ensure no downstream dependencies are missed</p>
+<p>The engine categorizes the change (a <strong>type change is structurally breaking</strong>), computes its reach
+(it flows to <code>transactions.account_holder</code>, which an executive Metabase dashboard reads), and your
+policy fires — so the PR comment leads with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>🛡️ Policy verdict — BLOCK
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>&gt; Blocked until the change stops tripping the rules below — the gate re-runs on every push
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  and clears itself.
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>⛔ breaking-reaches-executive-dashboard
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>   stg_accounts.account_holder  →  reaches metabase.dashboard.55 (executive)
+</code></pre></div>
+<p><code>--fail-on policy</code> makes the check exit non-zero, so CI fails — with a message that says <em>why</em> and
+<em>how to clear it</em>. Revert the change, prove it equivalent, or evolve the consumer, and the next push
+passes automatically. The full rule authoring is in the <a href="../../policy-gate/">Policy gate guide</a>.</p>
+<h2 id="where-to-go-next">Where to go next</h2>
+<ul>
+<li><a href="../guardrails/">Guardrails &amp; non-goals</a> — the lines the engine deliberately holds (and what it is
+  <em>not</em>).</li>
+<li><a href="../gotchas/">Things to know</a> — the handful of subtleties you must internalize to use it correctly.</li>
+<li><a href="../../glossary/">Glossary</a> — every term, pinned across code, UI, and docs.</li>
+<li>Then the how-to guides: <a href="../../semantic-categorization/">Semantic</a> ·
+  <a href="../../policy-gate/">Policy</a> · <a href="../../metabase/">Cross-boundary</a> · <a href="../../explorer/">Explorer</a>.</li>
+</ul>
 
 
 
@@ -1497,10 +1530,10 @@ runs on failure with <code>if: always()</code>.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.integrate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.integrate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
