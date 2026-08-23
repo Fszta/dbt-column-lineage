@@ -13,11 +13,11 @@ deliberately out of scope.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from dbt_column_lineage.lineage.provider import LineageAndMetadataProvider, LineageProvider
 from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
-from dbt_column_lineage.models.schema import BreakFinding, TestNode
+from dbt_column_lineage.models.schema import BreakFinding, OverrideVerb, TestNode
 
 # Change kinds that can orphan a test by making the column disappear. A rename is emitted by
 # the changeset builder as REMOVED(old) + ADDED(new), so REMOVED already covers it.
@@ -119,47 +119,248 @@ def classify_provable_breaks(
 
 
 def _has_meaning_shift(changes: Optional[List[ColumnChange]]) -> bool:
-    """True when any change carries a proven-or-unprovable meaning shift.
+    """True when any NON-overridden change carries a proven-or-unprovable meaning shift.
 
     An ``EQUIVALENT`` edit is never emitted as a change, so a *set* ``semantic`` is always
     either ``MEANING_CHANGED`` (the AST diff proved the derivation's meaning moved) or
     ``INDETERMINATE`` (it could not be proven safe) — both ``is_breaking``. Either warrants
-    a human look, even when nothing downstream is recomputed.
+    a human look, even when nothing downstream is recomputed. A change carrying ANY override
+    pragma is excluded (the author acknowledged it), so it no longer lifts the ruling.
     """
     if not changes:
         return False
-    return any(c.semantic is not None and c.semantic.is_breaking for c in changes)
+    return any(
+        c.override is None and c.semantic is not None and c.semantic.is_breaking for c in changes
+    )
+
+
+def break_is_overridden(break_finding: BreakFinding, changes: Optional[List[ColumnChange]]) -> bool:
+    """True when the change matching this provable break carries an ``allow-break`` override.
+
+    Fail-safe: only the hard ``allow-break`` verb can demote a break — ``allow-change`` never
+    can. Matched case-insensitively on ``(model, column)``.
+    """
+    if not changes:
+        return False
+    model = break_finding.change_model.lower()
+    column = break_finding.change_column.lower()
+    for change in changes:
+        if (
+            change.model.lower() == model
+            and change.column.lower() == column
+            and change.override is not None
+            and change.override.verb is OverrideVerb.ALLOW_BREAK
+        ):
+            return True
+    return False
+
+
+def unexcused_break_count(breaks: List[BreakFinding], changes: Optional[List[ColumnChange]]) -> int:
+    """Number of provable breaks NOT excused by an ``allow-break`` override.
+
+    This is the count the CI gate (``--fail-on tests``) must read: an acknowledged break is
+    demoted to REVIEW and must not keep the gate armed, or the override is cosmetic for the
+    exact gate the feature exists to keep usable. With no overrides this equals ``len(breaks)``.
+    """
+    return sum(1 for b in breaks if not break_is_overridden(b, changes))
+
+
+_REACHING_MECHANISMS = ("derived_recompute", "rowset_filter")
+
+
+def _reaching_change_keys(by_change: Optional[List[Dict[str, Any]]]) -> Set[Tuple[str, str, str]]:
+    """``(model, column, kind)`` keys of changes that reach a recompute/row-set column or an
+    exposure — i.e. the changes that drive a blast-radius REVIEW."""
+    keys: Set[Tuple[str, str, str]] = set()
+    for entry in by_change or []:
+        if not entry.get("resolved"):
+            continue
+        reaches = bool(entry.get("reached_exposures"))
+        if not reaches:
+            for reached in entry.get("reached_columns", []):
+                if reached.get("mechanism") in _REACHING_MECHANISMS:
+                    reaches = True
+                    break
+        if reaches:
+            keys.add((str(entry.get("model")), str(entry.get("column")), str(entry.get("kind"))))
+    return keys
+
+
+def _change_reaches(change: ColumnChange, reaching_keys: Set[Tuple[str, str, str]]) -> bool:
+    """Whether a change contributes to the REVIEW tier: it meaning-shifts, or it reaches a
+    recompute/row-set column or an exposure (per ``by_change``)."""
+    if change.semantic is not None and change.semantic.is_breaking:
+        return True
+    return (change.model, change.column, change.kind.value) in reaching_keys
+
+
+def _all_reaching_overridden(
+    changes: List[ColumnChange], by_change: Optional[List[Dict[str, Any]]]
+) -> bool:
+    """True only when EVERY change that drives a blast-radius review carries an override.
+
+    Used to suppress the reach-review tier precisely: if any reaching change is un-acknowledged,
+    the review stands. Returns False when nothing reaches (so the caller keeps ``summary``'s
+    reach signal as the baseline rather than re-deriving it)."""
+    reaching = _reaching_change_keys(by_change)
+    if not reaching:
+        return False
+    override_by_key = {(c.model, c.column, c.kind.value): c.override for c in changes}
+    for key in reaching:
+        if override_by_key.get(key) is None:
+            return False
+    return True
 
 
 def decide_verdict(
     breaks: List[BreakFinding],
     summary: Dict[str, Any],
     changes: Optional[List[ColumnChange]] = None,
+    by_change: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """Collapse breaks + blast-radius summary + semantic axis into a single ruling.
 
-    - ``block``: at least one provable break — objective enough to fail a gate.
-    - ``review``: no provable break, but *either* the change recomputes downstream logic,
+    - ``block``: at least one provable break with no ``allow-break`` override — objective
+      enough to fail a gate.
+    - ``review``: no *blocking* break, but *either* the change recomputes downstream logic,
       shifts a row-set, or reaches a business-facing exposure, *or* the semantic diff found
-      a column whose meaning changed (``MEANING_CHANGED``) or couldn't be proven safe
-      (``INDETERMINATE``) — a human should look.
+      a column whose meaning changed / couldn't be proven safe — a human should look. A break
+      demoted by ``allow-break`` also floors the ruling here (never ``safe``).
     - ``safe``: nothing downstream is recomputed, no exposure is touched, and every changed
       column's derivation is a proven ``EQUIVALENT`` (or non-logic) edit.
 
-    The semantic axis only ever lifts ``safe`` → ``review``; it never drives ``block``. BLOCK
-    stays reserved for provable test breaks so the current conservative canonicalizer — which
-    can over-classify a redundant-paren or commutative-reorder rewrite as ``MEANING_CHANGED``
-    — cannot hard-fail a cosmetic edit. Teams that trust their categorization can opt a
-    meaning shift into a hard block through the policy engine.
+    The semantic axis only ever lifts ``safe`` → ``review``; it never drives ``block``.
 
     ``changes`` is optional for backward compatibility; without it the semantic axis is
-    simply invisible (the pre-existing breaks + blast-radius behavior).
+    invisible. ``by_change`` (also optional) enables precise per-change override suppression of
+    the reach-review tier: it is used ONLY to test whether every reaching change is overridden,
+    never to re-derive the baseline reach signal (which stays ``summary``). When ``by_change``
+    is absent, the reach review can never be suppressed (fail-safe) — precise per-change capping
+    is then the policy engine's job.
     """
-    if breaks:
+    # (1) A break is demoted (not blocking) when its change carries an allow-break override.
+    blocking_breaks = [b for b in breaks if not break_is_overridden(b, changes)]
+    demoted = len(breaks) - len(blocking_breaks)
+    if blocking_breaks:
         return "block"
-    reaches_review = (
+
+    # (2) Blast-radius / semantic review. ``summary`` is the baseline reach signal; ``by_change``
+    # only lets us suppress it when EVERY reaching change is acknowledged.
+    reaches_review = bool(
         summary.get("critical_count", 0)
         or summary.get("filter_count", 0)
         or summary.get("affected_exposures", 0)
     )
-    return "review" if reaches_review or _has_meaning_shift(changes) else "safe"
+    review = False
+    if reaches_review:
+        if (
+            changes is not None
+            and by_change is not None
+            and _all_reaching_overridden(changes, by_change)
+        ):
+            review = False  # every reaching change acknowledged -> suppressed
+        else:
+            review = True
+    if _has_meaning_shift(changes):
+        review = True
+
+    # (3) A demoted (allow-break'd) break floors the ruling at review, never safe.
+    if demoted:
+        return "review"
+    return "review" if review else "safe"
+
+
+def _applied_record(
+    change: ColumnChange, downgraded_from: str, downgraded_to: str
+) -> Dict[str, Any]:
+    """A unified honored-override record. Same shape as the policy path so the report's
+    ``overrides`` block and the ``overrides_applied`` count never diverge across the two gates."""
+    override = change.override
+    assert override is not None
+    return {
+        "model": change.model,
+        "column": change.column,
+        "verb": override.verb.value,
+        "reason": override.reason,
+        "downgraded_from": downgraded_from,
+        "downgraded_to": downgraded_to,
+        "source_line": override.source_line,
+        "scope": override.scope,
+    }
+
+
+def override_hint(change: ColumnChange, is_break: bool) -> str:
+    """A pointed hint for an override that landed but changed nothing (a no-op)."""
+    override = change.override
+    assert override is not None
+    if is_break and override.verb is OverrideVerb.ALLOW_CHANGE:
+        return "allow-change cannot excuse a provable break — use allow-break to acknowledge it"
+    if change.kind is ChangeKind.ADDED and override.verb is OverrideVerb.ALLOW_BREAK:
+        return (
+            "allow-break landed on an ADDED column; a rename break is on the REMOVED old "
+            "column — use explicit column=<old_name> or model scope to excuse it"
+        )
+    return "matched a change that neither breaks nor reaches anything — safe to remove"
+
+
+def ineffective_override_record(change: ColumnChange, is_break: bool) -> Dict[str, Any]:
+    """A unified no-op override record (same base skeleton + a ``hint``)."""
+    override = change.override
+    assert override is not None
+    record = override.to_record()
+    record["model"] = change.model
+    record["column"] = change.column
+    record["hint"] = override_hint(change, is_break)
+    return record
+
+
+def applied_overrides(
+    changes: List[ColumnChange],
+    breaks: List[BreakFinding],
+    by_change: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Honored-override records for the DEFAULT (no-policy) gate — one per override that
+    actually lowered its change's contribution. Overrides that changed nothing are skipped
+    here and surface via :func:`ineffective_overrides` instead."""
+    break_keys = {(b.change_model.lower(), b.change_column.lower()) for b in breaks}
+    reaching = _reaching_change_keys(by_change)
+    records: List[Dict[str, Any]] = []
+    for change in changes:
+        if change.override is None:
+            continue
+        is_break = (change.model.lower(), change.column.lower()) in break_keys
+        verb = change.override.verb
+        if verb is OverrideVerb.ALLOW_BREAK and is_break:
+            records.append(_applied_record(change, "block", "review"))
+        elif verb is OverrideVerb.ALLOW_CHANGE and is_break:
+            continue  # cannot silence a provable break -> ineffective (fail-safe)
+        elif _change_reaches(change, reaching):
+            records.append(_applied_record(change, "review", "safe"))
+    return records
+
+
+def ineffective_overrides(
+    changes: List[ColumnChange],
+    breaks: List[BreakFinding],
+    by_change: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Override records that resolved to a REAL changed column but produced NO effect (the
+    rename black-hole and friends). Distinct from stale overrides (no matching change at all),
+    these must surface so the author isn't silently ignored."""
+    break_keys = {(b.change_model.lower(), b.change_column.lower()) for b in breaks}
+    reaching = _reaching_change_keys(by_change)
+    records: List[Dict[str, Any]] = []
+    for change in changes:
+        if change.override is None:
+            continue
+        is_break = (change.model.lower(), change.column.lower()) in break_keys
+        verb = change.override.verb
+        if verb is OverrideVerb.ALLOW_BREAK and is_break:
+            continue  # effective
+        if verb is OverrideVerb.ALLOW_CHANGE and is_break:
+            records.append(ineffective_override_record(change, is_break))
+            continue
+        if _change_reaches(change, reaching):
+            continue  # effective
+        records.append(ineffective_override_record(change, is_break))
+    return records
