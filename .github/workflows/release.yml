@@ -111,8 +111,9 @@ jobs:
           prerelease: false
 
       # Move the floating major tag (e.g. v0) to this release so consumers of the
-      # GitHub Action can pin `uses: Fszta/dbt-column-lineage@v0` and get updates
-      # within the major — the standard action-versioning convention.
+      # GitHub Action can pin `uses: Fszta/parrant@v0` and get updates within the
+      # major — the standard action-versioning convention. (The old
+      # `Fszta/dbt-column-lineage@v0` path keeps working via GitHub's repo redirect.)
       - name: Update floating major tag
         env:
           VERSION: ${{ steps.version.outputs.version }}
