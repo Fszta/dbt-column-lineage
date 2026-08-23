@@ -10,7 +10,12 @@ import os
 import pytest
 
 from dbt_column_lineage.lineage.policy import PolicyConfigError, load_policy, parse_policy
-from dbt_column_lineage.models.schema import ActionKind, MissingMetaPolicy, Operator
+from dbt_column_lineage.models.schema import (
+    ActionKind,
+    GateDecision,
+    MissingMetaPolicy,
+    Operator,
+)
 
 _POLICY_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "resources", "policies")
 
@@ -171,3 +176,21 @@ def test_repo_default_file_is_discovered(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     policy = load_policy(None)
     assert policy is not None and policy.rules[0].id == "r"
+
+
+def test_semantic_severity_knobs_parse():
+    policy = load_policy(_fixture("semantic_severity_defaults.yml"))
+    assert policy is not None
+    assert policy.defaults.on_meaning_changed is GateDecision.BLOCK
+    assert policy.defaults.on_indeterminate is GateDecision.WARN
+
+
+def test_semantic_severity_knobs_default_to_none():
+    policy = parse_policy({"version": 1, "rules": []})
+    assert policy.defaults.on_meaning_changed is None
+    assert policy.defaults.on_indeterminate is None
+
+
+def test_invalid_semantic_severity_value_is_rejected():
+    with pytest.raises(PolicyConfigError):
+        parse_policy({"version": 1, "defaults": {"on_meaning_changed": "review"}, "rules": []})

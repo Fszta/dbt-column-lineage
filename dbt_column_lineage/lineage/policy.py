@@ -549,6 +549,8 @@ class PolicyEngine:
                 test_set |= t_add
                 notifications.extend(notes)
 
+        hits.extend(self._semantic_default_hits(changes))
+
         decision = self._combine_decision(hits)
         deduped_notes = _dedup_notifications(notifications)
         return PolicyVerdict(
@@ -562,6 +564,46 @@ class PolicyEngine:
             unresolved_reach_count=unresolved_reach,
             skipped_missing_meta=skipped,
         )
+
+    # -- built-in semantic-severity knobs ------------------------------------
+
+    def _semantic_default_hits(self, changes: List[ColumnChange]) -> List[RuleHit]:
+        """Synthesize gate contributions from ``defaults.on_meaning_changed`` / ``on_indeterminate``.
+
+        These are the ergonomic shortcut for "gate on the semantic axis" without authoring a
+        ``change.semantic``/``change.breaking`` rule: each changed column whose classification
+        is ``MEANING_CHANGED`` or ``INDETERMINATE`` contributes the decision its knob names.
+        The two are independent — a user can block one and warn the other — which is the whole
+        point of splitting the axis.
+
+        Scope mirrors the no-policy verdict (verdict.py): only a change that actually carries a
+        semantic classification participates. Structural add/remove/type changes leave
+        ``semantic`` unset and are governed by provable breaks / user rules, not this axis; a
+        proven ``EQUIVALENT`` (never emitted as a change anyway) contributes nothing. An unset
+        knob, or one set to ``allow``, adds no hit, so behavior is unchanged by default.
+        """
+        defaults = self._policy.defaults
+        by_kind = {
+            SemanticChangeKind.MEANING_CHANGED: (defaults.on_meaning_changed, "on_meaning_changed"),
+            SemanticChangeKind.INDETERMINATE: (defaults.on_indeterminate, "on_indeterminate"),
+        }
+        hits: List[RuleHit] = []
+        for change in changes:
+            if change.semantic is None:
+                continue
+            decision, knob = by_kind.get(change.semantic, (None, ""))
+            if decision is None or decision is GateDecision.ALLOW:
+                continue
+            hits.append(
+                RuleHit(
+                    rule_id=f"builtin:{knob}",
+                    decision=decision,
+                    change_model=change.model,
+                    change_column=change.column,
+                    actions=[],
+                )
+            )
+        return hits
 
     # -- fail-safe resolution ------------------------------------------------
 

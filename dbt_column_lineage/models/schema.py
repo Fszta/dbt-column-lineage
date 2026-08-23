@@ -537,10 +537,21 @@ class Rule(BaseModel):
 
 
 class PolicyDefaults(BaseModel):
-    """Policy-wide fail-safe defaults, overridable per rule."""
+    """Policy-wide fail-safe defaults, overridable per rule.
+
+    ``on_meaning_changed`` / ``on_indeterminate`` are the built-in semantic-severity knobs:
+    they map a column's semantic classification straight to a gate contribution without any
+    hand-written rule, and — being two separate knobs — let a proven meaning shift
+    (``MEANING_CHANGED``) and an unprovable one (``INDETERMINATE``) be gated at *different*
+    severities (e.g. block one, warn the other). Left unset, neither contributes anything, so
+    a policy behaves exactly as before. They fold into the same most-severe-wins combination as
+    every rule, so a user rule can only ever raise the decision, never lower one of these.
+    """
 
     on_missing_meta: MissingMetaPolicy = MissingMetaPolicy.FAIL_CLOSED
     on_error: MissingMetaPolicy = MissingMetaPolicy.FAIL_CLOSED
+    on_meaning_changed: Optional[GateDecision] = None
+    on_indeterminate: Optional[GateDecision] = None
 
 
 class Policy(BaseModel):
