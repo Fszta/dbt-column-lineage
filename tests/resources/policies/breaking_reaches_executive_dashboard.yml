@@ -1,0 +1,31 @@
+version: 1
+# example: a BREAKING dbt column change that reaches a Metabase dashboard tagged
+# meta.tier=executive must BLOCK — the CFO board cannot silently break. Metabase dashboards
+# surface as kind: exposure reach, so this rule needs NO new engine surface.
+rules:
+  - id: breaking-reaches-executive-dashboard
+    description: >
+      A breaking change that reaches an executive-tier Metabase dashboard must block and
+      notify the exec data channel.
+    scope: change
+    # This rule targets EXPLICITLY-tagged executive Metabase dashboards. A reached dbt exposure
+    # (or mart) that carries no source/tier meta is not this rule's concern, so a missing key
+    # must resolve OPEN, not toward a fail-closed block — the `meta.source` guard pattern that
+    # lets a policy say "exposure, but only the Metabase ones".
+    on_missing_meta: fail_open
+    predicate:
+      all:
+        - change: { field: breaking, op: is_true }
+        - reach:
+            kind: exposure
+            where:
+              all:
+                - meta: { key: source, op: eq, value: metabase }
+                - meta: { key: tier, op: eq, value: executive }
+            min_count: 1
+    action:
+      - type: block
+      - type: notify
+        channel: slack
+        target: "#data-exec-alerts"
+        message: "BLOCK {change.model}.{change.column} breaks {reach.count} executive dashboard(s)"

@@ -1,0 +1,212 @@
+""" — the Metabase API client.
+
+**This is the ONLY module in the package that holds credentials or does network I/O.**
+The offline gate/artifact path imports :mod:`artifact` (and later the reach index) and
+never this module, so credentials are structurally confined to the credentialed
+``metabase-extract`` step.
+
+Testability: the client accepts an injected ``session`` (any object with ``requests``-style
+``get``/``post`` returning a response with ``status_code`` / ``headers`` / ``json()`` /
+``raise_for_status()``). Unit tests inject a fake session backed by recorded JSON, so the
+resolvers and extract pipeline run end-to-end with no live Metabase.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import time
+from typing import Any, Callable, Dict, Iterator, List, Optional
+
+try:  # ``requests`` is a runtime dependency; import lazily so importing the type/schema
+    import requests  # modules never forces it (defensive — mirrors the offline guardrail).
+except Exception:  # pragma: no cover - requests is declared in pyproject dependencies
+    requests = None  # type: ignore[assignment]
+
+# Metabase serves MBQL 4 (the stable ``["field", <id>, <opts>]`` shape) when this query
+# param is set; without it, v0.57+ returns MBQL 5 / pMBQL which the MBQL resolver does not
+# read. Pinned in exactly one place.
+LEGACY_MBQL_PARAM = {"legacy-mbql": "true"}
+
+_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+class MetabaseAuthError(Exception):
+    """No usable credential (neither an API key nor username+password) was supplied,
+    or session authentication was rejected by Metabase."""
+
+
+class MetabaseAPIError(Exception):
+    """A Metabase request failed after exhausting retries, or returned a non-2xx status."""
+
+
+class MetabaseClient:
+    """A thin, retrying Metabase REST client.
+
+    Auth precedence: an API key (``x-api-key`` header, Metabase v0.49+) is preferred; else
+    username + password session auth (``POST /api/session`` → ``X-Metabase-Session``).
+    Credentials are used only to build request headers — they are never returned to callers
+    and never persisted into the artifact.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        api_key: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        session: Any = None,
+        timeout: int = 30,
+        max_retries: int = 5,
+        page_size: int = 200,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        if not base_url:
+            raise ValueError("base_url is required")
+        self.base_url = base_url.rstrip("/")
+        self._api_key = api_key
+        self._username = username
+        self._password = password
+        self._session = session if session is not None else requests
+        if self._session is None:  # pragma: no cover - defensive
+            raise MetabaseAPIError("No HTTP session available (requests failed to import).")
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.page_size = page_size
+        self._sleep = sleep
+        self._session_token: Optional[str] = None
+        self._authenticated = False
+
+    # --- auth -------------------------------------------------------------
+    def _ensure_auth(self) -> None:
+        """Resolve credentials into request headers once, lazily on first use."""
+        if self._authenticated:
+            return
+        if self._api_key:
+            self._authenticated = True
+            return
+        if self._username and self._password:
+            resp = self._session.post(
+                f"{self.base_url}/api/session",
+                json={"username": self._username, "password": self._password},
+                timeout=self.timeout,
+            )
+            if getattr(resp, "status_code", 200) >= 400:
+                raise MetabaseAuthError(
+                    f"Metabase session auth failed (status {resp.status_code})."
+                )
+            token = (resp.json() or {}).get("id")
+            if not token:
+                raise MetabaseAuthError("Metabase session auth returned no session id.")
+            self._session_token = token
+            self._authenticated = True
+            return
+        raise MetabaseAuthError(
+            "No Metabase credentials: provide --metabase-api-key (preferred) or "
+            "--metabase-username/--metabase-password."
+        )
+
+    def _headers(self) -> Dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["x-api-key"] = self._api_key
+        elif self._session_token:
+            headers["X-Metabase-Session"] = self._session_token
+        return headers
+
+    # --- transport --------------------------------------------------------
+    def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        """GET ``path`` with retry/backoff on 429/5xx; returns the parsed JSON body."""
+        self._ensure_auth()
+        url = f"{self.base_url}{path}"
+        last_exc: Optional[Exception] = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                resp = self._session.get(
+                    url, headers=self._headers(), params=params, timeout=self.timeout
+                )
+            except Exception as exc:  # network error — retry with backoff
+                last_exc = exc
+                self._backoff(attempt)
+                continue
+            status = getattr(resp, "status_code", 200)
+            if status in _RETRYABLE_STATUS and attempt < self.max_retries:
+                self._backoff(attempt, resp)
+                continue
+            if status >= 400:
+                raise MetabaseAPIError(f"GET {url} failed with status {status}.")
+            return resp.json()
+        raise MetabaseAPIError(f"GET {url} failed after {self.max_retries} retries: {last_exc}")
+
+    def _backoff(self, attempt: int, resp: Any = None) -> None:
+        """Exponential backoff with light jitter; honor ``Retry-After`` when present."""
+        delay = min(2.0**attempt, 30.0)
+        if resp is not None:
+            retry_after = getattr(resp, "headers", {}) or {}
+            with contextlib.suppress(TypeError, ValueError):
+                delay = max(delay, float(retry_after.get("Retry-After", 0)))
+        # Deterministic small jitter (attempt-derived) keeps unit tests reproducible while
+        # still de-synchronizing concurrent extractors.
+        self._sleep(delay + (attempt % 3) * 0.1)
+
+    def _paginate(self, path: str, extra_params: Optional[Dict[str, Any]] = None) -> Iterator[dict]:
+        """Yield items from a list endpoint, defensively paging with limit/offset.
+
+        Metabase's ``/api/card`` and ``/api/dashboard`` historically return the full list
+        with no cursor; when they do, the first page is short and we stop. Where a
+        deployment supports ``limit``/``offset`` we keep paging until a short page.
+        """
+        offset = 0
+        while True:
+            params: Dict[str, Any] = {"limit": self.page_size, "offset": offset}
+            if extra_params:
+                params.update(extra_params)
+            body = self._get(path, params=params)
+            items = body if isinstance(body, list) else body.get("data", [])
+            if not items:
+                return
+            for item in items:
+                yield item
+            if len(items) < self.page_size:
+                return
+            offset += len(items)
+
+    # --- endpoints --------------------------------------------------------
+    def list_cards(self, include_archived: bool = False) -> List[dict]:
+        """All cards (``GET /api/card``), MBQL pinned to the legacy (v4) serialization."""
+        params = dict(LEGACY_MBQL_PARAM)
+        if include_archived:
+            params["f"] = "archived"
+        return list(self._paginate("/api/card", extra_params=params))
+
+    def list_dashboards(self) -> List[dict]:
+        """All dashboards (``GET /api/dashboard``) — summary shells; use
+        :meth:`get_dashboard` for each one's ``dashcards``."""
+        return list(self._paginate("/api/dashboard"))
+
+    def get_dashboard(self, dashboard_id: int) -> dict:
+        """One dashboard with its ``dashcards`` (``GET /api/dashboard/:id``)."""
+        return self._get(f"/api/dashboard/{dashboard_id}")
+
+    def list_snippets(self) -> List[dict]:
+        """All native-query snippets (``GET /api/native-query-snippet``)."""
+        return list(self._paginate("/api/native-query-snippet"))
+
+    def server_version(self) -> Optional[str]:
+        """Best-effort Metabase version tag (``GET /api/session/properties``) for provenance.
+
+        Returns ``None`` if the endpoint is unavailable — version stamping is nice-to-have,
+        never a hard requirement of the extract."""
+        try:
+            props = self._get("/api/session/properties")
+        except Exception:
+            return None
+        version = (props or {}).get("version") or {}
+        tag = version.get("tag") if isinstance(version, dict) else None
+        return str(tag) if tag else None
+
+    def database_metadata(self, database_id: int) -> dict:
+        """Bulk tables+fields for one database (``GET /api/database/:id/metadata``).
+
+        One call resolves every Table/Field id → ``schema.table.column`` in memory, so the
+        MBQL resolver needs no per-field round-trips."""
+        return self._get(f"/api/database/{database_id}/metadata")

@@ -1,0 +1,81 @@
+{
+  "_comment": "M5/M6 fixture: a metabase_lineage.json snapshot whose warehouse relations map onto the bundled dbt_test_project (DuckDB, database 'test', schema 'main'). Card 501 reads test.main.transactions.account_holder and sits on the executive dashboard 55; card 502 reads test.main.transactions.country_name on the operational dashboard 77. Used to prove a breaking dbt column change that reaches an executive dashboard BLOCKS.",
+  "schema_version": 1,
+  "provenance": {
+    "generated_at": "2026-08-21T08:00:00Z",
+    "metabase_base_url": "https://metabase.example.com",
+    "metabase_version": "v0.51.6",
+    "database_ids": [2],
+    "extractor_version": "0.9.0",
+    "dbt_adapter": "duckdb"
+  },
+  "coverage": {
+    "cards_total": 2,
+    "cards_resolved_column": 2,
+    "cards_resolved_table_only": 0,
+    "cards_unresolved": 0,
+    "dashboards_total": 2,
+    "snippets_total": 0,
+    "unresolved_card_ids": [],
+    "table_only_card_ids": []
+  },
+  "relations": {
+    "test.main.transactions": {
+      "database": "test",
+      "schema": "main",
+      "table": "transactions"
+    }
+  },
+  "cards": [
+    {
+      "card_id": 501,
+      "name": "Exec accounts by holder",
+      "query_kind": "mbql",
+      "precision": "column",
+      "collection_id": 4,
+      "archived": false,
+      "database_id": 2,
+      "columns": [
+        {"relation": "test.main.transactions", "column": "account_holder", "role": "field", "confidence": "high"}
+      ],
+      "table_relations": ["test.main.transactions"],
+      "upstream_card_ids": [],
+      "snippet_ids": [],
+      "unresolved_reason": null
+    },
+    {
+      "card_id": 502,
+      "name": "Ops transactions by country",
+      "query_kind": "mbql",
+      "precision": "column",
+      "collection_id": 9,
+      "archived": false,
+      "database_id": 2,
+      "columns": [
+        {"relation": "test.main.transactions", "column": "country_name", "role": "breakout", "confidence": "high"}
+      ],
+      "table_relations": ["test.main.transactions"],
+      "upstream_card_ids": [],
+      "snippet_ids": [],
+      "unresolved_reason": null
+    }
+  ],
+  "dashboards": [
+    {
+      "dashboard_id": 55,
+      "name": "Executive KPIs",
+      "collection_id": 4,
+      "url": "https://metabase.example.com/dashboard/55",
+      "card_ids": [501],
+      "meta": {"tier": "executive", "owner": "cfo-office"}
+    },
+    {
+      "dashboard_id": 77,
+      "name": "Ops daily",
+      "collection_id": 9,
+      "url": "https://metabase.example.com/dashboard/77",
+      "card_ids": [502],
+      "meta": {"tier": "operational", "owner": "data-ops"}
+    }
+  ]
+}
