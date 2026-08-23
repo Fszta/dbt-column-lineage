@@ -1,18 +1,28 @@
-# dbt-col-lineage
+<p align="center">
+  <img src="assets/parrant-logo.svg" alt="Parrant" width="96" height="96">
+</p>
 
-**Know what breaks before you change it.** Column-level lineage and change-impact
-analysis for dbt — answer *"what breaks if I change this column?"* in seconds,
-without ever running your warehouse.
+<h1 align="center">Parrant</h1>
 
-[![Tests](https://github.com/Fszta/dbt-column-lineage/actions/workflows/test.yml/badge.svg)](https://github.com/Fszta/dbt-column-lineage/actions/workflows/test.yml)
-[![PyPI Version](https://img.shields.io/pypi/v/dbt-col-lineage?style=flat-square&logo=pypi)](https://pypi.org/project/dbt-col-lineage/)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/dbt-col-lineage?style=flat-square&logo=pypi)](https://pypi.org/project/dbt-col-lineage/)
-[![Python Version](https://img.shields.io/pypi/pyversions/dbt-col-lineage?style=flat-square&logo=python)](https://pypi.org/project/dbt-col-lineage/)
-[![License](https://img.shields.io/github/license/Fszta/dbt-column-lineage?style=flat-square)](LICENSE)
+<p align="center">
+  <strong>Parry the breaking changes, warrant the safe ones.</strong><br>
+  Column-level lineage and change-impact analysis for dbt — answer
+  <em>"what breaks if I change this column?"</em> in seconds, without ever running your warehouse.
+</p>
 
-📖 **[Documentation](https://fszta.github.io/dbt-column-lineage/)** &nbsp;·&nbsp; 🚀 [Live Demo](https://dbt-column-lineage.onrender.com) &nbsp;·&nbsp; 🐛 [Report Bug](https://github.com/Fszta/dbt-column-lineage/issues) &nbsp;·&nbsp; 💡 [Request Feature](https://github.com/Fszta/dbt-column-lineage/issues)
+> **Formerly `dbt-col-lineage`.** Same tool, new name. `pip install parrant` (the old
+> `dbt-col-lineage` package and the `dbt-col-lineage` command still work for now).
 
-![dbt-col-lineage — interactive column lineage explorer](assets/demo_lineage.gif)
+[![Tests](https://github.com/Fszta/parrant/actions/workflows/test.yml/badge.svg)](https://github.com/Fszta/parrant/actions/workflows/test.yml)
+[![PyPI Version](https://img.shields.io/pypi/v/parrant?style=flat-square&logo=pypi)](https://pypi.org/project/parrant/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/parrant?style=flat-square&logo=pypi)](https://pypi.org/project/parrant/)
+[![Python Version](https://img.shields.io/pypi/pyversions/parrant?style=flat-square&logo=python)](https://pypi.org/project/parrant/)
+[![License](https://img.shields.io/github/license/Fszta/parrant?style=flat-square)](LICENSE)
+
+📖 **[Documentation](https://fszta.github.io/parrant/)** &nbsp;·&nbsp; 🚀 [Live Demo](https://dbt-column-lineage.onrender.com) &nbsp;·&nbsp; 🐛 [Report Bug](https://github.com/Fszta/parrant/issues) &nbsp;·&nbsp; 💡 [Request Feature](https://github.com/Fszta/parrant/issues)
+
+<!-- TODO(rebrand): rename the Render demo service so the URL becomes parrant.onrender.com (infra step, not code) -->
+![Parrant — interactive column lineage explorer](assets/demo_lineage.gif)
 
 ---
 
@@ -22,7 +32,7 @@ You have *model*-level lineage. When you rename, retype, or drop a single **colu
 the dbt DAG can't tell you which downstream columns, transformations, or dashboards
 actually break — it only knows model A feeds model B. That's the gap this closes.
 
-|  | **dbt docs / DAG** | **dbt-col-lineage** |
+|  | **dbt docs / DAG** | **Parrant** |
 |---|---|---|
 | Lineage granularity | Model → model | **Column → column** |
 | *"What breaks if I change `orders.amount`?"* | Guess from the model graph | **Exact affected columns, models & exposures** |
@@ -54,7 +64,7 @@ permissions:
   pull-requests: write        # so the check can post its comment
 
 # ...build base- and head-branch dbt artifacts, then:
-- uses: Fszta/dbt-column-lineage@v0
+- uses: Fszta/parrant@v0
   with:
     manifest: artifacts/head/manifest.json
     catalog: artifacts/head/catalog.json
@@ -88,11 +98,11 @@ reason — `-- lineage:allow-change reason="…"`, or `-- lineage:allow-break re
 one thing that can lower a provable-break block. It lives in the PR's SQL (diffable, reviewed,
 logged), so the first false positive tunes the gate instead of disarming it repo-wide. Every
 honored override is surfaced in the PR comment and counted in `overrides_applied`; run
-`dbt-col-lineage impact --no-overrides` (or set the action's `no-overrides: true`) to see the raw
-gate. See the [override guide](https://github.com/Fszta/dbt-column-lineage/blob/main/docs/decision-engine/policy-gate.md#overriding-a-verdict-the-in-code-escape-hatch).
+`parrant impact --no-overrides` (or set the action's `no-overrides: true`) to see the raw
+gate. See the [override guide](https://github.com/Fszta/parrant/blob/main/docs/decision-engine/policy-gate.md#overriding-a-verdict-the-in-code-escape-hatch).
 
 Pin `@v0` for updates within the current major (like `actions/checkout@v4`), or an
-exact release — `@v0.13.0` — for reproducible builds. The action installs the CLI
+exact release — `@v0.17.0` — for reproducible builds. The action installs the CLI
 bundled at whichever ref you pin, so the tool always matches the tag. A complete
 runnable workflow lives at
 [`docs/examples/impact-pr-check.yml`](docs/examples/impact-pr-check.yml).
@@ -102,7 +112,7 @@ runnable workflow lives at
 ## Quick start (local)
 
 ```bash
-pip install dbt-col-lineage
+pip install parrant
 ```
 
 Generate your dbt artifacts once — this is the only step that touches dbt, and it
@@ -117,7 +127,7 @@ Then explore your column lineage in the browser — no flags needed, it reads `t
 by default:
 
 ```bash
-dbt-col-lineage --explore
+parrant --explore
 ```
 
 Open `http://127.0.0.1:8000`, pick a column, and click **Analyze Impact** to see the
@@ -139,7 +149,7 @@ Emit any column's lineage and downstream impact as a **single JSON document** �
 stable contract you can pipe into an LLM tool call, a CI script, or your own tooling:
 
 ```bash
-dbt-col-lineage --select stg_accounts.account_id+ --format json \
+parrant --select stg_accounts.account_id+ --format json \
     --manifest target/manifest.json --catalog target/catalog.json
 ```
 
@@ -165,12 +175,12 @@ consolidated blast radius, ranked by severity:
 
 ```bash
 # Reliable two-manifest diff (base branch vs. current)
-dbt-col-lineage impact \
+parrant impact \
     --manifest target/manifest.json --catalog target/catalog.json \
     --base-manifest base/manifest.json --base-catalog base/catalog.json
 
 # Git-diff fallback when only one manifest is available
-dbt-col-lineage impact --git-base main
+parrant impact --git-base main
 ```
 
 It defaults to a human-readable Markdown summary (exposures first, then a blast-radius
@@ -192,32 +202,32 @@ and the tool behaves exactly as before.
   ships the engine; you ship the rules. `critical` / `pii` are example configs, never built-ins.
 
   ```bash
-  dbt-col-lineage impact --base-manifest base/manifest.json --base-catalog base/catalog.json \
+  parrant impact --base-manifest base/manifest.json --base-catalog base/catalog.json \
       --policy policy.yml --fail-on policy
   ```
-- **Scaffold a starter policy, don't start from a blank file** — `dbt-col-lineage policy init`
+- **Scaffold a starter policy, don't start from a blank file** — `parrant policy init`
   reads your manifest + catalog and writes a heavily-commented, safe-by-construction
-  `dbt-col-lineage.policy.yml` keyed only to signals the scan confirmed exist: it enables the
+  `parrant.policy.yml` keyed only to signals the scan confirmed exist: it enables the
   provable-break block when column-targeted tests are found and an exposure guard when exposures
   are found, and offers every dbt-`meta` key you actually use as a commented template prefixed with
   its real coverage. The result runs green on day one — no rage-block.
 
   ```bash
-  dbt-col-lineage policy init --manifest target/manifest.json --catalog target/catalog.json
+  parrant policy init --manifest target/manifest.json --catalog target/catalog.json
   ```
-- **Backtest a policy before you arm it** — `dbt-col-lineage policy test` replays a candidate
+- **Backtest a policy before you arm it** — `parrant policy test` replays a candidate
   policy over your recent git history (`--last 30`) or a saved changeset corpus and reports, per
   rule, what the gate *would* have ruled — including how many firings were driven by a fail-safe
   UNKNOWN rather than a proven match, and which rules never fired at all. Offline and deterministic.
 
   ```bash
-  dbt-col-lineage policy test --policy policy.yml --last 30
+  parrant policy test --policy policy.yml --last 30
   ```
 - **Cross-boundary (Metabase) impact** — a separate credentialed `metabase-extract` step snapshots
   Metabase into `metabase_lineage.json`; the offline gate then answers *"will this column change
   break that dashboard?"* by folding dashboards into the same reach the policy engine scans.
 
-Full guides: **[Decision Engine docs](https://fszta.github.io/dbt-column-lineage/decision-engine/overview/)**.
+Full guides: **[Decision Engine docs](https://fszta.github.io/parrant/decision-engine/overview/)**.
 
 ## Compatibility
 
@@ -235,8 +245,8 @@ etc., pass `--adapter <dialect>` if auto-detection needs a nudge.
 
 Full CLI reference — every flag (`--scope-git`, `--github-token`/`--repo`/`--pr-number`,
 the complete `impact` surface), output formats, and CI recipes — lives at
-**[fszta.github.io/dbt-column-lineage](https://fszta.github.io/dbt-column-lineage/)**.
+**[fszta.github.io/parrant](https://fszta.github.io/parrant/)**.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
