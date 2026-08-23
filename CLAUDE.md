@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-Guidance for working **on** this repository (the `dbt-col-lineage` Python codebase).
+Guidance for working **on** this repository (the `parrant` Python codebase).
 
 ## What this project is
 
-`dbt-col-lineage` is a CLI for **column-level lineage and change-impact analysis**
+`parrant` is a CLI for **column-level lineage and change-impact analysis**
 of dbt projects. It answers "what breaks if I change this column?" It **only reads
 dbt artifacts** (`manifest.json`, `catalog.json`) — it never runs dbt. SQL is parsed
 with `sqlglot`. Output is human text, DOT/graphviz, an interactive HTML explorer, or
@@ -23,7 +23,7 @@ models/     → pydantic schema (models/schema.py) — the shared data types
 cli/        → main.py, Click entrypoint that wires everything together
 ```
 
-Entrypoint: `dbt-col-lineage` → `dbt_column_lineage.cli.main:main`.
+Entrypoint: `parrant` → `parrant.cli.main:main`.
 Selector grammar: `+model.col` = upstream, `model.col+` = downstream, `model.col` = both.
 Change kinds ranked by blast radius: `removed` > `type_changed` > `logic_changed` > `added`.
 
@@ -35,7 +35,7 @@ Change kinds ranked by blast radius: `removed` > `type_changed` > `logic_changed
 | Unit / integration / e2e only | `poetry run test-unit` · `test-integration` · `test-e2e` |
 | Format (black + ruff) | `poetry run format` |
 | Type check (mypy) | `poetry run type-check` |
-| Run the CLI | `poetry run dbt-col-lineage --select model.col+ --format json` |
+| Run the CLI | `poetry run parrant --select model.col+ --format json` |
 
 Test tiers: **unit** (`tests/unit`, per-module, no artifacts needed) · **integration**
 (`tests/integration`, cross-module) · **e2e** (`tests/e2e`, drives the CLI end-to-end).
@@ -47,7 +47,7 @@ Test fixtures / a sample dbt project live in `tests/resources/dbt_test_project`.
 - **Python 3.10 floor** (`requires-python >=3.10`, mypy pinned to 3.10). Do **not** use
   3.11+ syntax. 3.10 features (`X | Y` unions, `match`) are allowed, but existing code
   favors `typing.Optional`/`Union` — match the surrounding style rather than mixing both.
-- **Type everything.** mypy runs over `dbt_column_lineage` and `tests` with
+- **Type everything.** mypy runs over `parrant` and `tests` with
   `show_error_codes`, strict-ish settings; new code must pass `poetry run type-check`.
 - **Conventional Commits**, enforced by commitlint (`.commitlintrc.json`) as a
   commit-msg hook. This gates `release.yml` / CHANGELOG — non-conforming messages break
@@ -74,4 +74,4 @@ in sync with the CLI surface they wrap. Contributor tooling lives in `.claude/` 
 - `/new-skill` (command) — scaffold a new *product* skill matching the house style.
 - `check-explorer` (skill) — launch the interactive explorer against the bundled test
   project and QA the UI (API smoke-tests + browser pass). Auto-triggers after edits under
-  `dbt_column_lineage/lineage/display/`. This is dev QA, not the product `explore-lineage`.
+  `parrant/lineage/display/`. This is dev QA, not the product `explore-lineage`.

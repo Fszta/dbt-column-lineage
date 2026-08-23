@@ -1,6 +1,6 @@
 # Design system
 
-The definitive design source of truth for `dbt-col-lineage`. Both surfaces — the
+The definitive design source of truth for `parrant`. Both surfaces — the
 documentation site and the interactive explorer app — **must** follow this system so they
 read as one product. Aesthetic: *engineering-grade editorial* (Linear / Stripe tier).
 
@@ -40,7 +40,7 @@ layer, fan-out to exposures + downstream marts. Never multiple sources into one 
 
 ## App alignment — required work
 
-Explorer CSS: `dbt_column_lineage/lineage/display/html/static/css/`. `base.css` already
+Explorer CSS: `parrant/lineage/display/html/static/css/`. `base.css` already
 shares most tokens (indigo, slate, amber, DM Sans, JetBrains Mono). These are the gaps.
 
 ### Fonts (do first)
