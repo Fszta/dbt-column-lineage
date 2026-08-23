@@ -1,6 +1,6 @@
 """CI integration for diff-driven impact: sticky PR comment + severity gate.
 
-P1 answers "what does this change break?" as a report. P2 puts that report where
+ answers "what does this change break?" as a report. puts that report where
 the decision is made — the pull request — with two pieces:
 
 - a *sticky* Markdown comment, found-or-updated by a hidden HTML marker so
@@ -46,18 +46,30 @@ class FailOn(str, Enum):
     EXPOSURES = "exposures"  # fail if a business-facing exposure is affected
     CRITICAL = "critical"  # fail if a downstream column recomputes derived logic
     ANY = "any"  # fail if the change touches anything downstream
+    POLICY = "policy"  # fail when the metadata-agnostic policy engine returns a BLOCK verdict
 
     @property
     def blocks(self) -> bool:
         return self is not FailOn.NONE
 
 
-def gate_exit_code(summary: Dict[str, Any], fail_on: FailOn) -> int:
+def gate_exit_code(
+    summary: Dict[str, Any],
+    fail_on: FailOn,
+    policy_verdict: Optional[Any] = None,
+) -> int:
     """Map an aggregated-impact ``summary`` to an exit code under ``fail_on``.
 
     Returns ``1`` when the policy is tripped, ``0`` otherwise. An empty/missing
     summary is always a pass — no impact never blocks.
+
+    ``policy_verdict`` is only consulted under :attr:`FailOn.POLICY`: the gate fails
+    when a policy verdict is present and ``policy_verdict.blocks()`` is true. Every
+    other branch ignores it, so passing a verdict never perturbs the legacy gates
+    (backward compatible).
     """
+    if fail_on == FailOn.POLICY:
+        return 1 if policy_verdict is not None and policy_verdict.blocks() else 0
     if fail_on == FailOn.TESTS:
         return 1 if summary.get("provable_break_count", 0) > 0 else 0
     if fail_on == FailOn.EXPOSURES:
@@ -110,6 +122,13 @@ def write_github_outputs(report: Dict[str, Any]) -> bool:
         "verdict": str(report.get("verdict", "")),
         "tripped_level": highest_tripped_level(summary),
     }
+    # Additive policy-engine outputs — only when a policy actually ran (report carries
+    # a policy_verdict). Absent policy leaves the legacy output set byte-for-byte intact.
+    policy_verdict = report.get("policy_verdict")
+    if isinstance(policy_verdict, dict):
+        values["policy_decision"] = str(policy_verdict.get("decision", ""))
+        values["build_set_size"] = len(policy_verdict.get("build_set", []) or [])
+        values["test_set_size"] = len(policy_verdict.get("test_set", []) or [])
     try:
         with open(output_path, "a", encoding="utf-8") as handle:
             for key, value in values.items():

@@ -32,10 +32,18 @@ inputs:
     default: ""
   fail-on:
     description: >-
-      Severity gate: none | tests | exposures | critical | any (default 'none' = warn only,
-      never block). 'tests' fails only on a provable break (a dbt test the change orphans) —
-      the safe level to block on; requires base-manifest.
+      Severity gate: none | tests | exposures | critical | any | policy (default 'none' =
+      warn only, never block). 'tests' fails only on a provable break (a dbt test the change
+      orphans) — the safe level to block on; requires base-manifest. 'policy' fails when the
+      metadata-agnostic policy engine returns a BLOCK verdict; requires 'policy'.
     default: "none"
+  policy:
+    description: >-
+      Path to a policy.yml for the metadata-agnostic policy engine. When set (or a
+      ./dbt-col-lineage.policy.yml exists), the report gains a 'policy_verdict' block and
+      'fail-on: policy' gates on it. A present-but-invalid file fails the run loudly.
+    required: false
+    default: ""
   adapter:
     description: "Override the sqlglot dialect (e.g. snowflake, bigquery, tsql)"
     required: false
@@ -78,6 +86,16 @@ outputs:
       Highest impact severity the change reaches, in gate terms:
       tests | exposures | critical | any | none.
     value: ${{ steps.impact.outputs.tripped_level }}
+  policy_decision:
+    description: >-
+      Policy-engine gate decision: block | warn | allow (empty when no policy ran).
+    value: ${{ steps.impact.outputs.policy_decision }}
+  build_set_size:
+    description: "Number of models in the policy engine's selective build set."
+    value: ${{ steps.impact.outputs.build_set_size }}
+  test_set_size:
+    description: "Number of models in the policy engine's selective test set."
+    value: ${{ steps.impact.outputs.test_set_size }}
 
 runs:
   using: "composite"
@@ -117,4 +135,5 @@ runs:
         [ -n "${{ inputs.git-base }}" ] && args+=(--git-base "${{ inputs.git-base }}")
         [ -n "${{ inputs.scope-git }}" ] && args+=(--scope-git "${{ inputs.scope-git }}")
         [ -n "${{ inputs.adapter }}" ] && args+=(--adapter "${{ inputs.adapter }}")
+        [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
         dbt-col-lineage "${args[@]}"

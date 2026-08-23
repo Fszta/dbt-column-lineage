@@ -1,0 +1,13 @@
+# Backward-compat — reproduce the legacy `--fail-on tests` gate as a one-line rule.
+#
+# The provable-break signal (classify_provable_breaks) is a built-in STRUCTURAL fact,
+# not a hardcoded verdict. A consumer who wants the old behaviour writes this one rule.
+version: 1
+rules:
+  - id: provable-break-blocks
+    description: A change that provably breaks a dbt test must block (legacy --fail-on tests).
+    scope: change
+    predicate:
+      structural: { fact: provable_test_break }
+    action:
+      - type: block

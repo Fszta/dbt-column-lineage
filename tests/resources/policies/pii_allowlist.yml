@@ -1,0 +1,29 @@
+# Example (a) — PII must not reach a reader outside the compliance allowlist.
+#
+# This is PURE CONSUMER CONFIG, not a tool built-in: the offline analogue of
+# PII-exposure check expressed entirely as a rule. A change to a PII-tagged column
+# that reaches a downstream model whose declared readers are NOT a subset of the
+# allowlist blocks the PR (and notifies data-governance).
+version: 1
+rules:
+  - id: pii-outside-allowlist
+    description: >
+      A change to a PII-tagged column that reaches a consumer readable by a role
+      outside the compliance allowlist must block (offline PII-exposure check).
+    scope: change
+    predicate:
+      all:
+        - meta: { key: pii, op: is_true } # subject column is PII
+        - reach:
+            kind: model # scan reached downstream models
+            where:
+              meta:
+                key: readable_by # roles the mart exposes to
+                op: not_subset_of
+                value: [COMPLIANCE, PAYMENT_OPS]
+    action:
+      - type: block
+      - type: notify
+        channel: slack
+        target: "#data-governance"
+        message: "PII {change.model}.{change.column} reaches a non-allowlisted reader"
