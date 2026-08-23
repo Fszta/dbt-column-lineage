@@ -63,7 +63,13 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        # Render ```mermaid fences as diagrams. Material bundles Mermaid.js locally and
+        # auto-themes it to the indigo palette in light + dark (no external CDN).
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - admonition
@@ -81,6 +87,18 @@ nav:
     - Quick Start: getting-started/quickstart.md
   - Features:
     - Impact Analysis: features/impact-analysis.md
+  - Decision Engine:
+    - Overview: decision-engine/overview.md
+    - Concepts:
+      - How it works: decision-engine/concepts/how-it-works.md
+      - Guardrails & non-goals: decision-engine/concepts/guardrails.md
+      - Things to know: decision-engine/concepts/gotchas.md
+    - Guides:
+      - Semantic Categorization: decision-engine/semantic-categorization.md
+      - Policy Gate: decision-engine/policy-gate.md
+      - Cross-boundary (Metabase): decision-engine/metabase.md
+      - Explorer: decision-engine/explorer.md
+    - Glossary: decision-engine/glossary.md
   - Reference:
     - JSON Output: reference/json-output.md
   - Changelog: changelog.md

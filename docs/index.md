@@ -3,29 +3,29 @@ hide:
   - navigation
   - toc
   - path
-title: Impact analysis for dbt, column by column
+title: A change-impact decision engine for dbt
 ---
 
 <div class="landing" markdown="0">
 
 <section class="hero band"><div class="wrap">
   <div>
-    <div class="eyebrow" style="color:var(--indigo-light)"><b>Column-level</b> lineage &middot; <b>impact</b> analysis</div>
-    <h1>Know what breaks<br>before you <em>change it.</em></h1>
-    <p class="sub"><b>Column-level</b> data lineage for dbt projects. Trace any <b>column</b> upstream and down, and see a change's exact <b>impact</b> before you ship it.</p>
+    <div class="eyebrow" style="color:var(--indigo-light)"><b>Change-impact</b> decision engine &middot; for <b>dbt</b></div>
+    <h1>Know what breaks &mdash;<br>and what to <em>rebuild.</em></h1>
+    <p class="sub">A change-impact <b>decision engine</b> for dbt. It categorizes <b>breaking vs cosmetic</b> changes, gates PRs on <b>your</b> policy over any dbt <code>meta</code>, and follows impact past dbt&rsquo;s edge into your <b>BI tools</b> &mdash; offline, from your artifacts, no warehouse, no dbt run. Built on column-level lineage.</p>
     <div class="cta">
       <a class="btn btn-primary" href="getting-started/quickstart/">Quick start &rarr;</a>
-      <a class="btn btn-ghost" href="https://dbt-column-lineage.onrender.com">Explore a live project</a>
+      <a class="btn btn-ghost" href="decision-engine/concepts/how-it-works/">How it works</a>
     </div>
     <div class="metrics">
-      <div class="m"><b>6</b><span>columns changed</span></div>
-      <div class="m"><b>1</b><span>mart downstream</span></div>
-      <div class="m"><b>1</b><span>exposure hit</span></div>
+      <div class="m"><b>1</b><span>breaking change</span></div>
+      <div class="m"><b>1</b><span>exec dashboard hit</span></div>
+      <div class="m"><b>BLOCK</b><span>policy verdict</span></div>
     </div>
   </div>
 
   <div class="frame">
-    <div class="fh"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">lineage &middot; account_holder</span></div>
+    <div class="fh"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">impact &middot; account_holder</span></div>
     <svg viewBox="0 0 500 300" role="img" aria-label="dbt column lineage: two chains — raw_accounts to stg_accounts to accounts, and raw_transactions to stg_transactions to transactions — both feed one finance exposure. The account_holder change propagates down the accounts chain and breaks the exposure.">
       <defs>
         <marker id="lar" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7z" fill="#5E6AD2"/></marker>
@@ -55,50 +55,52 @@ title: Impact analysis for dbt, column by column
 
 <section class="problem band"><div class="wrap">
   <div class="eyebrow">The problem</div>
-  <p class="pull">Change one column in a large dbt project and you&rsquo;re guessing. <b>Which models depend on it? Which dashboards break?</b> Without column-level visibility, every refactor is a risk you can&rsquo;t measure.</p>
+  <p class="pull">Change one column in a large dbt project and you&rsquo;re guessing. <b>Which models recompute? Which dashboards break? Should CI even let it merge?</b> Without column-level impact, every refactor is a risk you can&rsquo;t measure &mdash; and every CI gate is all-or-nothing.</p>
 </div></section>
 
 <section class="features band"><div class="wrap">
-  <div class="eyebrow">Why it matters</div>
-  <h2>See the blast radius, then ship with confidence.</h2>
+  <div class="eyebrow">The decision engine</div>
+  <h2>From blast radius to a <em>decision</em>.</h2>
   <div class="dir">
     <div class="col">
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-      <h3>Safe refactoring</h3>
-      <p>Change a column knowing exactly what it touches, upstream and down &mdash; no guesswork.</p>
-      <div class="lnk"><a href="features/impact-analysis/">impact &rarr;</a></div>
+      <h3>Breaking, or just cosmetic?</h3>
+      <p>Diff the SQL <b>expression</b>, not the text. A provably-equivalent refactor doesn&rsquo;t block; a change that shifts meaning &mdash; or can&rsquo;t be proven safe &mdash; fails safe.</p>
+      <div class="lnk"><a href="decision-engine/semantic-categorization/">categorize &rarr;</a></div>
     </div>
     <div class="col">
-      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg></div>
-      <h3>Faster development</h3>
-      <p>Trace dependencies in seconds instead of grepping models. Understand the graph instantly.</p>
-      <div class="lnk"><a href="getting-started/quickstart/">explore &rarr;</a></div>
+      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <h3>Your rules, your gate.</h3>
+      <p>Write rules over <b>any</b> dbt <code>meta</code>. The tool ships the engine; <b>you</b> ship the policy. Block, warn, or schedule a <b>selective</b> rebuild &mdash; nothing about your taxonomy is hardcoded.</p>
+      <div class="lnk"><a href="decision-engine/policy-gate/">gate &rarr;</a></div>
     </div>
     <div class="col">
-      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div>
-      <h3>CI impact gating</h3>
-      <p>Fail a PR when a change hits a critical exposure. Machine-readable output feeds your agents.</p>
-      <div class="lnk"><a href="features/impact-analysis/">ci &rarr;</a></div>
+      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div>
+      <h3>Past dbt&rsquo;s edge.</h3>
+      <p>Follow a column change into your <b>BI layer</b> &mdash; which dashboard, which field &mdash; so &ldquo;what breaks&rdquo; includes your BI, not just your models. <b>Metabase</b> is the first supported connector.</p>
+      <div class="lnk"><a href="decision-engine/metabase/">cross-boundary &rarr;</a></div>
     </div>
   </div>
+  <p class="pull" style="font-size:1rem;margin-top:2rem">All surfaced in an interactive <b><a href="decision-engine/explorer/">explorer</a></b> and as machine-readable JSON for your agents &mdash; on top of the column-level lineage it&rsquo;s built on. New here? Start with <a href="decision-engine/concepts/how-it-works/"><b>how it works</b></a>.</p>
 </div></section>
 
 <section class="qs band"><div class="wrap">
   <div>
     <div class="eyebrow">Quick start</div>
     <h2>One pip install. No dbt run required.</h2>
-    <p class="lead">It reads your <span class="kbd">manifest.json</span> and <span class="kbd">catalog.json</span> &mdash; it never runs your warehouse.</p>
+    <p class="lead">Every command reads your <span class="kbd">manifest.json</span> and <span class="kbd">catalog.json</span> &mdash; offline, zero-credential, it never touches your warehouse.</p>
   </div>
   <div class="term">
     <div class="bar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">bash</span></div>
 <pre><span class="c"># install</span>
 <span class="g">$</span> <span class="w">pip install</span> dbt-col-lineage
 
-<span class="c"># explore column lineage in the browser</span>
+<span class="c"># explore lineage + impact in the browser</span>
 <span class="g">$</span> <span class="w">dbt-col-lineage</span> --explore
 
-<span class="c"># what breaks if orders.amount changes?</span>
-<span class="g">$</span> <span class="w">dbt-col-lineage</span> --select <span class="a">orders.amount+</span> --format json</pre>
+<span class="c"># turn a PR into a decision: gate on your policy</span>
+<span class="g">$</span> <span class="w">dbt-col-lineage</span> impact --base-manifest <span class="a">base/manifest.json</span> \
+    --policy <span class="a">policy.yml</span> --fail-on <span class="a">policy</span></pre>
   </div>
 </div></section>
 
@@ -107,7 +109,7 @@ title: Impact analysis for dbt, column by column
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
     dbt-col-lineage
   </span>
-  <span class="mono">MIT &middot; built for dbt teams who refactor with confidence</span>
+  <span class="mono">MIT &middot; a decision engine for dbt teams who ship with confidence</span>
 </div></div>
 
 </div>
