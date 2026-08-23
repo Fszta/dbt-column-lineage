@@ -84,16 +84,20 @@ def test_impact_explain_annotates_changed_column(dbt_artifacts, logic_change_bas
         "--base-catalog",
         logic_change_base["catalog"],
     ]
-    # Default human report: no explain annotation.
+    # Default human report: the compact semantic reason shows (the default gate explains
+    # itself) but NOT the base→head expression trace.
     plain = _run_impact(args)
     assert plain.exit_code == 0, plain.output
-    assert "_why:_" not in plain.output
+    assert "_why:_" in plain.output
+    assert "meaning changed" in plain.output
+    assert "→ `" not in plain.output  # no expression trace without --explain
 
-    # --explain surfaces the semantic reason under the changed column.
+    # --explain additionally surfaces the base→head expression trace.
     explained = _run_impact([*args, "--explain"])
     assert explained.exit_code == 0, explained.output
     assert "_why:_" in explained.output
     assert "meaning changed" in explained.output
+    assert "→ `" in explained.output
 
     # JSON always carries the explain block regardless of the flag.
     json_result = _run_impact([*args, "--format", "json"])

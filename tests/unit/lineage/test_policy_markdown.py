@@ -108,22 +108,89 @@ def test_allow_and_warn_have_no_block_until_note():
         assert "Blocked until" not in md
 
 
-def test_honesty_counters_surface():
+def _hit(rule_id="r", decision="block", **kwargs):
+    hit = {
+        "rule_id": rule_id,
+        "decision": decision,
+        "change_model": "m",
+        "change_column": "c",
+        "matched_reach": [],
+        "actions": [decision],
+    }
+    hit.update(kwargs)
+    return hit
+
+
+def test_coverage_footer_present_when_undecided():
+    """Honesty invariant: anything the policy left UNDECIDED (missing meta / unresolved reach)
+    is stated LOUDLY and never folded into a clean pass."""
     verdict = {
         "decision": "block",
-        "hits": [
-            {
-                "rule_id": "r",
-                "decision": "block",
-                "change_model": "m",
-                "change_column": "c",
-                "matched_reach": [],
-                "actions": ["block"],
-            }
-        ],
+        "hits": [_hit()],
         "unresolved_reach_count": 2,
         "skipped_missing_meta": 1,
     }
     md = render_changeset_markdown(_report_with_policy(verdict))
-    assert "unresolved reach" in md
-    assert "skipped for missing meta" in md
+    assert "Coverage:" in md
+    assert "1 column undecided (missing meta)" in md
+    assert "2 reaches unresolved" in md
+    assert "did NOT count as safe" in md
+
+
+def test_coverage_footer_absent_when_fully_decided():
+    verdict = {
+        "decision": "block",
+        "hits": [_hit()],
+        "unresolved_reach_count": 0,
+        "skipped_missing_meta": 0,
+    }
+    md = render_changeset_markdown(_report_with_policy(verdict))
+    assert "Coverage:" not in md
+    assert "did NOT count as safe" not in md
+
+
+def test_fired_on_unknown_hit_marked_distinct_from_proven():
+    """The single most important line: a fail-safe-driven block MUST render visibly differently
+    from a proven one — never presented as a proven match."""
+    verdict = {
+        "decision": "block",
+        "hits": [
+            _hit(rule_id="proven-block", fired_on_unknown=False),
+            _hit(rule_id="failsafe-block", fired_on_unknown=True, unknown_cause="missing"),
+        ],
+    }
+    md = render_changeset_markdown(_report_with_policy(verdict))
+    proven_line = next(ln for ln in md.splitlines() if "proven-block" in ln)
+    failsafe_line = next(ln for ln in md.splitlines() if "failsafe-block" in ln)
+    # They must not render identically (strip the rule id to compare the treatment).
+    assert proven_line.replace("proven-block", "X") != failsafe_line.replace("failsafe-block", "X")
+    # The fail-safe row is LOUD and names the cause; the proven row is a quiet check.
+    assert "fired on a fail-safe default" in failsafe_line
+    assert "meta missing" in failsafe_line
+    assert "proven match" in proven_line
+    assert "fired on a fail-safe default" not in proven_line
+
+
+def test_fired_on_unknown_error_cause_labeled():
+    verdict = {
+        "decision": "warn",
+        "hits": [_hit(decision="warn", fired_on_unknown=True, unknown_cause="error")],
+    }
+    md = render_changeset_markdown(_report_with_policy(verdict))
+    assert "fired on a fail-safe default" in md
+    assert "(evaluation error)" in md
+
+
+def test_matched_reach_sample_capped():
+    verdict = {
+        "decision": "warn",
+        "hits": [_hit(decision="warn", matched_reach=["a", "b", "c", "d", "e"])],
+    }
+    md = render_changeset_markdown(_report_with_policy(verdict))
+    assert "+2 more" in md
+
+
+def test_why_this_verdict_heading_present():
+    verdict = {"decision": "block", "hits": [_hit()]}
+    md = render_changeset_markdown(_report_with_policy(verdict))
+    assert "Why this verdict" in md

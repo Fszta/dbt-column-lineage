@@ -13,6 +13,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 _POLICY = str(REPO_ROOT / "tests" / "resources" / "policies" / "block_on_removed.yml")
+_NAIVE_PII_POLICY = str(REPO_ROOT / "tests" / "resources" / "policies" / "naive_pii.yml")
 
 
 def _load(path):
@@ -77,6 +78,38 @@ def test_fail_on_policy_block_exits_nonzero(dbt_artifacts, mutated_base):
         ]
     )
     assert result.returncode == 1, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+
+def test_naive_pii_block_renders_as_fail_safe_not_proven(dbt_artifacts, mutated_base):
+    """e2e comment snapshot: the naive `meta.pii eq true` policy blocks via a fail-safe UNKNOWN
+    (the column carries no `pii` meta), so the PR comment MUST render its block as
+    fail-safe-driven — never as a proven match. Locks in the honesty distinction end-to-end."""
+    result = _run(
+        [
+            "--manifest",
+            str(dbt_artifacts["manifest_path"]),
+            "--catalog",
+            str(dbt_artifacts["catalog_path"]),
+            "--base-manifest",
+            mutated_base["manifest"],
+            "--base-catalog",
+            mutated_base["catalog"],
+            "--policy",
+            _NAIVE_PII_POLICY,
+        ]
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    md = result.stdout
+    # The verdict blocks, and the "why this verdict" section explains it.
+    assert "Policy verdict — BLOCK" in md
+    assert "Why this verdict" in md
+    assert "naive-pii-guard" in md
+    # The load-bearing honesty distinction: this block fired on a fail-safe default, not a proof.
+    assert "fired on a fail-safe default" in md
+    assert "meta missing" in md
+    # The naive-pii-guard line must NOT be dressed up as a proven match.
+    pii_line = next(ln for ln in md.splitlines() if "naive-pii-guard" in ln)
+    assert "proven match" not in pii_line
 
 
 def test_fail_on_policy_no_change_exits_zero(dbt_artifacts):

@@ -131,13 +131,14 @@ def test_policy_hit_line_shows_suppression():
         "rule_id": "exposure-guard",
         "change_model": "marts.x",
         "change_column": "amount",
+        "decision": "allow",
         "overridden": True,
         "original_decision": "warn",
         "override_reason": "downstream updated",
     }
     line = _policy_hit_line(hit)
-    assert "override suppressed warn" in line
-    assert "downstream updated" in line
+    # The audit delta shows the pre-cap → effective decision and the reason.
+    assert "warn → allow (overridden: downstream updated)" in line
 
 
 def test_full_render_includes_overrides_section():
