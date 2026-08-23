@@ -742,6 +742,181 @@ def impact(
         _run_ci(report, fail_on, github_token, repo, pr_number, explain=explain)
 
 
+@click.group(name="policy")
+def policy_group() -> None:
+    """Policy tooling: author and validate metadata-agnostic gate policies."""
+
+
+@policy_group.command("test")
+@click.option(
+    "--manifest",
+    type=click.Path(exists=True),
+    default="target/manifest.json",
+    help="Path to the current (head) dbt manifest — the registry replayed against every point.",
+)
+@click.option(
+    "--catalog",
+    type=click.Path(exists=True),
+    default="target/catalog.json",
+    help="Path to the current (head) dbt catalog.",
+)
+@click.option("--adapter", help="Override sqlglot dialect (e.g., tsql, snowflake, bigquery).")
+@click.option(
+    "--policy",
+    "policy_path",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to the candidate policy.yml to backtest. A present-but-invalid file fails loudly.",
+)
+@click.option(
+    "--git-range",
+    "git_range",
+    help="Replay each commit in <base>..<head> as one changeset (default head = HEAD).",
+)
+@click.option(
+    "--last",
+    type=int,
+    help="Sugar for --git-range HEAD~N..HEAD (replay the last N commits).",
+)
+@click.option(
+    "--changesets",
+    "changesets_dir",
+    type=click.Path(exists=True, file_okay=False),
+    help="Replay a directory of saved changeset JSONs (fixtures / CI corpora).",
+)
+@click.option(
+    "--repo-dir",
+    "repo_dir",
+    type=click.Path(exists=True, file_okay=False),
+    help="Git repo directory for git-range/last modes (defaults to the current directory). "
+    "Independent of the manifest/catalog paths, which may live under target/.",
+)
+@click.option(
+    "--format",
+    "-f",
+    "fmt",
+    type=click.Choice(["table", "json", "markdown"]),
+    default="table",
+    help="Output format (table for terminals, json/markdown for CI artifacts + agents).",
+)
+@click.option(
+    "--fail-on",
+    "fail_on",
+    type=click.Choice(["none", "any-block", "regression"]),
+    default="none",
+    help="Exit-code gate. 'any-block': fail if any replayed PR would block. 'regression': fail "
+    "if any rule's would-BLOCK count rose vs --baseline (which is then REQUIRED). Default none.",
+)
+@click.option(
+    "--baseline",
+    "baseline_path",
+    type=click.Path(exists=True),
+    help="A saved prior backtest JSON to compare against (required for --fail-on regression).",
+)
+def policy_test(
+    manifest: str,
+    catalog: str,
+    adapter: Optional[str],
+    policy_path: str,
+    git_range: Optional[str],
+    last: Optional[int],
+    changesets_dir: Optional[str],
+    repo_dir: Optional[str],
+    fmt: str,
+    fail_on: str,
+    baseline_path: Optional[str],
+) -> None:
+    """Backtest a candidate policy over git history (or a saved changeset corpus).
+
+    Builds the head registry ONCE and replays the policy against each point, reporting per rule
+    what the gate WOULD have ruled — would-BLOCK / would-WARN PRs and, the headline trust column,
+    how many firings were driven by a fail-safe UNKNOWN rather than a proven match. Deterministic,
+    offline, and SEQUENTIAL (no dbt run, no warehouse). NOTE: the backtest has no per-commit before-state,
+    so the provable-break and semantic meaning-change BLOCK tiers are NOT exercised (see the
+    fidelity note in the output).
+    """
+    from dbt_column_lineage.lineage.backtest import run_backtest
+    from dbt_column_lineage.lineage.display.backtest import (
+        render_backtest_markdown,
+        render_backtest_table,
+    )
+    from dbt_column_lineage.lineage.policy import load_policy
+    from dbt_column_lineage.models.schema import BacktestReport
+
+    # Exactly-one-source guard (loud), mirroring the mutually-exclusive discipline elsewhere.
+    supplied = [git_range is not None or last is not None, changesets_dir is not None]
+    if sum(1 for s in supplied if s) != 1:
+        click.echo(
+            "Error: provide exactly one change source: --git-range / --last (git history) "
+            "or --changesets (a directory of saved changesets).",
+            err=True,
+        )
+        sys.exit(1)
+    if git_range is not None and last is not None:
+        click.echo("Error: --git-range and --last are mutually exclusive.", err=True)
+        sys.exit(1)
+
+    # --fail-on regression is uncomputable without a baseline: fail loudly, never silently pass.
+    if fail_on == "regression" and not baseline_path:
+        click.echo(
+            "Error: --fail-on regression requires --baseline (a saved prior run to compare "
+            "against). A regression gate with no baseline validates nothing.",
+            err=True,
+        )
+        sys.exit(1)
+
+    report: Optional[BacktestReport] = None
+    baseline: Optional[BacktestReport] = None
+    try:
+        # Resolve the policy up front so a broken file fails loudly (PolicyConfigError -> exit 1),
+        # never treated as "no policy".
+        policy = load_policy(policy_path)
+        if policy is None:
+            # required=True + exists=True means the path resolved; None would be a resolution bug.
+            raise click.ClickException(f"could not load policy '{policy_path}'")
+
+        if baseline_path:
+            try:
+                with open(baseline_path, "r", encoding="utf-8") as handle:
+                    baseline = BacktestReport.model_validate_json(handle.read())
+            except Exception as exc:
+                raise click.ClickException(
+                    f"could not parse --baseline '{baseline_path}' as a backtest report: {exc}"
+                )
+
+        head_service = LineageService(Path(catalog), Path(manifest), adapter=adapter)
+        report = run_backtest(
+            head_service,
+            policy,
+            git_range=git_range,
+            last=last,
+            changesets_dir=changesets_dir,
+            repo_dir=repo_dir,
+            baseline=baseline,
+            policy_source=str(policy_path),
+        )
+
+        if fmt == "json":
+            click.echo(json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=False))
+        elif fmt == "markdown":
+            click.echo(render_backtest_markdown(report))
+        else:
+            click.echo(render_backtest_table(report))
+    except Exception as exc:
+        click.echo(f"Error: {str(exc)}", err=True)
+        sys.exit(1)
+
+    # The gate exit is OUTSIDE the try/except (mirrors impact's CI gate): a tripped gate is a
+    # normal non-zero outcome, not an "Error".
+    from dbt_column_lineage.lineage.backtest import backtest_exit_code as _exit_code
+
+    assert report is not None  # the except above sys.exit(1)s, so we only get here on success
+    code = _exit_code(report, fail_on, baseline)
+    if code != 0:
+        click.echo(f"Backtest gate '--fail-on {fail_on}' tripped — failing.", err=True)
+    sys.exit(code)
+
+
 def _relation_name_resolver(registry: Any):
     """Build a ``model_name -> manifest relation_name`` callable for the Metabase join.
 
@@ -832,6 +1007,10 @@ def main() -> None:
     argv = sys.argv[1:]
     if argv and argv[0] == "impact":
         impact.main(args=argv[1:], prog_name="dbt-col-lineage impact")
+    elif argv and argv[0] == "policy":
+        # `policy test` backtests a candidate policy over git history. Dispatched on argv[0] only,
+        # so it never shadows the `--policy` OPTION on the root `cli` / `impact` commands.
+        policy_group.main(args=argv[1:], prog_name="dbt-col-lineage policy")
     elif argv and argv[0] == "metabase-extract":
         # Imported lazily so the credentialed Metabase client is only loaded when the
         # extract subcommand is actually invoked — the offline gate path never imports it.
