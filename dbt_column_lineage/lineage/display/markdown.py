@@ -158,7 +158,97 @@ def _policy_hit_line(hit: Dict[str, Any]) -> str:
     if reach:
         names = ", ".join(f"`{name}`" for name in reach)
         reach_txt = f" → reaches {names}"
-    return f"- **{rule_id}** — {subject}{reach_txt}"
+    line = f"- **{rule_id}** — {subject}{reach_txt}"
+    # when an override capped this hit, show the delta so the audit trail is visible.
+    if hit.get("overridden"):
+        original = hit.get("original_decision") or "?"
+        reason = hit.get("override_reason") or ""
+        line += f" — override suppressed {original} (reason: {reason})"
+    return line
+
+
+def _override_applied_line(record: Dict[str, Any]) -> str:
+    """One line for a honored override: verb, subject, the severity delta, and the reason."""
+    model = record.get("model", "?")
+    column = record.get("column")
+    node = f"`{model}.{column}`" if column else f"`{model}`"
+    scope_txt = " (model-level)" if record.get("scope") == "model" else ""
+    downgraded_from = record.get("downgraded_from") or "?"
+    downgraded_to = record.get("downgraded_to") or "?"
+    return (
+        f"- `{record.get('verb', '?')}` on {node}{scope_txt} — "
+        f"{downgraded_from} → {downgraded_to} (reason: {record.get('reason', '')})"
+    )
+
+
+def _render_overrides_section(report: Dict[str, Any]) -> List[str]:
+    """Render the override signals: malformed-pragma warnings (loud, unfolded, FIRST — a
+    dropped pragma must be noticed), honored overrides with their severity delta, ineffective
+    (no-op) overrides with a fix hint, and a folded list of stale overrides to prune.
+
+    Returns ``[]`` (rendered nothing) unless at least one of these is present.
+    """
+    applied = report.get("overrides") or []
+    ineffective = report.get("ineffective_overrides") or []
+    stale = report.get("stale_overrides") or []
+    warnings = report.get("override_warnings") or []
+    if not (applied or ineffective or stale or warnings):
+        return []
+
+    out: List[str] = []
+    # Warnings FIRST and UNFOLDED — the audit invariant (a reasonless/malformed pragma is
+    # dropped, ruling unchanged) is only useful if the author actually notices it did nothing.
+    if warnings:
+        out.append(f"### ⚠️ Override pragmas IGNORED ({len(warnings)})")
+        out.append("")
+        out.append("These pragmas were malformed and had NO effect on the ruling — fix or remove:")
+        out.append("")
+        out += [f"- {warning}" for warning in warnings]
+        out.append("")
+
+    if applied:
+        out.append(f"### ⚠️ Overrides applied ({len(applied)})")
+        out.append("")
+        out.append(
+            "Each acknowledged change below was downgraded with a logged reason "
+            "(source line is relative to the **compiled** SQL):"
+        )
+        out.append("")
+        out += [_override_applied_line(record) for record in applied]
+        out.append("")
+
+    if ineffective:
+        out.append(f"### ⚠️ Overrides with no effect ({len(ineffective)})")
+        out.append("")
+        out.append("These pragmas landed on a real change but changed nothing — fix or remove:")
+        out.append("")
+        for record in ineffective:
+            model = record.get("model", "?")
+            column = record.get("column")
+            node = f"`{model}.{column}`" if column else f"`{model}`"
+            hint = record.get("hint", "")
+            out.append(
+                f"- `{record.get('verb', '?')}` on {node} — {hint} "
+                f"(reason: {record.get('reason', '')})"
+            )
+        out.append("")
+
+    if stale:
+        out.append(
+            f"<details><summary>Stale overrides ({len(stale)}) — "
+            f"no matching change, prune these</summary>"
+        )
+        out.append("")
+        for record in stale:
+            model = record.get("model", "?")
+            column = record.get("column")
+            node = f"`{model}.{column}`" if column else f"`{model}` (model scope)"
+            out.append(
+                f"- `{record.get('verb', '?')}` on {node} (reason: {record.get('reason', '')})"
+            )
+        out += ["", "</details>", ""]
+
+    return out
 
 
 def _render_policy_section(verdict: Dict[str, Any]) -> List[str]:
@@ -500,6 +590,9 @@ def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> 
             )
             out.append(f"- **`{model}`**: {names}")
         out += ["", "</details>", ""]
+
+    # --- ⚠️ Overrides applied / ignored / stale -------------------------------------
+    out += _render_overrides_section(report)
 
     # --- 🛡️ Policy verdict (only when a policy ran) --------------------------------------
     policy_verdict = report.get("policy_verdict")
