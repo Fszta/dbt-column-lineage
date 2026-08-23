@@ -1,0 +1,136 @@
+{
+  "_comment": "Recorded Metabase API responses for E4 extract unit tests. Represents a tiny Snowflake-backed instance (database id 2 = ANALYTICS). Field/table ids and UPPERCASE names mirror Snowflake's metadata as Metabase returns it. See tests/unit/metabase/.",
+  "session_properties": {
+    "version": {"tag": "v0.51.6"}
+  },
+  "database_metadata": {
+    "2": {
+      "id": 2,
+      "name": "Snowflake Analytics",
+      "engine": "snowflake",
+      "details": {"db": "ANALYTICS"},
+      "tables": [
+        {
+          "id": 100,
+          "name": "DIM_ACCOUNTS",
+          "schema": "MARTS_FINANCE",
+          "db_id": 2,
+          "fields": [
+            {"id": 1001, "name": "ACCOUNT_STATUS", "base_type": "type/Text"},
+            {"id": 1002, "name": "COUNTRY_CODE", "base_type": "type/Text"},
+            {"id": 1003, "name": "ACCOUNT_ID", "base_type": "type/Text"}
+          ]
+        },
+        {
+          "id": 200,
+          "name": "FACT_REVENUE",
+          "schema": "MARTS_FINANCE",
+          "db_id": 2,
+          "fields": [
+            {"id": 2001, "name": "AMOUNT", "base_type": "type/Float"},
+            {"id": 2002, "name": "ACCOUNT_ID", "base_type": "type/Text"},
+            {"id": 2003, "name": "REGION", "base_type": "type/Text"}
+          ]
+        }
+      ]
+    }
+  },
+  "snippets": [
+    {
+      "id": 23,
+      "name": "recent revenue",
+      "content": "fact_revenue.amount > 0"
+    }
+  ],
+  "cards": [
+    {
+      "id": 128,
+      "name": "Active accounts by country",
+      "collection_id": 17,
+      "archived": false,
+      "dataset_query": {
+        "type": "query",
+        "database": 2,
+        "query": {
+          "source-table": 100,
+          "aggregation": [["count"]],
+          "breakout": [["field", 1002, null]],
+          "filter": ["=", ["field", 1001, null], "active"]
+        }
+      }
+    },
+    {
+      "id": 3391,
+      "name": "Exec revenue (native, select *)",
+      "collection_id": 4,
+      "archived": false,
+      "dataset_query": {
+        "type": "native",
+        "database": 2,
+        "native": {
+          "query": "select * from {{#128}}",
+          "template-tags": {
+            "#128": {"type": "card", "card-id": 128, "name": "#128"}
+          }
+        }
+      }
+    },
+    {
+      "id": 3402,
+      "name": "Revenue by region (native, column-precise)",
+      "collection_id": 4,
+      "archived": false,
+      "dataset_query": {
+        "type": "native",
+        "database": 2,
+        "native": {
+          "query": "select amount, region from analytics.marts_finance.fact_revenue where region = {{region}}",
+          "template-tags": {
+            "region": {"type": "text", "name": "region", "display-name": "Region"}
+          }
+        }
+      }
+    },
+    {
+      "id": 3403,
+      "name": "Revenue with snippet (native)",
+      "collection_id": 4,
+      "archived": false,
+      "dataset_query": {
+        "type": "native",
+        "database": 2,
+        "native": {
+          "query": "select region from analytics.marts_finance.fact_revenue where {{snippet: recent revenue}}",
+          "template-tags": {
+            "snippet: recent revenue": {"type": "snippet", "snippet-id": 23, "snippet-name": "recent revenue", "name": "snippet: recent revenue"}
+          }
+        }
+      }
+    },
+    {
+      "id": 3500,
+      "name": "Archived card",
+      "collection_id": 4,
+      "archived": true,
+      "dataset_query": {
+        "type": "query",
+        "database": 2,
+        "query": {"source-table": 200, "breakout": [["field", 2003, null]]}
+      }
+    }
+  ],
+  "dashboards": [
+    {"id": 55, "name": "Executive KPIs", "collection_id": 4}
+  ],
+  "dashboard_details": {
+    "55": {
+      "id": 55,
+      "name": "Executive KPIs",
+      "collection_id": 4,
+      "dashcards": [
+        {"id": 9001, "card_id": 128, "card": {"id": 128}},
+        {"id": 9002, "card_id": 3391, "card": {"id": 3391}}
+      ]
+    }
+  }
+}
