@@ -284,6 +284,43 @@ def test_builder_suppresses_identifier_case_only_change():
     assert logic == set(), "identifier-case-only change must not be flagged"
 
 
+def test_builder_flags_reordered_case_arms():
+    # Soundness guard for the sorted per-column signature (`_column_signatures`): a multi-arm
+    # CASE is a SINGLE lineage entry whose arm order lives inside the expression, so a reorder
+    # — which is meaning-changing under CASE's first-match-wins — changes the entry's canonical
+    # key and MUST be flagged. (If CASE ever became multi-entry, the signature's `sorted()`
+    # could hide this; this test fails loudly if that regression is introduced.)
+    base = _FakeRegistry(
+        {"m": _Model({"x": _LinCol("int", [_Lin({"t.a"}, "derived", "CASE WHEN a>0 THEN 1 WHEN a>5 THEN 2 ELSE 0 END")])})},
+        compiled={"m": "select CASE WHEN a>0 THEN 1 WHEN a>5 THEN 2 ELSE 0 END as x from t"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"x": _LinCol("int", [_Lin({"t.a"}, "derived", "CASE WHEN a>5 THEN 2 WHEN a>0 THEN 1 ELSE 0 END")])})},
+        compiled={"m": "select CASE WHEN a>5 THEN 2 WHEN a>0 THEN 1 ELSE 0 END as x from t"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    assert "x" in logic, "reordered CASE arms are meaning-changing and must be flagged"
+
+
+def test_builder_suppresses_reordered_union_branches():
+    # The counterpart: a column fed by a UNION is a MULTI-entry column (one entry per branch),
+    # and branch order is set-semantic (the result set is identical either way). So the sorted
+    # signature SHOULD collapse a pure branch reorder — suppressing it is sound, not a bug.
+    entries = [_Lin({"t1.a"}, "renamed", "a"), _Lin({"t2.b"}, "renamed", "b")]
+    base = _FakeRegistry(
+        {"m": _Model({"x": _LinCol("int", list(entries))})},
+        compiled={"m": "select a as x from t1 union all select b as x from t2"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"x": _LinCol("int", list(reversed(entries)))})},
+        compiled={"m": "select b as x from t2 union all select a as x from t1"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    assert logic == set(), "set-semantic UNION branch reorder must not be flagged"
+
+
 def test_builder_flags_meaning_change_and_tags_it():
     base = _FakeRegistry(
         {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")])})},
