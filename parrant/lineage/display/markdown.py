@@ -20,6 +20,9 @@ _MAX_VIA_COLUMNS_INLINE = 4
 # Truncate a single SQL expression past this many chars (a 2000-char JSON_OBJECT on one
 # line forces horizontal scroll and makes the whole disclosure useless).
 _MAX_SQL_CHARS = 400
+# Cap the matched-reach sample shown per fired policy rule in the "why this verdict" section:
+# enough to be concrete ("it reaches `marts.revenue`"), not a wall on a wide fan-out.
+_MAX_REACH_INLINE = 3
 
 # Subtle attribution appended to every rendered report so an adopting repo's PRs
 # passively surface where the analysis came from. Kept to one muted line.
@@ -138,8 +141,35 @@ _POLICY_DECISION_MARKER = {
 _POLICY_DECISION_ORDER = ["block", "warn", "allow"]
 
 
+def _reach_sample(reach: List[str]) -> str:
+    """A capped, deterministic ```a`, `b` +N more`` sample of the matched reach."""
+    if not reach:
+        return ""
+    shown = ", ".join(f"`{name}`" for name in reach[:_MAX_REACH_INLINE])
+    extra = len(reach) - _MAX_REACH_INLINE
+    if extra > 0:
+        shown += f" +{extra} more"
+    return shown
+
+
+def _proof_marker(hit: Dict[str, Any]) -> str:
+    """The load-bearing honesty distinction for one fired rule.
+
+    A rule that fired because a fail-safe knob resolved an UNKNOWN (missing meta / an
+    evaluation error) MUST NOT read like a proven match — a confident-looking block that was
+    actually "undecided" is exactly the trust erosion this feature exists to prevent. So a
+    ``fired_on_unknown`` hit gets a LOUD, visually-distinct marker; a proven one a quiet check.
+    """
+    if hit.get("fired_on_unknown"):
+        cause = hit.get("unknown_cause")
+        cause_txt = "evaluation error" if cause == "error" else "meta missing"
+        return f"⚠️ **fired on a fail-safe default** ({cause_txt})"
+    return "✓ proven match"
+
+
 def _policy_hit_line(hit: Dict[str, Any]) -> str:
-    """One line for a fired rule: the rule id, the subject change, and the matched reach.
+    """One "why this verdict" row for a fired rule: the honesty marker (proven vs fail-safe),
+    the rule id, the subject change, and a capped sample of the matched reach.
 
     Deliberately references node NAMES only — the blast radius already has its own section
     above, and re-listing it here would duplicate (and risk contradicting) that report.
@@ -153,17 +183,15 @@ def _policy_hit_line(hit: Dict[str, Any]) -> str:
         subject = f"`{model}`"
     else:
         subject = "_changeset_"  # aggregate-scope rule: no single subject
-    reach = hit.get("matched_reach") or []
-    reach_txt = ""
-    if reach:
-        names = ", ".join(f"`{name}`" for name in reach)
-        reach_txt = f" → reaches {names}"
-    line = f"- **{rule_id}** — {subject}{reach_txt}"
-    # when an override capped this hit, show the delta so the audit trail is visible.
+    reach_sample = _reach_sample(hit.get("matched_reach") or [])
+    reach_txt = f" → reaches {reach_sample}" if reach_sample else ""
+    line = f"- {_proof_marker(hit)} — **{rule_id}** on {subject}{reach_txt}"
+    # when an override capped this hit, show the decision delta so the audit trail is visible.
     if hit.get("overridden"):
         original = hit.get("original_decision") or "?"
+        effective = hit.get("decision") or "?"
         reason = hit.get("override_reason") or ""
-        line += f" — override suppressed {original} (reason: {reason})"
+        line += f" — {original} → {effective} (overridden: {reason})"
     return line
 
 
@@ -279,6 +307,10 @@ def _render_policy_section(verdict: Dict[str, Any]) -> List[str]:
     if not hits:
         out.append("No policy rule fired against this change.")
     else:
+        # "Why this verdict" — one row per fired rule, grouped by contribution (block first).
+        # The honesty marker on each row states whether the rule PROVED its match or fired on a
+        # fail-safe default, so a fail-safe block never reads as a confident one.
+        out += ["**Why this verdict** — the rules that fired, and on what:", ""]
         by_decision: Dict[str, List[Dict[str, Any]]] = {}
         for hit in hits:
             by_decision.setdefault(str(hit.get("decision", "allow")), []).append(hit)
@@ -318,16 +350,22 @@ def _render_policy_section(verdict: Dict[str, Any]) -> List[str]:
             out.append(f"- `{channel}` → **{target}**: {message}")
         out.append("")
 
-    # Honesty counters — a fail-closed block driven by unknowns should read as such.
+    # Honesty coverage footer — LOUD (not folded into a <sub>): anything the policy left
+    # UNDECIDED (missing meta / unresolved reach) resolved via a fail-safe default and MUST NOT
+    # be silently folded into a clean pass. Shown whenever either counter is > 0.
     unresolved = int(verdict.get("unresolved_reach_count", 0) or 0)
     skipped = int(verdict.get("skipped_missing_meta", 0) or 0)
-    honesty: List[str] = []
-    if unresolved:
-        honesty.append(f"{_plural(unresolved, 'change')} had unresolved reach (treated fail-safe)")
+    coverage_bits: List[str] = []
     if skipped:
-        honesty.append(f"{_plural(skipped, 'rule evaluation')} skipped for missing meta")
-    if honesty:
-        out += ["<sub>" + " · ".join(honesty) + "</sub>", ""]
+        coverage_bits.append(f"{_plural(skipped, 'column')} undecided (missing meta)")
+    if unresolved:
+        reach_word = "reach" if unresolved == 1 else "reaches"
+        coverage_bits.append(f"{unresolved} {reach_word} unresolved")
+    if coverage_bits:
+        out += [
+            "> ⚠️ **Coverage:** " + ", ".join(coverage_bits) + " — these did NOT count as safe.",
+            "",
+        ]
 
     return out
 
@@ -343,9 +381,10 @@ def _truncate_expr(raw: str, limit: int = 120) -> str:
 def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> str:
     """Render a changeset impact report (from ``build_changeset_report``) as Markdown.
 
-    When ``explain`` is True, each changed column is annotated with the semantic reason it
-    was flagged and (when available) a compact ``base → head`` expression line. The default
-    (``explain=False``) leaves the output byte-for-byte as before.
+    The compact semantic reason a column was flagged is shown by default, so the default gate
+    explains itself. When ``explain`` is True, each changed column is additionally annotated
+    with a compact ``base → head`` expression line (the fuller trace). The machine-readable
+    JSON always carries the full explanation regardless of this flag.
     """
     changeset = report.get("changeset", {})
     summary = report.get("summary", {})
@@ -434,12 +473,15 @@ def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> 
         rows: List[str] = []
         for model, column in changed_nodes:
             rows.append(f"- `{model}.{column}`")
-            if explain:
-                block = explain_by_node.get((model, column))
-                if block is not None:
-                    reason = block.get("reason")
-                    if reason:
-                        rows.append(f"  - _why:_ {reason}")
+            # The compact semantic reason ("why was this flagged?") shows BY DEFAULT so the
+            # free/default gate explains itself; ``--explain`` EXPANDS it with the base→head
+            # expression trace. Structural changes carry no explain block (nothing to add).
+            block = explain_by_node.get((model, column))
+            if block is not None:
+                reason = block.get("reason")
+                if reason:
+                    rows.append(f"  - _why:_ {reason}")
+                if explain:
                     base = (block.get("base") or "").strip()
                     head = (block.get("head") or "").strip()
                     if base or head:

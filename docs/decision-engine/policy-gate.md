@@ -593,7 +593,8 @@ surface:
     "hits": [
       { "rule_id": "pii-outside-allowlist", "decision": "block",
         "change_model": "dim_account_holders", "change_column": "email",
-        "matched_reach": ["account_holders"], "actions": ["block", "notify"] }
+        "matched_reach": ["account_holders"], "actions": ["block", "notify"],
+        "fired_on_unknown": false, "unknown_cause": null }
     ],
     "build_set": ["dim_accounts"],
     "test_set": ["fact_revenue"],
@@ -601,20 +602,49 @@ surface:
       { "channel": "slack", "target": "#data-governance", "message": "PII …" }
     ],
     "evaluated_rules": 4,
-    "fired_rules": 2
+    "fired_rules": 2,
+    "unresolved_reach_count": 0,
+    "skipped_missing_meta": 0
   }
 }
 ```
 
+Each hit carries `fired_on_unknown` (with `unknown_cause` — `missing` / `error`): `true` means the
+rule fired because a [fail-safe knob](#fail-safe-defaults) resolved an **UNKNOWN**, not because it
+proved a match. The verdict-level `unresolved_reach_count` / `skipped_missing_meta` count what the
+policy left **undecided**. Both are surfaced in the PR comment (below) so a fail-safe block never
+reads as a proven one.
+
 ### Markdown / PR comment
 
-When a policy is present, the report adds a **Policy verdict** section — fired rules grouped by
-decision (block first), each naming the subject change and the reach it matched, followed by the
-**selective build set / test set** and the notify intents. It deliberately references node
-*names* only; it never re-lists the downstream blast radius (the impact section above it owns
-that). A `block` verdict leads with a one-line **"blocked until…"** note stating how the block
-clears (see [above](#a-block-is-a-block-until-not-a-dead-end)), so the PR comment carries the
-release path, not just the obstacle.
+When a policy is present, the report adds a **Policy verdict** section — a **"Why this verdict"**
+breakdown of the rules that fired, grouped by decision (block first). Each row names the subject
+change, a capped sample of the reach it matched, and — the load-bearing bit — an **honesty
+marker**:
+
+- `✓ proven match` — the rule proved its predicate against real data.
+- `⚠️ **fired on a fail-safe default** (meta missing / evaluation error)` — the rule fired only
+  because a [fail-safe knob](#fail-safe-defaults) resolved an **UNKNOWN**. A fail-safe block reads
+  very differently from a proven one, on purpose: a confident-looking ruling that was actually
+  *undecided* is exactly the trust this gate is sold on.
+
+When an [override](#overriding-a-verdict--the-in-code-escape-hatch) capped a hit, the row shows the
+`original → effective (overridden: reason)` delta so the audit trail is visible. Below the rules
+come the **selective build set / test set** and the notify intents.
+
+Whenever the policy left anything **undecided**, a LOUD **Coverage** footer states it plainly —
+`Coverage: N columns undecided (missing meta), M reaches unresolved — these did NOT count as
+safe.` — so a fail-closed block driven by unknowns is never folded into a clean pass.
+
+The section deliberately references node *names* only; it never re-lists the downstream blast radius
+(the impact section above it owns that). A `block` verdict leads with a one-line **"blocked until…"**
+note stating how the block clears (see [above](#a-block-is-a-block-until-not-a-dead-end)), so the PR
+comment carries the release path, not just the obstacle.
+
+The **default gate** (no policy) explains itself too: each flagged column carries the compact
+semantic reason it was flagged, alongside the provable-break diagnostics. `impact --explain`
+*expands* the human comment with the `base → head` expression trace; the JSON always carries the
+full explanation regardless of the flag.
 
 ## Overriding a verdict — the in-code escape hatch
 

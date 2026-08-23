@@ -566,9 +566,12 @@ def test_markdown_explain_renders_reason_and_expressions():
     report = build_changeset_report(
         "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
     )
-    # explain=False -> no reason surfaced (output unchanged from today).
-    assert "expression meaning changed" not in render_changeset_markdown(report)
-    # explain=True -> reason and the base→head expression line appear.
+    # explain=False -> the compact semantic reason shows by default (the default gate explains
+    # itself) but NOT the base→head expression trace.
+    default_md = render_changeset_markdown(report)
+    assert "expression meaning changed" in default_md
+    assert "coalesce(up.a, up.z)" not in default_md
+    # explain=True -> reason and the base→head expression line both appear.
     md = render_changeset_markdown(report, explain=True)
     assert "expression meaning changed" in md
     assert "up.a" in md and "coalesce(up.a, up.z)" in md
