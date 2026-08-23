@@ -12,14 +12,18 @@ def run_tests(test_type: Optional[str] = None) -> int:
         [os.environ.get("PYTHONPATH", ""), str(project_root)]
     )
 
+    # Invoke pytest via the current interpreter (`python -m pytest`) rather than the bare
+    # `pytest` binary, so it doesn't depend on the venv's bin dir being on the subprocess PATH
+    # (which isn't guaranteed in every CI runner / cached-venv state).
+    pytest_cmd = [sys.executable, "-m", "pytest"]
     if test_type == "unit":
-        cmd = ["pytest", "tests/unit", "-v"]
+        cmd = [*pytest_cmd, "tests/unit", "-v"]
     elif test_type == "integration":
-        cmd = ["pytest", "tests/integration", "-v"]
+        cmd = [*pytest_cmd, "tests/integration", "-v"]
     elif test_type == "e2e":
-        cmd = ["pytest", "tests/e2e", "-v"]
+        cmd = [*pytest_cmd, "tests/e2e", "-v"]
     else:
-        cmd = ["pytest", "tests", "-v"]
+        cmd = [*pytest_cmd, "tests", "-v"]
 
     result = subprocess.run(cmd, cwd=project_root)
     return result.returncode
