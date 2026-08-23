@@ -251,17 +251,18 @@ def test_structural_diff_available_requires_catalog_on_both_sides():
 
 
 def test_builder_suppresses_cosmetic_column_change():
-    # `a`'s derivation differs only by redundant parentheses — a cosmetic edit the OLD
-    # string compare would flag, but the AST canonical form collapses to equal. The
-    # compiled SQL genuinely differs (the parens), so the model-level gate DOES fire;
-    # the per-column AST diff is what suppresses `a`. This is the headline proof.
+    # `a`'s derivation differs only by whitespace — a cosmetic edit the OLD string compare
+    # would flag, but the AST canonical form collapses to equal. The compiled SQL genuinely
+    # differs (the spacing), so the model-level gate DOES fire; the per-column AST diff is what
+    # suppresses `a`. This is the headline proof. (Whitespace — not redundant parens — because
+    # canonicalization no longer runs the NULL-unsound ``simplify`` pass that folded parens.)
     base = _FakeRegistry(
         {"m": _Model({"a": _LinCol("text", [_Lin({"up.a", "up.b"}, "derived", "up.a + up.b")])})},
         compiled={"m": "select up.a + up.b as a from up"},
     )
     head = _FakeRegistry(
-        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a", "up.b"}, "derived", "(up.a + up.b)")])})},
-        compiled={"m": "select (up.a + up.b) as a from up"},
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a", "up.b"}, "derived", "up.a  +  up.b")])})},
+        compiled={"m": "select up.a  +  up.b as a from up"},
     )
     changes = ChangesetBuilder(base, head).build()
     logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
