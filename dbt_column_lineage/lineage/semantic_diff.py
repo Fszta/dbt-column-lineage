@@ -4,12 +4,24 @@ No I/O, no dbt artifacts, no registry — SQL expression strings in, a verdict o
 the first factor of the roadmap formula (AST semantic-diff × column-level lineage). Its only
 consumer is ``changeset.py``.
 
-Canonicalization pipeline (see the spec, §2/§3):
-``parse_one(sql, dialect)`` → ``normalize_identifiers(dialect)`` → ``simplify`` (guarded) →
+Canonicalization pipeline:
+``parse_one(sql, dialect)`` → ``normalize_identifiers(dialect)`` →
 render with ``.sql(dialect=..., comments=False, normalize_functions="upper")``.
 
 Fail-safe is load-bearing: anything that is not a *proven* ``EQUIVALENT`` is classified as
 breaking (``MEANING_CHANGED`` or ``INDETERMINATE``). A parse failure never yields "equal".
+
+Soundness note — why there is no ``simplify`` pass: sqlglot's ``simplify`` applies boolean
+absorption / complement / collapse rules (``a OR NOT a`` → ``TRUE``, ``x AND NOT x`` → ``FALSE``,
+``(x AND y) OR (x AND NOT y)`` → ``x``) that are valid in two-valued logic but **wrong under
+SQL's three-valued (NULL) logic** — the two sides differ whenever an operand is NULL. Running it
+made the engine report such genuinely-breaking rewrites as ``EQUIVALENT`` (a false negative that
+silently passes a breaking change — the one thing this engine must never do). Canonicalization is
+therefore limited to parse + identifier/whitespace/comment/function-name normalization, which is
+provably meaning-preserving. This is conservative: sound cosmetic folds that only ``simplify``
+provided (redundant parens, commutative reordering) now read as ``MEANING_CHANGED`` — over-blocking,
+the correct failure direction for a gate. Restoring them soundly (a curated, NULL-safe rewrite set)
+is deferred follow-up work.
 """
 
 from __future__ import annotations
@@ -18,7 +30,6 @@ from functools import lru_cache
 
 from sqlglot import exp, parse_one
 from sqlglot.optimizer.normalize_identifiers import normalize_identifiers
-from sqlglot.optimizer.simplify import simplify
 
 from dbt_column_lineage.models.schema import SemanticChangeKind, SemanticDiff
 
@@ -31,10 +42,13 @@ _UNPARSEABLE_PREFIX: str = "\x00unparseable:"
 def canonicalize_expression(expr_sql: str, dialect: str | None = None) -> exp.Expression | None:
     """Parse a SQL expression fragment and return its canonical AST, or ``None``.
 
-    Pipeline: ``parse_one(expr_sql, dialect)`` → ``normalize_identifiers(dialect)`` →
-    ``simplify`` (guarded; on any exception the non-simplified normalized AST is kept).
-    Canonicalization folds every cosmetic difference in §2's "WORK" table into one form so two
-    cosmetically-different-but-equivalent expressions produce equal ASTs (``==``).
+    Pipeline: ``parse_one(expr_sql, dialect)`` → ``normalize_identifiers(dialect)``.
+    Canonicalization folds only *provably* meaning-preserving cosmetic differences
+    (whitespace, comments, identifier case, function-name case) into one form so two
+    cosmetically-different-but-equivalent expressions produce equal ASTs (``==``). It deliberately
+    does **not** run sqlglot's ``simplify`` — see the module docstring's soundness note: those
+    boolean rewrites are unsound under SQL's three-valued (NULL) logic and would let a breaking
+    change be reported ``EQUIVALENT``.
 
     Returns ``None`` when ``parse_one`` raises (``ParseError`` / unsupported) — the caller must
     treat ``None`` as *indeterminate → breaking* (fail-safe), never as "equal".
@@ -44,13 +58,7 @@ def canonicalize_expression(expr_sql: str, dialect: str | None = None) -> exp.Ex
     except Exception:  # noqa: BLE001 - fail-safe: any parse failure -> None (indeterminate)
         return None
 
-    normalized = normalize_identifiers(expression, dialect=dialect)
-    try:
-        return simplify(normalized)
-    except Exception: # noqa: BLE001 - guarded per; fall back to normalized AST
-        # ``simplify`` can (rarely) raise or be slow on pathological fragments; the
-        # non-simplified normalized AST still folds whitespace/case/comments/idents.
-        return normalized
+    return normalize_identifiers(expression, dialect=dialect)
 
 
 @lru_cache(maxsize=4096)

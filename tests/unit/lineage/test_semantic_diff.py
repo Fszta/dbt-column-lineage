@@ -23,8 +23,12 @@ _MATRIX: list[tuple[str, str | None, str | None, bool, SemanticChangeKind]] = [
     ("comment", "a /* c */", "a", True, SemanticChangeKind.EQUIVALENT),
     ("identifier_case", "A + B", "a + b", True, SemanticChangeKind.EQUIVALENT),
     ("function_case", "SUM(x)", "sum( x )", True, SemanticChangeKind.EQUIVALENT),
-    ("redundant_parens", "(a + b)", "a + b", True, SemanticChangeKind.EQUIVALENT),
-    ("boolean_reorder", "a and b", "b and a", True, SemanticChangeKind.EQUIVALENT),
+    # Conservative-but-sound: canonicalization no longer runs ``simplify`` (unsound under SQL
+    # three-valued logic), so redundant parens and commutative reordering — folds only
+    # ``simplify`` provided — now read as MEANING_CHANGED (over-block, the safe direction).
+    # A NULL-safe rewrite set that restores these soundly is deferred follow-up work.
+    ("redundant_parens", "(a + b)", "a + b", False, SemanticChangeKind.MEANING_CHANGED),
+    ("boolean_reorder", "a and b", "b and a", False, SemanticChangeKind.MEANING_CHANGED),
     ("arithmetic_reorder", "a + b", "b + a", False, SemanticChangeKind.MEANING_CHANGED),
     ("changed_operator", "a + b", "a - b", False, SemanticChangeKind.MEANING_CHANGED),
     ("changed_cast", "a::int", "a::text", False, SemanticChangeKind.MEANING_CHANGED),
@@ -76,16 +80,39 @@ def test_indeterminate_never_equal() -> None:
 
 
 def test_canonical_key_equal_for_cosmetic_rows() -> None:
-    """Cosmetic-only rows 1–5 must produce identical canonical keys."""
+    """Provably meaning-preserving cosmetic edits must produce identical canonical keys.
+
+    (Redundant parens are intentionally excluded now — see the matrix note: without an unsound
+    ``simplify`` pass they no longer fold, and over-blocking is the correct failure direction.)
+    """
     cosmetic_pairs = [
         ("a + b", "a  +   b"),
         ("a /* c */", "a"),
         ("A + B", "a + b"),
         ("SUM(x)", "sum( x )"),
-        ("(a + b)", "a + b"),
     ]
     for base, head in cosmetic_pairs:
         assert canonical_key(base, _DIALECT) == canonical_key(head, _DIALECT)
+
+
+def test_boolean_simplification_is_never_equivalent_under_null_logic() -> None:
+    """Regression: boolean rewrites that are valid in two-valued logic but WRONG under SQL's
+    three-valued (NULL) logic must never be reported EQUIVALENT.
+
+    Each pair below differs whenever an operand is NULL, so calling them equal would silently
+    pass a breaking change — the one failure this engine must never make. These asserted
+    EQUIVALENT before the ``simplify`` pass was removed.
+    """
+    unsound_pairs = [
+        ("(x AND y) OR (x AND NOT y)", "x"),  # x=T, y=NULL -> base NULL, head TRUE
+        ("a OR NOT a", "TRUE"),  # a=NULL -> base NULL, head TRUE
+        ("(x > 5) AND NOT (x > 5)", "FALSE"),  # x=NULL -> base NULL, head FALSE
+    ]
+    for base, head in unsound_pairs:
+        result = compare_expressions(base, head, dialect=_DIALECT)
+        assert result.equal is False, f"{base!r} vs {head!r} must not be equal (NULL-unsound)"
+        assert result.kind is SemanticChangeKind.MEANING_CHANGED
+        assert result.kind.is_breaking is True
 
 
 def test_canonical_key_differs_for_meaning_change() -> None:
