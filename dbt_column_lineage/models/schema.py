@@ -4,6 +4,56 @@ from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import List, Optional, Set, Dict, Literal, Any
 
 
+class OverrideVerb(str, Enum):
+    """The two override pragma verbs, deliberately distinct so a soft acknowledgement can
+    NEVER silence a hard break (see override fail-safe invariants).
+
+    - ``ALLOW_CHANGE`` (soft): downgrades a REVIEW/WARN contribution for a column to allow.
+    - ``ALLOW_BREAK`` (hard): the ONLY verb that can downgrade a *provable BLOCK*, and only
+      to REVIEW/WARN — never to safe/allow.
+    """
+
+    ALLOW_CHANGE = "allow-change"
+    ALLOW_BREAK = "allow-break"
+
+    @property
+    def is_hard(self) -> bool:
+        """True for the hard ``allow-break`` verb (the only one that can touch a break)."""
+        return self is OverrideVerb.ALLOW_BREAK
+
+
+class OverrideDirective(BaseModel):
+    """One parsed ``-- lineage:allow-(change|break) ...`` pragma from a model's head SQL.
+
+    Lives in ``models.schema`` (not ``changeset.py``) so ``parser/sql_parser.py`` — which sits
+    BELOW ``lineage`` in the layering — can import it without inverting the architecture.
+    ``reason`` is guaranteed non-empty by the parser: a reasonless pragma is dropped as a loud
+    warning and never constructed (the whole audit value is the justification).
+    """
+
+    verb: OverrideVerb
+    # Lowercased target column. ``None`` => model scope OR an unresolved line-adjacency.
+    column: Optional[str] = None
+    reason: str
+    # ``model`` when no column arg and the pragma precedes the first SELECT; ``column`` otherwise.
+    scope: Literal["column", "model"]
+    # 1-indexed line within the scanned (compiled) head SQL — NOTE: compiled-relative.
+    source_line: int
+    # Set by the changeset builder once it knows which model this SQL belongs to.
+    model: Optional[str] = None
+
+    def to_record(self) -> Dict[str, Any]:
+        """The report dict skeleton for an override record (stale / applied / ineffective)."""
+        return {
+            "model": self.model,
+            "column": self.column,
+            "verb": self.verb.value,
+            "reason": self.reason,
+            "source_line": self.source_line,
+            "scope": self.scope,
+        }
+
+
 class SemanticChangeKind(str, Enum):
     """Semantic relationship between a column's base and head defining expression.
 
@@ -582,6 +632,12 @@ class RuleHit(BaseModel):
     change_column: Optional[str] = None
     matched_reach: List[str] = Field(default_factory=list)
     actions: List[ActionKind] = Field(default_factory=list)
+    # override cap (backward-compatible): when an override pragma capped this hit,
+    # ``decision`` holds the effective/capped value (so ``_combine_decision`` needs no change)
+    # while ``original_decision`` keeps the pre-cap value so the report can show the delta.
+    overridden: bool = False
+    original_decision: Optional[GateDecision] = None
+    override_reason: Optional[str] = None
 
 
 class PolicyVerdict(BaseModel):
