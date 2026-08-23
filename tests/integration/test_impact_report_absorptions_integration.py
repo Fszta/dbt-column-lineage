@@ -9,7 +9,7 @@ a change propagates, not just how many nodes it reaches.
 
 from pathlib import Path
 
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.lineage.service import LineageService
 
 
 def _service(dbt_artifacts) -> LineageService:

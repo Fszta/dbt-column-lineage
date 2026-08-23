@@ -2,8 +2,8 @@ import os
 import sys
 from pathlib import Path
 
-from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.lineage.display.html.explore import LineageExplorer
+from parrant.lineage.service import LineageService
 
 
 def main():

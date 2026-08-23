@@ -1,4 +1,4 @@
-from dbt_column_lineage.parser import SQLColumnParser
+from parrant.parser import SQLColumnParser
 
 
 def test_simple_select_with_join():

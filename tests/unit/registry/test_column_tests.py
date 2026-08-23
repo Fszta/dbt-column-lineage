@@ -7,7 +7,7 @@ real regenerated ``dbt_test_project`` manifest.
 
 import json
 
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from parrant.artifacts.registry import ModelRegistry
 
 
 def _catalog_node(name, columns, schema="main", database="main"):

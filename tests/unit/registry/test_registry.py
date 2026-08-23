@@ -1,7 +1,7 @@
 import json
 import pytest
-from dbt_column_lineage.artifacts.registry import ModelRegistry
-from dbt_column_lineage.artifacts.exceptions import ModelNotFoundError, RegistryNotLoadedError
+from parrant.artifacts.registry import ModelRegistry
+from parrant.artifacts.exceptions import ModelNotFoundError, RegistryNotLoadedError
 
 @pytest.fixture
 def sample_catalog(tmp_path):

@@ -1,11 +1,11 @@
 """Renderer tests: the per-rule aggregate table/markdown flag fail-safe + dead rules loudly,
 and an empty range renders cleanly (no division-by-zero, no crash)."""
 
-from dbt_column_lineage.lineage.display.backtest import (
+from parrant.lineage.display.backtest import (
     render_backtest_markdown,
     render_backtest_table,
 )
-from dbt_column_lineage.models.schema import (
+from parrant.models.schema import (
     BacktestReport,
     BacktestRuleStat,
 )

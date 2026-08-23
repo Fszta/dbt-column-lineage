@@ -7,8 +7,8 @@ GitHub outputs, and (critically) that adding the policy gate leaves every pre-ex
 
 import pytest
 
-from dbt_column_lineage.lineage.ci import FailOn, gate_exit_code, write_github_outputs
-from dbt_column_lineage.models.schema import GateDecision, PolicyVerdict
+from parrant.lineage.ci import FailOn, gate_exit_code, write_github_outputs
+from parrant.models.schema import GateDecision, PolicyVerdict
 
 
 def _verdict(decision: GateDecision, **kw) -> PolicyVerdict:

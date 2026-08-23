@@ -20,17 +20,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set
 
-from dbt_column_lineage.artifacts.exceptions import ModelNotFoundError
-from dbt_column_lineage.lineage.changeset import ChangeKind, ChangesetBuilder
-from dbt_column_lineage.lineage.provider import (
+from parrant.artifacts.exceptions import ModelNotFoundError
+from parrant.lineage.changeset import ChangeKind, ChangesetBuilder
+from parrant.lineage.provider import (
     LineageAndMetadataProvider,
     LineageProvider,
     ProjectMetadataProvider,
 )
-from dbt_column_lineage.lineage.service import LineageService
-from dbt_column_lineage.lineage.sqlglot_provider import SqlglotLineageProvider
-from dbt_column_lineage.lineage.verdict import classify_provable_breaks
-from dbt_column_lineage.models.schema import (
+from parrant.lineage.service import LineageService
+from parrant.lineage.sqlglot_provider import SqlglotLineageProvider
+from parrant.lineage.verdict import classify_provable_breaks
+from parrant.models.schema import (
     Column,
     ColumnLineage,
     Coverage,
@@ -285,7 +285,7 @@ def test_verdict_runs_against_the_fake():
     # head: the whole model (and its column) is gone, but the test declaration survives.
     head = InMemoryProvider({}, column_tests={("mart", "id"): [test]})
 
-    from dbt_column_lineage.lineage.changeset import ColumnChange
+    from parrant.lineage.changeset import ColumnChange
 
     breaks = classify_provable_breaks([ColumnChange("mart", "id", ChangeKind.REMOVED)], head, base)
     assert [b.test_unique_id for b in breaks] == ["test.demo.not_null_mart_id"]

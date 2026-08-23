@@ -8,8 +8,8 @@ machine-readable JSON (agent context) and the interactive explorer.
 
 import json
 
-from dbt_column_lineage.lineage.display.json import JsonDisplay
-from dbt_column_lineage.models.schema import Column
+from parrant.lineage.display.json import JsonDisplay
+from parrant.models.schema import Column
 
 
 def _impact_with_descriptions():

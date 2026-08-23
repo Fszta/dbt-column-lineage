@@ -9,7 +9,7 @@ import json
 
 from click.testing import CliRunner
 
-from dbt_column_lineage.cli.main import cli
+from parrant.cli.main import cli
 
 
 def _run(dbt_artifacts, select, fmt):

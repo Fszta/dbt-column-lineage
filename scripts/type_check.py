@@ -8,7 +8,7 @@ def type_check() -> int:
     project_root = Path(__file__).parent.parent
     cmd = [
         "mypy",
-        "dbt_column_lineage",
+        "parrant",
         "tests",
         "--show-error-codes",
         "--pretty",

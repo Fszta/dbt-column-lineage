@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from dbt_column_lineage.cli.main import impact
+from parrant.cli.main import impact
 
 _POLICIES = Path(__file__).parent.parent / "resources" / "policies"
 _BLOCK_ON_REMOVED = str(_POLICIES / "block_on_removed.yml")

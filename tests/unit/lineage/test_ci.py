@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from dbt_column_lineage.lineage.ci import (
+from parrant.lineage.ci import (
     COMMENT_MARKER,
     FailOn,
     GitHubContext,

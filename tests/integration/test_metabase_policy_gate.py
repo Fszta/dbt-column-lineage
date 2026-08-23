@@ -21,14 +21,14 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from dbt_column_lineage.cli.main import impact
-from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
-from dbt_column_lineage.lineage.policy import evaluate_policy, load_policy
-from dbt_column_lineage.lineage.service import LineageService
-from dbt_column_lineage.metabase.artifact import load_metabase_lineage
-from dbt_column_lineage.metabase.join import build_relation_index
-from dbt_column_lineage.metabase.reach import MetabaseReach
-from dbt_column_lineage.models.schema import SemanticChangeKind
+from parrant.cli.main import impact
+from parrant.lineage.changeset import ChangeKind, ColumnChange
+from parrant.lineage.policy import evaluate_policy, load_policy
+from parrant.lineage.service import LineageService
+from parrant.metabase.artifact import load_metabase_lineage
+from parrant.metabase.join import build_relation_index
+from parrant.metabase.reach import MetabaseReach
+from parrant.models.schema import SemanticChangeKind
 
 _RESOURCES = Path(__file__).parent.parent / "resources"
 _METABASE_ARTIFACT = str(_RESOURCES / "metabase" / "joined_lineage.json")

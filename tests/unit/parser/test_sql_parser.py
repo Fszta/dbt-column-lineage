@@ -1,4 +1,4 @@
-from dbt_column_lineage.parser import SQLColumnParser
+from parrant.parser import SQLColumnParser
 
 
 def test_simple_select_with_join():
@@ -795,7 +795,7 @@ def test_complex_query_structure():
 
 def test_table_names_normalized_from_sql() -> None:
     """Test that table names extracted from SQL are normalized to lowercase."""
-    from dbt_column_lineage.parser.sql_parser_utils import (
+    from parrant.parser.sql_parser_utils import (
         get_table_context,
         get_all_tables_from_select,
     )
@@ -834,7 +834,7 @@ def test_table_names_normalized_from_sql() -> None:
 
 def test_strip_sql_comments_utility() -> None:
     """Test the strip_sql_comments utility function."""
-    from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
+    from parrant.parser.sql_parser_utils import strip_sql_comments
 
     # Test /* ... */ style comments
     assert strip_sql_comments("customer_name /* customer data */") == "customer_name"

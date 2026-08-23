@@ -10,8 +10,8 @@ an ordinary value impact.
 
 from pathlib import Path
 
-from dbt_column_lineage.artifacts.registry import ModelRegistry
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.artifacts.registry import ModelRegistry
+from parrant.lineage.service import LineageService
 
 _FILTER_MODEL = "flagged_transaction_metrics"
 

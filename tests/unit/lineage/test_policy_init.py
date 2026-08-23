@@ -8,9 +8,9 @@ which builds the project via the ``dbt_artifacts`` fixture — the unit tier sta
 
 import yaml
 
-from dbt_column_lineage.lineage.policy import parse_policy
-from dbt_column_lineage.lineage.policy_init import _flatten_meta_keys, emit_policy_yaml
-from dbt_column_lineage.models.schema import MetaKeyCoverage, PolicyInitScan
+from parrant.lineage.policy import parse_policy
+from parrant.lineage.policy_init import _flatten_meta_keys, emit_policy_yaml
+from parrant.models.schema import MetaKeyCoverage, PolicyInitScan
 
 
 # --- pure scan helpers -------------------------------------------------------

@@ -11,7 +11,7 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from dbt_column_lineage.cli.main import impact
+from parrant.cli.main import impact
 
 
 def _load(path):
@@ -255,7 +255,7 @@ def test_scope_git_requires_base_manifest(dbt_artifacts):
 def test_scope_git_filters_to_changed_models(dbt_artifacts, base_artifacts, monkeypatch):
     # The two-manifest diff detects a change on stg_accounts, but we scope to a
     # git diff that touched no matching model -> the changeset is emptied.
-    from dbt_column_lineage.lineage import changeset
+    from parrant.lineage import changeset
 
     monkeypatch.setattr(
         changeset,

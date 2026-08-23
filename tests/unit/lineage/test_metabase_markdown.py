@@ -5,7 +5,7 @@ so a reviewer goes straight to the field instead of hunting the whole dashboard.
 reach (no proven column) must stay honest — tagged ``(table-grain)`` with no invented column.
 """
 
-from dbt_column_lineage.lineage.display.markdown import render_changeset_markdown
+from parrant.lineage.display.markdown import render_changeset_markdown
 
 
 def _report_with_exposures(exposures):

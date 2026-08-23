@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from dbt_column_lineage.artifacts.catalog import CatalogReader
+from parrant.artifacts.catalog import CatalogReader
 
 
 @pytest.fixture

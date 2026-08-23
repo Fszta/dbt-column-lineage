@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from dbt_column_lineage.lineage.backtest import run_backtest
-from dbt_column_lineage.lineage.policy import load_policy
-from dbt_column_lineage.lineage.service import LineageService
+from parrant.lineage.backtest import run_backtest
+from parrant.lineage.policy import load_policy
+from parrant.lineage.service import LineageService
 
 _REPO_ROOT = Path(__file__).parent.parent.parent
 _CHANGESETS = str(_REPO_ROOT / "tests" / "resources" / "changesets")
@@ -72,7 +72,7 @@ def test_block_on_removed_fires_on_real_match_not_fail_safe(head_service):
 
 
 def test_baseline_delta_and_regression_gate(head_service):
-    from dbt_column_lineage.lineage.backtest import backtest_exit_code
+    from parrant.lineage.backtest import backtest_exit_code
 
     baseline = _run(head_service, _NAIVE_PII)
     # Same run vs itself: no rule's would-block rose -> regression gate passes.

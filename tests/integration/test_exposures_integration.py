@@ -1,6 +1,6 @@
 import pytest
-from dbt_column_lineage.lineage.service import LineageService, LineageSelector
-from dbt_column_lineage.lineage.display.text import TextDisplay
+from parrant.lineage.service import LineageService, LineageSelector
+from parrant.lineage.display.text import TextDisplay
 from pathlib import Path
 
 
@@ -159,7 +159,7 @@ def test_exposures_not_in_upstream_lineage(lineage_service):
 
 def test_exposure_metadata_in_lineage_explorer(lineage_service):
     """Test that exposure metadata is correctly included in lineage explorer."""
-    from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
+    from parrant.lineage.display.html.explore import LineageExplorer
     
     lineage_explorer = LineageExplorer(host="127.0.0.1", port=8000)
     lineage_explorer.set_lineage_service(lineage_service)

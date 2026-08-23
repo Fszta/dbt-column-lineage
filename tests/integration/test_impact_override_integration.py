@@ -12,7 +12,7 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from dbt_column_lineage.cli.main import impact
+from parrant.cli.main import impact
 
 
 def _load(path):

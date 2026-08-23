@@ -15,8 +15,8 @@ No key is privileged — meta is exposed generically.
 
 import json
 
-from dbt_column_lineage.artifacts.manifest import ManifestReader
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from parrant.artifacts.manifest import ManifestReader
+from parrant.artifacts.registry import ModelRegistry
 
 # --- ManifestReader-level tests -------------------------------------------
 

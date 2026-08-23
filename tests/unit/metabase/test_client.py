@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dbt_column_lineage.metabase.client import MetabaseAuthError, MetabaseClient
+from parrant.metabase.client import MetabaseAuthError, MetabaseClient
 from tests.unit.metabase._fixtures import FakeSession, load_recorded
 
 

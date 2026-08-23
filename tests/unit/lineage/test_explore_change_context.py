@@ -7,7 +7,7 @@ fields, ``Coverage`` + Metabase reach). Backward-compat is asserted explicitly: 
 change context every payload is returned untouched.
 """
 
-from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
+from parrant.lineage.display.html.explore import LineageExplorer
 
 
 def _report():
@@ -280,7 +280,7 @@ def test_annotate_nodes_with_semantic_marks_nodes_and_blast_edge():
 
 def test_graph_node_and_edge_carry_new_optional_fields():
     """The GraphNode/GraphEdge additions default to None → today's payload when absent."""
-    from dbt_column_lineage.lineage.display.html.explore import GraphEdge, GraphNode
+    from parrant.lineage.display.html.explore import GraphEdge, GraphNode
 
     node = GraphNode(id="n", label="c", type="column", model="m").model_dump()
     assert node["semantic"] is None

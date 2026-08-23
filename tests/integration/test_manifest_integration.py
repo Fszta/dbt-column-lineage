@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dbt_column_lineage.artifacts.manifest import ManifestReader
+from parrant.artifacts.manifest import ManifestReader
 
 
 def test_get_model_dependencies_does_not_raise(dbt_artifacts):

@@ -9,8 +9,8 @@ import os
 
 import pytest
 
-from dbt_column_lineage.lineage.policy import PolicyConfigError, load_policy, parse_policy
-from dbt_column_lineage.models.schema import (
+from parrant.lineage.policy import PolicyConfigError, load_policy, parse_policy
+from parrant.models.schema import (
     ActionKind,
     GateDecision,
     MissingMetaPolicy,

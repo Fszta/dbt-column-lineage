@@ -1,0 +1,130 @@
+""" — the ``metabase-extract`` CLI subcommand (credentialed).
+
+Wired into ``cli/main.py:main()`` as an additive dispatch branch, mirroring the existing
+``impact`` subcommand. Credentials come from env/flags and live only here + the client;
+they are never persisted into the artifact (only the non-secret base URL is stamped).
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+from typing import Dict, Optional, Tuple
+
+import click
+
+from parrant.artifacts.manifest import ManifestReader
+from parrant.metabase.artifact import dump_metabase_lineage
+from parrant.metabase.client import MetabaseClient
+from parrant.metabase.extract import ExtractConfig, coverage_ratio, run_extract
+
+
+def _extractor_version() -> str:
+    try:
+        return version("parrant")
+    except PackageNotFoundError:  # pragma: no cover - installed in normal use
+        return "0.0.0"
+
+
+def _resolve_dialect(manifest: str, adapter: Optional[str]) -> Optional[str]:
+    if adapter:
+        return adapter
+    reader = ManifestReader(manifest)
+    reader.load()
+    return reader.get_adapter()
+
+
+def _load_dashboard_meta(path: Optional[str]) -> Dict:
+    if not path:
+        return {}
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+@click.command()
+@click.option("--metabase-url", envvar="METABASE_URL", required=True)
+@click.option("--metabase-api-key", envvar="METABASE_API_KEY")
+@click.option("--metabase-username", envvar="METABASE_USERNAME")
+@click.option("--metabase-password", envvar="METABASE_PASSWORD")
+@click.option(
+    "--database-id",
+    "database_ids",
+    multiple=True,
+    type=int,
+    required=True,
+    help="Restrict to these Metabase database id(s) (the warehouse dbt targets).",
+)
+@click.option(
+    "--manifest",
+    required=True,
+    type=click.Path(exists=True),
+    help="dbt manifest.json — supplies the SQL dialect for the native resolver.",
+)
+@click.option("--adapter", help="Override the SQL dialect for the native resolver.")
+@click.option("--output", "-o", default="metabase_lineage.json")
+@click.option("--include-archived", is_flag=True, default=False)
+@click.option(
+    "--dashboard-meta-file",
+    type=click.Path(exists=True),
+    help='JSON mapping dashboards to consumer meta: {"by_collection": {...}, '
+    '"by_dashboard": {...}}. The tool never hardcodes a taxonomy (tier/owner).',
+)
+@click.option(
+    "--fail-under",
+    type=float,
+    help="Exit non-zero if (column + table) coverage ratio < this value.",
+)
+def metabase_extract(
+    metabase_url: str,
+    metabase_api_key: Optional[str],
+    metabase_username: Optional[str],
+    metabase_password: Optional[str],
+    database_ids: Tuple[int, ...],
+    manifest: str,
+    adapter: Optional[str],
+    output: str,
+    include_archived: bool,
+    dashboard_meta_file: Optional[str],
+    fail_under: Optional[float],
+) -> None:
+    """Snapshot Metabase card→column and card→dashboard lineage into an offline artifact."""
+    try:
+        dialect = _resolve_dialect(manifest, adapter)
+        client = MetabaseClient(
+            base_url=metabase_url,
+            api_key=metabase_api_key,
+            username=metabase_username,
+            password=metabase_password,
+        )
+        config = ExtractConfig(
+            metabase_base_url=metabase_url,
+            database_ids=list(database_ids),
+            extractor_version=_extractor_version(),
+            dialect=dialect,
+            include_archived=include_archived,
+            dashboard_meta=_load_dashboard_meta(dashboard_meta_file),
+        )
+        lineage = run_extract(config, client)
+        dump_metabase_lineage(lineage, output)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    cov = lineage.coverage
+    ratio = coverage_ratio(cov)
+    click.echo(
+        f"Wrote {output}: {cov.cards_total} cards "
+        f"({cov.cards_resolved_column} column-precise, {cov.cards_resolved_table_only} "
+        f"table-only, {cov.cards_unresolved} unresolved), "
+        f"{cov.dashboards_total} dashboards. Coverage {ratio:.0%}.",
+        err=True,
+    )
+    if fail_under is not None and ratio < fail_under:
+        click.echo(f"Coverage {ratio:.0%} is below --fail-under {fail_under:.0%}.", err=True)
+        sys.exit(1)
+
+
+def main(args: Optional[list] = None, prog_name: Optional[str] = None) -> None:
+    """Entry point used by ``cli/main.py``'s dispatch branch."""
+    metabase_extract.main(args=args, prog_name=prog_name)

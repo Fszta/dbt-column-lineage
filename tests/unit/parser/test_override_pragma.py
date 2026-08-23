@@ -5,8 +5,8 @@ line-adjacency, model scope, and the audit invariants (reasonless / unknown-verb
 pragmas are DROPPED as warnings, never constructed).
 """
 
-from dbt_column_lineage.models.schema import OverrideVerb
-from dbt_column_lineage.parser.sql_parser import (
+from parrant.models.schema import OverrideVerb
+from parrant.parser.sql_parser import (
     _extract_select_alias,
     parse_override_directives,
 )

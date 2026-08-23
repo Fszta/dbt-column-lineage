@@ -12,8 +12,8 @@ Covered:
 
 import os
 
-from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
-from dbt_column_lineage.lineage.policy import (
+from parrant.lineage.changeset import ChangeKind, ColumnChange
+from parrant.lineage.policy import (
     MetaIndex,
     PolicyEngine,
     build_impact_view,
@@ -21,7 +21,7 @@ from dbt_column_lineage.lineage.policy import (
     load_policy,
     parse_policy,
 )
-from dbt_column_lineage.models.schema import (
+from parrant.models.schema import (
     ActionKind,
     BreakFinding,
     GateDecision,
@@ -1191,11 +1191,11 @@ def test_semantic_knobs_fold_into_user_rules_most_severe_wins():
 
 # --- override caps -------------------------------------------------------
 
-from dbt_column_lineage.lineage.policy import (  # noqa: E402
+from parrant.lineage.policy import (  # noqa: E402
     applied_policy_overrides,
     ineffective_policy_overrides,
 )
-from dbt_column_lineage.models.schema import OverrideDirective, OverrideVerb  # noqa: E402
+from parrant.models.schema import OverrideDirective, OverrideVerb  # noqa: E402
 
 
 def _ov(verb, column, reason="ack"):

@@ -12,10 +12,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dbt_column_lineage.lineage.policy import evaluate_policy, parse_policy
-from dbt_column_lineage.lineage.policy_init import emit_policy_yaml, run_policy_init, scan_project
-from dbt_column_lineage.lineage.service import LineageService
-from dbt_column_lineage.models.schema import GateDecision
+from parrant.lineage.policy import evaluate_policy, parse_policy
+from parrant.lineage.policy_init import emit_policy_yaml, run_policy_init, scan_project
+from parrant.lineage.service import LineageService
+from parrant.models.schema import GateDecision
 
 
 @pytest.fixture

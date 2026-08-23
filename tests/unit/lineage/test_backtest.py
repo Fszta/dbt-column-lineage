@@ -13,19 +13,19 @@ import subprocess
 
 import pytest
 
-from dbt_column_lineage.lineage.backtest import (
+from parrant.lineage.backtest import (
     _aggregate_rule_stats,
     backtest_exit_code,
 )
-from dbt_column_lineage.lineage.changeset import (
+from parrant.lineage.changeset import (
     ChangeKind,
     ColumnChange,
     changes_from_dicts,
     git_changed_models_and_unmapped,
     git_rev_list,
 )
-from dbt_column_lineage.lineage.policy import parse_policy
-from dbt_column_lineage.models.schema import (
+from parrant.lineage.policy import parse_policy
+from parrant.models.schema import (
     BacktestFiredHit,
     BacktestPointResult,
     BacktestReport,

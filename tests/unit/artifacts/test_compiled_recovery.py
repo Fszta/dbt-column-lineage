@@ -8,7 +8,7 @@ file is still on disk under its old sub-path. These tests cover the by-filename 
 
 import json
 
-from dbt_column_lineage.artifacts.manifest import ManifestReader
+from parrant.artifacts.manifest import ManifestReader
 
 
 def _write_manifest(tmp_path, node):
