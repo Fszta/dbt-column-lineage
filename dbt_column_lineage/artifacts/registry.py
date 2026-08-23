@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass, field
 import logging
 
@@ -226,6 +226,33 @@ class ModelRegistry:
                 manifest_desc = desc_by_column.get(col_name)
                 if manifest_desc:
                     column.description = manifest_desc
+
+    def _apply_meta(self, models: Dict[str, Model]) -> None:
+        """Attach arbitrary dbt ``meta`` from the manifest onto models and columns.
+
+        User-authored meta (ANY key) is namespaced under ``Model.metadata["dbt_meta"]``
+        so it stays disjoint from the tool-internal flags already stored there
+        (``catalog_missing``, ``star_sources``) — a consumer meta key named
+        ``star_sources`` must never corrupt the star-reference pass. Column meta lands on
+        ``Column.metadata``. Meta is merged ``config.meta`` over top-level ``meta`` (dbt
+        precedence) in the manifest reader. No key is privileged; empty meta is left unset.
+
+        Runs *after* lineage parsing so columns materialised from compiled SQL for
+        catalog-missing models are covered too.
+        """
+        for model_name, model in models.items():
+            model_meta = self._manifest_reader.get_model_meta(model_name)
+            if model_meta:
+                model.metadata = model.metadata or {}
+                model.metadata["dbt_meta"] = model_meta
+
+            column_meta = self._manifest_reader.get_column_meta(model_name)
+            if not column_meta:
+                continue
+            for col_name, column in model.columns.items():
+                col_meta = column_meta.get(col_name)
+                if col_meta:
+                    column.metadata = col_meta
 
     def _load_exposures(self) -> Dict[str, Exposure]:
         """Load exposures from manifest."""
@@ -488,6 +515,7 @@ class ModelRegistry:
             self._apply_dependencies(models)
             self._process_lineage(models)
             self._apply_descriptions(models)
+            self._apply_meta(models)
             exposures = self._load_exposures()
             self._build_test_index()
             self._state = RegistryState(models=models, exposures=exposures, is_loaded=True)
@@ -500,6 +528,15 @@ class ModelRegistry:
             raise RegistryNotLoadedError("Registry must be loaded before accessing models")
         return self._state.models
 
+    def get_dialect(self) -> Optional[str]:
+        """Return the resolved SQL dialect (adapter), or ``None`` when unknown.
+
+        Public accessor over the dialect the registry already computes at load time
+        (adapter override or manifest adapter). Consumed by ``ChangesetBuilder`` so the
+        AST semantic-diff canonicalizes expressions with the right dialect rules.
+        """
+        return self._dialect
+
     def get_model(self, model_name: str) -> Model:
         """Get a specific model by name."""
         if not self.is_loaded:
@@ -509,6 +546,33 @@ class ModelRegistry:
         if model is None:
             raise ModelNotFoundError(f"Model '{model_name}' not found")
         return model
+
+    def get_model_dbt_meta(self, model: str) -> Dict[str, Any]:
+        """Arbitrary user-authored dbt ``meta`` for a model (case-insensitive).
+
+        Reads the meta namespaced under ``Model.metadata["dbt_meta"]`` by
+        :meth:`_apply_meta`, kept disjoint from the tool-internal flags. Returns an empty
+        dict for an unknown model or one with no declared meta — meta is absent, never
+        guessed. Metadata-agnostic: every key is exposed generically, none privileged.
+        """
+        model_obj = self._state.models.get(model.lower())
+        if model_obj is None or not model_obj.metadata:
+            return {}
+        return dict(model_obj.metadata.get("dbt_meta") or {})
+
+    def get_column_dbt_meta(self, model: str, column: str) -> Dict[str, Any]:
+        """Arbitrary user-authored dbt ``meta`` for a column (case-insensitive).
+
+        Reads ``Column.metadata`` populated by :meth:`_apply_meta`. Returns an empty dict
+        for an unknown model/column or one with no meta.
+        """
+        model_obj = self._state.models.get(model.lower())
+        if model_obj is None:
+            return {}
+        col = model_obj.columns.get(column) or model_obj.columns.get(column.lower())
+        if col is None or not col.metadata:
+            return {}
+        return dict(col.metadata)
 
     def get_exposures(self) -> Dict[str, Exposure]:
         """Get all exposures in the registry."""

@@ -1,5 +1,38 @@
-from pydantic import BaseModel, Field, ConfigDict
+from enum import Enum
+
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import List, Optional, Set, Dict, Literal, Any
+
+
+class SemanticChangeKind(str, Enum):
+    """Semantic relationship between a column's base and head defining expression.
+
+    Maps to the roadmap's breaking / non-breaking axis (orthogonal to ``ChangeKind``):
+      - ``EQUIVALENT``      → non-breaking (cosmetic-only; the column is NOT emitted as changed)
+      - ``MEANING_CHANGED`` → breaking (the expression's meaning changed)
+      - ``INDETERMINATE``   → conservative-breaking (could not parse/compare → fail safe)
+    """
+
+    EQUIVALENT = "equivalent"
+    MEANING_CHANGED = "meaning_changed"
+    INDETERMINATE = "indeterminate"
+
+    @property
+    def is_breaking(self) -> bool:
+        """Everything except a proven ``EQUIVALENT`` is treated as breaking (fail-safe)."""
+        return self is not SemanticChangeKind.EQUIVALENT
+
+
+class SemanticDiff(BaseModel):
+    """Result of comparing two SQL expressions for semantic equality.
+
+    ``equal`` is the fast boolean the changeset uses to decide whether to emit a column;
+    ``kind`` is the roadmap classification; ``reason`` is a short human string for display.
+    """
+
+    equal: bool
+    kind: SemanticChangeKind
+    reason: str
 
 
 class ColumnLineage(BaseModel):
@@ -164,3 +197,429 @@ class ImpactConfidence(BaseModel):
     no_column_info_models: List[str] = Field(default_factory=list)
     parse_failed_models: List[str] = Field(default_factory=list)
     level: Literal["full", "partial"]
+
+
+# ---------------------------------------------------------------------------
+# Metabase cross-boundary lineage artifact (metabase_lineage.json).
+#
+# Snapshot of "which Metabase card reads which warehouse column, and which
+# dashboards show that card", plus provenance. Produced by the credentialed
+# ``metabase-extract`` step and consumed OFFLINE (zero credentials) by the gate,
+# exactly like ``manifest.json`` / ``catalog.json``.
+# ---------------------------------------------------------------------------
+
+
+class MetabaseProvenance(BaseModel):
+    """Where/when a snapshot came from — stamps snapshot age and the parse dialect.
+
+    Credentials are NEVER stored here: only the (non-secret) base URL is stamped.
+    """
+
+    generated_at: str  # ISO-8601 UTC — stamps snapshot age
+    metabase_base_url: str
+    metabase_version: Optional[str] = None
+    database_ids: List[int] = Field(default_factory=list)
+    extractor_version: str
+    dbt_adapter: Optional[str] = None  # dialect the native resolver parsed with
+
+
+class MetabaseCoverage(BaseModel):
+    """Resolution honesty for one snapshot — column-precise vs table-only vs unresolved.
+
+    Same discipline as :class:`Coverage` / :class:`ImpactConfidence`: never guess,
+    count what could not be resolved and expose a capped id sample.
+    """
+
+    cards_total: int
+    cards_resolved_column: int  # column-precise (MBQL, or confident native)
+    cards_resolved_table_only: int  # degraded to table grain (select *, complex SQL)
+    cards_unresolved: int  # no warehouse relation resolved at all
+    dashboards_total: int
+    snippets_total: int
+    unresolved_card_ids: List[int] = Field(default_factory=list)  # capped honesty sample
+    table_only_card_ids: List[int] = Field(default_factory=list)
+
+
+class MetabaseRelation(BaseModel):
+    """A warehouse relation (``database.schema.table``) a card reads from.
+
+    The join anchor: this normalized key maps to a dbt model via the manifest
+    ``relation_name`` in the (later) reach phase. Normalized = lowercased, unquoted.
+    """
+
+    database: str
+    schema_name: str = Field(alias="schema")
+    table: str
+    model_config = ConfigDict(populate_by_name=True)
+
+    def key(self) -> str:
+        """Normalized ``database.schema.table`` (lowercased, unquoted) — the dict key."""
+        return f"{self.database}.{self.schema_name}.{self.table}".lower()
+
+
+class MetabaseColumnRef(BaseModel):
+    """One column a card reads, resolved to a warehouse relation + column.
+
+    ``role`` records HOW the column is used (breakout/filter/field/...) so the policy
+    engine can later filter on mechanism and the explorer can show "used as a filter".
+    """
+
+    relation: str  # normalized relation key (FK into ``MetabaseLineage.relations``)
+    column: str  # lowercased warehouse column
+    role: Literal["field", "breakout", "aggregation", "filter", "join", "order", "native"]
+    confidence: Literal["high", "medium"] = "high"
+
+
+class MetabaseCard(BaseModel):
+    """A Metabase question and the warehouse columns/relations it reads.
+
+    ``precision`` is first-class: ``column`` cards give column-precise reach; ``table``
+    cards degrade to "the changed column is in a table this card reads" (still a valid
+    dashboard-reach signal); ``none`` means no relation resolved at all.
+    """
+
+    card_id: int
+    name: str
+    query_kind: Literal["mbql", "native"]
+    precision: Literal["column", "table", "none"]
+    collection_id: Optional[int] = None
+    archived: bool = False
+    database_id: Optional[int] = None
+    columns: List[MetabaseColumnRef] = Field(default_factory=list)
+    table_relations: List[str] = Field(default_factory=list)  # relation keys, table grain
+    upstream_card_ids: List[int] = Field(default_factory=list)  # {{#id}} / card__<id> deps
+    snippet_ids: List[int] = Field(default_factory=list)
+    unresolved_reason: Optional[str] = None  # select_star | parse_failed | unknown_table | ...
+
+
+class MetabaseDashboard(BaseModel):
+    """A Metabase dashboard and the cards it shows.
+
+    ``meta`` (tier/owner/...) is a CONSUMER-CONFIGURABLE input to the extract — the tool
+    never hardcodes an org's taxonomy. Absent meta is ``{}``; the policy
+    engine treats that per its ``MissingMetaPolicy`` (fail-closed by default).
+    """
+
+    dashboard_id: int
+    name: str
+    collection_id: Optional[int] = None
+    url: Optional[str] = None
+    card_ids: List[int] = Field(default_factory=list)
+    meta: Dict[str, Any] = Field(default_factory=dict)  # tier/owner/... for policy reach.where
+
+
+class MetabaseLineage(BaseModel):
+    """The ``metabase_lineage.json`` artifact — a self-contained snapshot.
+
+    ``relations`` de-duplicates relation metadata; cards/dashboards reference relations
+    and cards by key/id, mirroring the manifest's node/edge normalization (diff-friendly).
+    """
+
+    schema_version: int = 1
+    provenance: MetabaseProvenance
+    coverage: MetabaseCoverage
+    relations: Dict[str, MetabaseRelation] = Field(default_factory=dict)
+    cards: List[MetabaseCard] = Field(default_factory=list)
+    dashboards: List[MetabaseDashboard] = Field(default_factory=list)
+
+
+# ===========================================================================
+# POLICY ENGINE — metadata-agnostic rule engine types.
+#
+# This block is APPEND-ONLY and self-contained so a concurrent append elsewhere
+# in this file merges trivially. It declares the rule model (predicate -> action)
+# and the PolicyVerdict the engine emits. No metadata key is privileged here; the
+# consumer authors the rules (policy.yml). See lineage/policy.py for the engine.
+# ===========================================================================
+
+
+# --- vocabulary enums ------------------------------------------------------
+
+
+class MatchAxis(str, Enum):
+    """The four axes a predicate leaf can match on."""
+
+    CHANGE = "change"
+    META = "meta"
+    REACH = "reach"
+    STRUCTURAL = "structural"
+
+
+class Operator(str, Enum):
+    """Operator vocabulary for ``meta`` and ``change`` string/list/numeric matching."""
+
+    EXISTS = "exists"
+    ABSENT = "absent"
+    IS_TRUE = "is_true"
+    IS_FALSE = "is_false"
+    EQ = "eq"
+    NE = "ne"
+    IN = "in"
+    NOT_IN = "not_in"
+    MATCHES = "matches"
+    INTERSECTS = "intersects"
+    SUBSET_OF = "subset_of"
+    NOT_SUBSET_OF = "not_subset_of"
+    SUPERSET_OF = "superset_of"
+    GT = "gt"
+    GE = "ge"
+    LT = "lt"
+    LE = "le"
+
+
+class ReachKind(str, Enum):
+    """What kind of downstream object a ``reach`` condition scans."""
+
+    MODEL = "model"
+    COLUMN = "column"
+    EXPOSURE = "exposure"
+
+
+class Mechanism(str, Enum):
+    """Reach *mechanism* taxonomy — the machine-readable twin of ``_MECHANISM_LABELS``.
+
+    Predicates match reach on these labels (recompute vs row-set vs pass-through).
+    """
+
+    DERIVED_RECOMPUTE = "derived_recompute"
+    ROWSET_FILTER = "rowset_filter"
+    RENAMED_PASSTHROUGH = "renamed_passthrough"
+    DIRECT_PASSTHROUGH = "direct_passthrough"
+
+
+class ActionKind(str, Enum):
+    """What a fired rule contributes to the ``PolicyVerdict``."""
+
+    BLOCK = "block"
+    WARN = "warn"
+    ADD_TO_BUILD_SET = "add-to-build-set"
+    ADD_TO_TEST_SET = "add-to-test-set"
+    NOTIFY = "notify"
+
+
+class MissingMetaPolicy(str, Enum):
+    """How an undecidable leaf (missing meta / type error / unresolved reach) resolves."""
+
+    FAIL_CLOSED = "fail_closed"
+    FAIL_OPEN = "fail_open"
+    SKIP = "skip"
+
+
+class GateDecision(str, Enum):
+    """The gate ruling, combined most-severe-wins across all fired rules."""
+
+    BLOCK = "block"
+    WARN = "warn"
+    ALLOW = "allow"
+
+    @property
+    def severity(self) -> int:
+        """block=2, warn=1, allow=0 — for most-severe-wins combination."""
+        return {GateDecision.BLOCK: 2, GateDecision.WARN: 1, GateDecision.ALLOW: 0}[self]
+
+
+# --- leaf conditions -------------------------------------------------------
+
+
+class ChangeCondition(BaseModel):
+    """A fact about the subject ``ColumnChange`` itself."""
+
+    field: Literal["kind", "semantic", "breaking", "model", "column"]
+    op: Operator
+    value: Optional[Any] = None
+
+
+class MetaCondition(BaseModel):
+    """A ``meta.<dotted.key>`` on the subject node/column (or a reached object)."""
+
+    key: str
+    op: Operator
+    value: Optional[Any] = None
+
+
+class ReachCondition(BaseModel):
+    """A quantified condition over the subject's downstream reach.
+
+    Satisfied when at least ``min_count`` reached objects (of ``kind``, optionally
+    filtered to ``mechanism``) match the inner ``where`` predicate (which matches on
+    each reached object's own ``meta.*``).
+    """
+
+    kind: ReachKind
+    mechanism: Optional[List[Mechanism]] = None
+    where: "Predicate"
+    # ge=1: min_count 0 is a vacuously-true reach (matches with zero reached objects), which is
+    # never a meaningful gate — reject it at config load rather than silently always-firing.
+    min_count: int = Field(default=1, ge=1)
+
+
+class StructuralCondition(BaseModel):
+    """A boolean fact the pipeline already computes."""
+
+    fact: Literal["provable_test_break", "touches_exposure", "reaches_anything"]
+
+
+# --- predicate tree (recursive) --------------------------------------------
+
+
+class Predicate(BaseModel):
+    """Exactly one field is set: a boolean combinator OR a leaf condition.
+
+    Combinators: ``all_`` (AND, alias ``all``), ``any_`` (OR, alias ``any``),
+    ``not_`` (negation, alias ``not``). Leaves: ``change`` / ``meta`` / ``reach`` /
+    ``structural``. The one-of invariant is enforced by a model validator.
+    """
+
+    all_: Optional[List["Predicate"]] = Field(default=None, alias="all")
+    any_: Optional[List["Predicate"]] = Field(default=None, alias="any")
+    not_: Optional["Predicate"] = Field(default=None, alias="not")
+    change: Optional[ChangeCondition] = None
+    meta: Optional[MetaCondition] = None
+    reach: Optional[ReachCondition] = None
+    structural: Optional[StructuralCondition] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> "Predicate":
+        set_fields = [
+            name
+            for name in ("all_", "any_", "not_", "change", "meta", "reach", "structural")
+            if getattr(self, name) is not None
+        ]
+        if len(set_fields) != 1:
+            raise ValueError(
+                "a predicate must set exactly one of "
+                "all/any/not/change/meta/reach/structural, got: "
+                f"{sorted(set_fields) or 'none'}"
+            )
+        return self
+
+
+# --- actions ---------------------------------------------------------------
+
+
+class Action(BaseModel):
+    """One effect a fired rule contributes to the ``PolicyVerdict``."""
+
+    type: ActionKind
+    include: Literal["reached", "subject", "both"] = "reached"
+    mechanism: Optional[List[Mechanism]] = None
+    channel: Optional[str] = None
+    target: Optional[str] = None
+    message: Optional[str] = None
+
+
+# --- rule + policy ---------------------------------------------------------
+
+
+class Rule(BaseModel):
+    """A single ``predicate -> actions`` rule."""
+
+    id: str
+    description: Optional[str] = None
+    scope: Literal["change", "aggregate"] = "change"
+    predicate: Predicate
+    action: List[Action]
+    # Two independent fail-safe knobs: on_missing_meta governs an undecidable leaf
+    # caused by a missing meta key / unresolved reach; on_error governs an operator/type
+    # mismatch (a genuine evaluation error). Each falls back to the matching PolicyDefaults knob.
+    on_missing_meta: Optional[MissingMetaPolicy] = None
+    on_error: Optional[MissingMetaPolicy] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_action_list(cls, data: Any) -> Any:
+        """A single ``action`` mapping is coerced to a length-1 list for authoring ease."""
+        if isinstance(data, dict) and isinstance(data.get("action"), dict):
+            data = {**data, "action": [data["action"]]}
+        return data
+
+
+class PolicyDefaults(BaseModel):
+    """Policy-wide fail-safe defaults, overridable per rule."""
+
+    on_missing_meta: MissingMetaPolicy = MissingMetaPolicy.FAIL_CLOSED
+    on_error: MissingMetaPolicy = MissingMetaPolicy.FAIL_CLOSED
+
+
+class Policy(BaseModel):
+    """A parsed ``policy.yml`` — schema version + defaults + rules."""
+
+    version: int
+    defaults: PolicyDefaults = Field(default_factory=PolicyDefaults)
+    rules: List[Rule] = Field(default_factory=list)
+
+
+# --- outputs ---------------------------------------------------------------
+
+
+class Notification(BaseModel):
+    """A notify intent the engine emits; routing is the consumer's CI job."""
+
+    channel: str
+    target: str
+    message: str
+
+
+class RuleHit(BaseModel):
+    """One firing of a rule against a subject (or once, for aggregate scope)."""
+
+    rule_id: str
+    decision: GateDecision
+    change_model: Optional[str] = None
+    change_column: Optional[str] = None
+    matched_reach: List[str] = Field(default_factory=list)
+    actions: List[ActionKind] = Field(default_factory=list)
+
+
+class PolicyVerdict(BaseModel):
+    """The engine's output: a gate decision + accumulated build/test sets + notifications."""
+
+    decision: GateDecision
+    hits: List[RuleHit] = Field(default_factory=list)
+    build_set: List[str] = Field(default_factory=list)
+    test_set: List[str] = Field(default_factory=list)
+    notifications: List[Notification] = Field(default_factory=list)
+    evaluated_rules: int = 0
+    fired_rules: int = 0
+    # Honesty counters for fail-safe explainability (additive; see policy.py §7).
+    unresolved_reach_count: int = 0
+    skipped_missing_meta: int = 0
+
+    def blocks(self) -> bool:
+        """True when the gate decision is ``BLOCK``."""
+        return self.decision is GateDecision.BLOCK
+
+
+# Resolve the mutual forward references (Predicate <-> ReachCondition).
+ReachCondition.model_rebuild()
+Predicate.model_rebuild()
+
+
+# ===========================================================================
+# METABASE CROSS-BOUNDARY REACH — offline join honesty.
+#
+# Append-only block. When the Metabase artifact is joined into the impact reach
+# (``--metabase``), the report carries this honesty signal so a fail-closed block
+# driven by a STALE or coarse snapshot reads as such — never fabricated dashboard
+# reach. Mirrors the discipline of ``Coverage`` / ``ImpactConfidence``.
+# ===========================================================================
+
+
+class MetabaseReachConfidence(BaseModel):
+    """How trustworthy the appended Metabase dashboard reach is for one impact run.
+
+    Two independent axes: snapshot *staleness* (age vs a threshold) and
+    *resolution* (how many reached dashboards are backed by column-precise vs merely
+    table-grain cards). An absent or stale snapshot degrades to "dbt-only reach + a
+    warning"; it never fabricates dashboard reach.
+    """
+
+    snapshot_generated_at: Optional[str] = None
+    snapshot_age_hours: Optional[float] = None
+    stale: bool = False  # age > threshold OR artifact missing
+    dashboards_reached: int = 0
+    cards_column_precise: int = 0  # reached via a column-precise card
+    cards_table_only: int = 0  # reached only via a table-grain card
+    level: Literal["full", "partial", "absent"] = "absent"

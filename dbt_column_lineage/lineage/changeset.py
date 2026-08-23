@@ -17,7 +17,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from dbt_column_lineage.lineage.provider import LineageProvider
+from dbt_column_lineage.lineage.semantic_diff import (
+    _UNPARSEABLE_PREFIX,
+    canonical_key,
+    compare_expressions,
+)
+from dbt_column_lineage.models.schema import SemanticChangeKind
 from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
 
 logger = logging.getLogger(__name__)
@@ -51,12 +57,20 @@ _KIND_PRIORITY: Dict[ChangeKind, int] = {
 
 @dataclass(frozen=True)
 class ColumnChange:
-    """A single changed column, with the kind of change and optional detail."""
+    """A single changed column, with the kind of change and optional detail.
+
+    ``semantic`` carries the AST-diff classification (breaking / non-breaking axis) for
+    ``logic_changed`` columns: ``MEANING_CHANGED`` when the expression's meaning changed,
+    ``INDETERMINATE`` when a precise per-column diff was impossible (fail-safe). Structural
+    kinds (``ADDED`` / ``REMOVED`` / ``TYPE_CHANGED``) leave it ``None`` — their breaking
+    nature is already conveyed by the kind.
+    """
 
     model: str
     column: str
     kind: ChangeKind
     detail: Optional[str] = None
+    semantic: Optional[SemanticChangeKind] = None
 
     def to_dict(self) -> Dict[str, Optional[str]]:
         return {
@@ -64,6 +78,7 @@ class ColumnChange:
             "column": self.column,
             "kind": self.kind.value,
             "detail": self.detail,
+            "semantic": self.semantic.value if self.semantic else None,
         }
 
 
@@ -79,8 +94,21 @@ def _normalize_sql(sql: Optional[str]) -> Optional[str]:
     return strip_sql_comments(sql)
 
 
+def _registry_dialect(registry: object) -> Optional[str]:
+    """Best-effort SQL dialect from a registry, ``None`` when it exposes no getter.
+
+    Defensive so a real ``ModelRegistry`` yields its dialect while lightweight test stubs
+    (no ``get_dialect``) degrade to ``None`` (sqlglot's default dialect) rather than raising.
+    """
+    getter = getattr(registry, "get_dialect", None)
+    if getter is None:
+        return None
+    dialect = getter()
+    return dialect if isinstance(dialect, str) else None
+
+
 class ChangesetBuilder:
-    """Derive a :class:`ColumnChange` list from two loaded ``ModelRegistry`` instances.
+    """Derive a :class:`ColumnChange` list from two loaded :class:`LineageProvider` sides.
 
     Compares base (target branch) against head (current) and emits, per column:
     ``added`` / ``removed`` / ``type_changed``, plus ``logic_changed`` for every
@@ -88,9 +116,18 @@ class ChangesetBuilder:
     than one way, the highest-priority kind is kept (see :class:`ChangeKind`).
     """
 
-    def __init__(self, base: ModelRegistry, head: ModelRegistry):
+    def __init__(
+        self,
+        base: LineageProvider,
+        head: LineageProvider,
+        dialect: Optional[str] = None,
+    ):
         self.base = base
         self.head = head
+        # The semantic diff canonicalizes expressions per SQL dialect (matters for e.g.
+        # Snowflake identifier folding). Resolve it from the head registry when not given,
+        # defensively so the 2-arg call and stubs without ``get_dialect`` keep working.
+        self._dialect = dialect if dialect is not None else _registry_dialect(head)
 
     def build(self) -> List[ColumnChange]:
         # (model, column) -> ColumnChange, keeping the highest-priority kind.
@@ -164,8 +201,16 @@ class ChangesetBuilder:
             # changed. Falls back to flagging all columns when neither side exposes per-column
             # lineage (nothing to diff precisely).
             if self._logic_changed(model_name):
-                for column in sorted(self._logic_changed_columns(base_model, head_model)):
-                    record(ColumnChange(model_name, column, ChangeKind.LOGIC_CHANGED))
+                classified = self._logic_changed_columns(base_model, head_model)
+                for column in sorted(classified):
+                    record(
+                        ColumnChange(
+                            model_name,
+                            column,
+                            ChangeKind.LOGIC_CHANGED,
+                            semantic=classified[column],
+                        )
+                    )
 
         return sorted(chosen.values(), key=lambda c: (c.model, c.column, c.kind.value))
 
@@ -176,9 +221,7 @@ class ChangesetBuilder:
         come from the catalog on both sides; otherwise we fall back to the compiled-SQL
         (logic) diff to avoid phantom add/remove/type changes from parser-derived columns.
         """
-        return self.base.is_catalog_backed(model_name) and self.head.is_catalog_backed(
-            model_name
-        )
+        return self.base.is_catalog_backed(model_name) and self.head.is_catalog_backed(model_name)
 
     def structural_diff_available(self) -> bool:
         """Whether add/removed/type_changed detection could run at all.
@@ -193,7 +236,7 @@ class ChangesetBuilder:
         return self._side_has_catalog(self.base) and self._side_has_catalog(self.head)
 
     @staticmethod
-    def _side_has_catalog(registry: ModelRegistry) -> bool:
+    def _side_has_catalog(registry: LineageProvider) -> bool:
         return any(registry.is_catalog_backed(name) for name in registry.get_models())
 
     def _logic_changed(self, model_name: str) -> bool:
@@ -203,25 +246,33 @@ class ChangesetBuilder:
             return False
         return base_sql != head_sql
 
-    def _logic_changed_columns(self, base_model, head_model) -> Set[str]:
-        """Which output columns actually changed derivation between base and head.
+    def _logic_changed_columns(self, base_model, head_model) -> Dict[str, SemanticChangeKind]:
+        """Which output columns changed derivation, each with a semantic classification.
 
         The model's compiled SQL differs, but usually only a few columns are responsible.
         We compare each column's per-column lineage signature (transformation type +
-        normalized expression + source columns) so downstream tracing follows only the
+        *canonical* expression + source columns) so downstream tracing follows only the
         columns whose *value* changed — not every pass-through the model happens to expose.
+        The expression component is now an AST canonical key, so a purely cosmetic edit
+        (whitespace / comments / identifier case / redundant parens) yields identical
+        signatures and is suppressed — where the old string compare would have flagged it.
 
+        Returns a ``{column -> SemanticChangeKind}`` map (breaking / non-breaking axis).
         Conservative fallbacks preserve correctness where a precise diff isn't possible:
-        - if NEITHER side has any parsed per-column lineage, flag all head columns;
-        - a column parsed on exactly one side (its signature appeared or disappeared) is
-          treated as changed.
+        - if NEITHER side has any parsed per-column lineage, flag all head columns as
+          ``INDETERMINATE`` (nothing to diff precisely → fail-safe breaking);
+        - a column changed on both sides is ``MEANING_CHANGED`` unless an involved
+          expression is unparseable, then ``INDETERMINATE``;
+        - a column parsed on exactly one side (its derivation appeared/disappeared) is
+          ``MEANING_CHANGED`` unless the present side is unparseable, then ``INDETERMINATE``;
+        - a column parsed on NEITHER side (no lineage either place) is skipped.
         """
         base_sigs = self._column_signatures(base_model)
         head_sigs = self._column_signatures(head_model)
         if not base_sigs and not head_sigs:
-            return set(head_model.columns)
+            return {column: SemanticChangeKind.INDETERMINATE for column in head_model.columns}
 
-        changed: Set[str] = set()
+        changed: Dict[str, SemanticChangeKind] = {}
         for column in head_model.columns:
             base_sig = base_sigs.get(column)
             head_sig = head_sigs.get(column)
@@ -229,16 +280,54 @@ class ChangesetBuilder:
                 # Neither side parsed this column (e.g. a literal constant with no lineage);
                 # there's nothing to diff, so don't treat it as changed.
                 continue
-            if base_sig != head_sig:
-                changed.add(column)
+            if base_sig == head_sig:
+                # Equal signatures ⇒ semantically equal (now covers cosmetic-only edits).
+                continue
+            changed[column] = self._classify_change(
+                self._column_expressions(base_model, column),
+                self._column_expressions(head_model, column),
+            )
         return changed
 
+    def _classify_change(self, base_exprs: List[str], head_exprs: List[str]) -> SemanticChangeKind:
+        """Classify a signature-differing column into ``MEANING_CHANGED`` / ``INDETERMINATE``.
+
+        Fail-safe: if any involved defining expression is unparseable we cannot prove *how*
+        it changed, so we stay conservative (``INDETERMINATE`` → breaking). For the common
+        single-entry column we defer to ``compare_expressions`` for precision; a multi-entry
+        (UNION) column with all-parseable branches is a real meaning change.
+        """
+        if self._any_unparseable(base_exprs) or self._any_unparseable(head_exprs):
+            return SemanticChangeKind.INDETERMINATE
+        if len(base_exprs) == 1 and len(head_exprs) == 1:
+            diff = compare_expressions(base_exprs[0], head_exprs[0], self._dialect)
+            if diff.kind is SemanticChangeKind.INDETERMINATE:
+                return SemanticChangeKind.INDETERMINATE
+            return SemanticChangeKind.MEANING_CHANGED
+        return SemanticChangeKind.MEANING_CHANGED
+
+    def _any_unparseable(self, expressions: List[str]) -> bool:
+        return any(
+            canonical_key(expression, self._dialect).startswith(_UNPARSEABLE_PREFIX)
+            for expression in expressions
+        )
+
     @staticmethod
-    def _column_signatures(model) -> Dict[str, Tuple]:
+    def _column_expressions(model, column_name: str) -> List[str]:
+        """The raw defining expression string(s) of a column's lineage entries (or ``[]``)."""
+        column = model.columns.get(column_name)
+        if column is None:
+            return []
+        lineage = getattr(column, "lineage", None) or []
+        return [getattr(entry, "sql_expression", None) or "" for entry in lineage]
+
+    def _column_signatures(self, model) -> Dict[str, Tuple]:
         """Per-column derivation signature: {column -> sorted lineage fingerprint}.
 
         Columns with no parsed lineage are omitted (no signature), so the caller can tell
-        "parsed, unchanged" apart from "not parsed".
+        "parsed, unchanged" apart from "not parsed". The expression component is a
+        dialect-aware AST canonical key (``canonical_key``), so cosmetic-only differences
+        collapse to the same signature.
         """
         signatures: Dict[str, Tuple] = {}
         for column_name, column in model.columns.items():
@@ -247,14 +336,14 @@ class ChangesetBuilder:
                 continue
             parts = []
             for entry in lineage:
-                expression = _normalize_sql(getattr(entry, "sql_expression", None)) or ""
+                expression = canonical_key(getattr(entry, "sql_expression", None), self._dialect)
                 sources = ",".join(sorted(entry.source_columns or []))
                 parts.append((entry.transformation_type or "", expression, sources))
             signatures[column_name] = tuple(sorted(parts))
         return signatures
 
     @staticmethod
-    def _safe_compiled_sql(registry: ModelRegistry, model_name: str) -> Optional[str]:
+    def _safe_compiled_sql(registry: LineageProvider, model_name: str) -> Optional[str]:
         try:
             return registry.get_compiled_sql(model_name)
         except Exception:
@@ -263,7 +352,7 @@ class ChangesetBuilder:
             return None
 
 
-def _path_to_model_map(head: ModelRegistry) -> Dict[str, str]:
+def _path_to_model_map(head: LineageProvider) -> Dict[str, str]:
     """Map each model's ``resource_path`` (dbt ``original_file_path``) to its name."""
     mapping: Dict[str, str] = {}
     for model_name, model in head.get_models().items():
@@ -273,7 +362,7 @@ def _path_to_model_map(head: ModelRegistry) -> Dict[str, str]:
 
 
 def git_changed_models(
-    head: ModelRegistry,
+    head: LineageProvider,
     git_base: str,
     repo_dir: Optional[str] = None,
 ) -> Set[str]:
@@ -292,7 +381,7 @@ def git_changed_models(
 
 
 def build_git_changeset(
-    head: ModelRegistry,
+    head: LineageProvider,
     git_base: str,
     repo_dir: Optional[str] = None,
 ) -> List[ColumnChange]:
@@ -312,7 +401,13 @@ def build_git_changeset(
         model = head_models[model_name]
         for column in sorted(model.columns):
             chosen[(model_name, column)] = ColumnChange(
-                model_name, column, ChangeKind.LOGIC_CHANGED, detail=model.resource_path
+                model_name,
+                column,
+                ChangeKind.LOGIC_CHANGED,
+                detail=model.resource_path,
+                # Single-manifest fallback: we diffed whole .sql files, not columns, so we
+                # cannot prove which derivations changed — honestly conservative-breaking.
+                semantic=SemanticChangeKind.INDETERMINATE,
             )
 
     return sorted(chosen.values(), key=lambda c: (c.model, c.column))

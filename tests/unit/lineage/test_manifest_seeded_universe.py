@@ -183,9 +183,9 @@ _SEMANTIC_VIEW = (
 
 
 def _manifest_nodes(env, orders_sql, *, otif_in_manifest=True):
-    """Build the manifest node set for one environment ('QA' head or 'PRD' base)."""
+    """Build the manifest node set for one environment ('QA' head or 'spec' base)."""
     db = "ANALYTICS_QA" if env == "QA" else "ANALYTICS_PRD"
-    prefix = "MR_PR_validate" if env == "QA" else "PRD"
+    prefix = "MR_PR_validate" if env == "QA" else "spec"
 
     def sch(layer):
         return f"{prefix}_{layer}"
@@ -241,7 +241,7 @@ def _catalog_nodes(env, *, include_absent):
     """Catalog for one environment. When include_absent is False, the two projecting
     consumers (otif + semantic view) are omitted, modelling a deferred/partial build
     where they were NOT written to the catalog even though they are in the manifest."""
-    prefix = "MR_PR_validate" if env == "QA" else "PRD"
+    prefix = "MR_PR_validate" if env == "QA" else "spec"
     db = "ANALYTICS_QA" if env == "QA" else "ANALYTICS_PRD"
 
     def sch(layer):
@@ -282,8 +282,8 @@ def _base(tmp_path):
     cat, man = _write(
         tmp_path,
         "base",
-        _catalog_nodes("PRD", include_absent=True),
-        _manifest_nodes("PRD", _ORDERS_BASE),
+        _catalog_nodes("spec", include_absent=True),
+        _manifest_nodes("spec", _ORDERS_BASE),
     )
     return LineageService(cat, man, adapter="snowflake")
 

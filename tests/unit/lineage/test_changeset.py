@@ -15,8 +15,10 @@ from dbt_column_lineage.lineage.changeset import (
     ChangesetBuilder,
     ColumnChange,
     build_changeset_report,
+    build_git_changeset,
     scope_changes_to_models,
 )
+from dbt_column_lineage.models.schema import SemanticChangeKind
 from dbt_column_lineage.lineage.display.markdown import render_changeset_markdown
 from dbt_column_lineage.lineage.service import LineageService
 
@@ -243,6 +245,130 @@ def test_structural_diff_available_requires_catalog_on_both_sides():
     no_catalog = _FakeRegistry({"m": _Model({"a": _Col("int")})}, catalog_backed=set())
     assert ChangesetBuilder(base, no_catalog).structural_diff_available() is False
     assert ChangesetBuilder(no_catalog, head).structural_diff_available() is False
+
+
+# --- AST semantic-diff integration (Package B) -----------------------------
+
+
+def test_builder_suppresses_cosmetic_column_change():
+    # `a`'s derivation differs only by redundant parentheses — a cosmetic edit the OLD
+    # string compare would flag, but the AST canonical form collapses to equal. The
+    # compiled SQL genuinely differs (the parens), so the model-level gate DOES fire;
+    # the per-column AST diff is what suppresses `a`. This is the headline proof.
+    base = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a", "up.b"}, "derived", "up.a + up.b")])})},
+        compiled={"m": "select up.a + up.b as a from up"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a", "up.b"}, "derived", "(up.a + up.b)")])})},
+        compiled={"m": "select (up.a + up.b) as a from up"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    assert logic == set(), "cosmetic-only change must not be flagged (AST beats string compare)"
+
+
+def test_builder_suppresses_identifier_case_only_change():
+    # base `UP.A`, head `up.a` — unquoted identifier case folds to one form; not a change.
+    base = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "UP.A")])})},
+        compiled={"m": "select UP.A as a from up"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")])})},
+        compiled={"m": "select up.a as a from up"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    assert logic == set(), "identifier-case-only change must not be flagged"
+
+
+def test_builder_flags_meaning_change_and_tags_it():
+    base = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")])})},
+        compiled={"m": "select up.a as a from up"},
+    )
+    head = _FakeRegistry(
+        {
+            "m": _Model(
+                {"a": _LinCol("text", [_Lin({"up.a", "up.z"}, "derived", "coalesce(up.a, up.z)")])}
+            )
+        },
+        compiled={"m": "select coalesce(up.a, up.z) as a from up"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    a_change = next(c for c in changes if c.column == "a")
+    assert a_change.kind == ChangeKind.LOGIC_CHANGED
+    assert a_change.semantic == SemanticChangeKind.MEANING_CHANGED
+
+
+def test_builder_tags_unparseable_head_as_indeterminate():
+    base = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")])})},
+        compiled={"m": "select up.a as a from up"},
+    )
+    # Head expression is junk (fails to parse) -> conservative-breaking, not a proven change.
+    head = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "derived", "up.a +")])})},
+        compiled={"m": "select up.a + as a from up"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    a_change = next(c for c in changes if c.column == "a")
+    assert a_change.kind == ChangeKind.LOGIC_CHANGED
+    assert a_change.semantic == SemanticChangeKind.INDETERMINATE
+
+
+def test_builder_no_lineage_fallback_tags_all_indeterminate():
+    # No per-column lineage anywhere -> flag every head column, each INDETERMINATE
+    # (matches the pre-existing "flag all" fallback, now carrying an honest tag).
+    base = _FakeRegistry(
+        {"m": _Model({"a": _Col("text"), "b": _Col("text")})},
+        compiled={"m": "select 1 as a, 2 as b"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"a": _Col("text"), "b": _Col("text")})},
+        compiled={"m": "select 9 as a, 8 as b"},
+    )
+    changes = ChangesetBuilder(base, head).build()
+    semantics = {c.column: c.semantic for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    assert semantics == {
+        "a": SemanticChangeKind.INDETERMINATE,
+        "b": SemanticChangeKind.INDETERMINATE,
+    }
+
+
+def test_git_changeset_fallback_tags_indeterminate(monkeypatch):
+    from dbt_column_lineage.lineage import changeset
+
+    monkeypatch.setattr(
+        changeset,
+        "_git_changed_sql_files",
+        lambda ref, repo_dir=None: ["models/orders.sql"],
+    )
+    registry = _PathRegistry({"orders": _PathModel({"id": _Col("int")}, "models/orders.sql")})
+    changes = build_git_changeset(registry, "origin/main")
+    assert len(changes) == 1
+    (change,) = changes
+    assert change.kind == ChangeKind.LOGIC_CHANGED
+    assert change.semantic == SemanticChangeKind.INDETERMINATE
+    assert change.detail == "models/orders.sql"
+
+
+def test_column_change_to_dict_carries_semantic_key():
+    # Structural changes leave semantic=None; the key is present (superset) but None.
+    structural = ColumnChange("m", "a", ChangeKind.TYPE_CHANGED, detail="int -> bigint")
+    assert structural.to_dict() == {
+        "model": "m",
+        "column": "a",
+        "kind": "type_changed",
+        "detail": "int -> bigint",
+        "semantic": None,
+    }
+    # A logic change carries the classification value.
+    logic = ColumnChange(
+        "m", "a", ChangeKind.LOGIC_CHANGED, semantic=SemanticChangeKind.MEANING_CHANGED
+    )
+    assert logic.to_dict()["semantic"] == "meaning_changed"
 
 
 # --- get_changeset_impact (severity-aware aggregation) ---------------------

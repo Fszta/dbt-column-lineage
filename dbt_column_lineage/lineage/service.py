@@ -3,10 +3,12 @@ from typing import Dict, List, Literal, Set, Optional, Any, Tuple, Union, TYPE_C
 from dataclasses import dataclass, field
 import logging
 
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from dbt_column_lineage.lineage.provider import LineageAndMetadataProvider
+from dbt_column_lineage.lineage.sqlglot_provider import build_sqlglot_provider
 
 if TYPE_CHECKING:
     from dbt_column_lineage.lineage.changeset import ColumnChange
+    from dbt_column_lineage.metabase.reach import MetabaseReach
 from dbt_column_lineage.models.schema import ColumnLineage, Coverage, ImpactConfidence
 from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
 
@@ -30,6 +32,67 @@ _MECHANISM_LABELS: Dict[str, str] = {
     "renamed": "renamed_passthrough",
     "direct": "direct_passthrough",
 }
+
+
+def _mechanism_label(transformation_type: Optional[str]) -> str:
+    """Map a downstream column's ``transformation_type`` to its reach *mechanism* label.
+
+    The single source of the recompute/filter/pass-through taxonomy predicates match on.
+    An unrecognized (or missing) type is bucketed under its raw value / ``"unknown"`` so
+    nothing is silently dropped.
+    """
+    raw = transformation_type or "unknown"
+    return _MECHANISM_LABELS.get(raw, raw)
+
+
+def _reached_from_impact(
+    impact: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Re-shape a single change's impact into reached NAMES + mechanism (no new traversal).
+
+    ``get_column_impact`` already computes the reached models/columns/exposures; it only
+    reports *counts* per change. This lifts the identifiers back out so a downstream reach
+    predicate can attribute what a specific change tripped:
+
+      * ``reached_columns``   — one entry per affected downstream column, with mechanism.
+      * ``reached_models``    — one entry per (model, mechanism) the change reaches; a model
+                                reached by several mechanisms yields several entries so a
+                                mechanism filter resolves cleanly. Models with no attributed
+                                column carry ``mechanism = None``.
+      * ``reached_exposures`` — one entry per reached exposure (name only).
+
+    Pure re-shape of data already in ``impact``; deterministic ordering for stable reports.
+    """
+    reached_columns: List[Dict[str, Any]] = [
+        {
+            "model": column["model"],
+            "column": column["column"],
+            "mechanism": _mechanism_label(column.get("transformation_type")),
+        }
+        for column in impact.get("affected_columns", [])
+    ]
+
+    model_mechanisms: Dict[str, Set[str]] = {}
+    for column in impact.get("affected_columns", []):
+        model_mechanisms.setdefault(column["model"], set()).add(
+            _mechanism_label(column.get("transformation_type"))
+        )
+
+    reached_models: List[Dict[str, Any]] = []
+    for model in impact.get("affected_models", []):
+        mechanisms = sorted(model_mechanisms.get(model["name"], set()))
+        if mechanisms:
+            reached_models.extend(
+                {"name": model["name"], "mechanism": mechanism} for mechanism in mechanisms
+            )
+        else:
+            reached_models.append({"name": model["name"], "mechanism": None})
+
+    reached_exposures: List[Dict[str, Any]] = [
+        {"name": exposure["name"]} for exposure in impact.get("affected_exposures", [])
+    ]
+
+    return reached_models, reached_exposures, reached_columns
 
 
 def _mechanism_breakdown(affected_columns: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -121,10 +184,12 @@ class LineageService:
     """Service for handling lineage operations."""
 
     def __init__(self, catalog_path: Path, manifest_path: Path, adapter: Optional[str] = None):
-        self.registry = ModelRegistry(
+        # Depend on the LineageProvider seam, not the concrete registry: the factory builds
+        # and loads the SQLGlot-backed provider today, and is the single place a future
+        # Fusion/warehouse backend would swap in.
+        self.registry: LineageAndMetadataProvider = build_sqlglot_provider(
             str(catalog_path), str(manifest_path), adapter_override=adapter
         )
-        self.registry.load()
         self._coverage: Coverage = self.registry.get_coverage()
 
     def get_coverage(self) -> Coverage:
@@ -753,6 +818,8 @@ class LineageService:
         self,
         changes: List["ColumnChange"],
         base_service: Optional["LineageService"] = None,
+        *,
+        metabase: Optional["MetabaseReach"] = None,
     ) -> Dict[str, Any]:
         """Aggregate single-column impact across a changeset into one blast radius.
 
@@ -764,6 +831,12 @@ class LineageService:
         against ``base_service`` (where the column and its downstream consumers
         still exist). If no base service is supplied, such changes are reported as
         unresolved rather than silently dropped.
+
+        When a :class:`~dbt_column_lineage.metabase.reach.MetabaseReach` index is supplied
+        (``metabase=``, from the offline ``metabase_lineage.json`` artifact), the Metabase
+        dashboards that read any terminal node of a change are APPENDED onto that change's
+        reach as EXPOSURE-kind objects — ONE unified reach model. ``metabase=None``
+        (the default) leaves every existing behaviour byte-for-byte unchanged.
 
         Returns a dict with the same top-level keys as :meth:`get_column_impact`
         (``summary``, ``affected_models``, ``affected_columns``,
@@ -818,12 +891,63 @@ class LineageService:
             for exposure in impact["affected_exposures"]:
                 affected_exposures[exposure["name"]] = exposure
 
+            reached_models, reached_exposures, reached_columns = _reached_from_impact(impact)
+
+            # Cross-boundary reach: the Metabase dashboards that read any terminal
+            # node of THIS change — the changed column itself plus every downstream column /
+            # model the dbt reach already resolved. Appended, never re-walked.
+            if metabase is not None:
+                columns_universe: Set[Tuple[str, str]] = {(change.model, change.column)}
+                for affected in impact["affected_columns"]:
+                    columns_universe.add((affected["model"], affected["column"]))
+                models_universe: Set[str] = {change.model} | {
+                    model["name"] for model in impact["affected_models"]
+                }
+                for entry in metabase.reached_dashboards(columns_universe, models_universe):
+                    # Carry the column-precise chain (changed column -> card field ->
+                    # dashboard) onto THIS change's reach so per-change attribution stays
+                    # column-precise downstream, not just the dashboard name.
+                    reached_exposures.append(
+                        {
+                            "name": entry["name"],
+                            "via_columns": entry["via_columns"],
+                            "precision": entry["precision"],
+                        }
+                    )
+                    # A Metabase dashboard IS an exposure — surface it in the global blast
+                    # radius so markdown/JSON render it and the summary count includes it.
+                    # When several changes reach the SAME dashboard, union the column chain +
+                    # cards so the global entry names every affected column, not just the last.
+                    existing = affected_exposures.get(entry["name"])
+                    if existing is None:
+                        affected_exposures[entry["name"]] = entry
+                    else:
+                        seen = {
+                            (v["model"], v["column"], v["card_id"])
+                            for v in existing.get("via_columns", [])
+                        }
+                        for v in entry["via_columns"]:
+                            vk = (v["model"], v["column"], v["card_id"])
+                            if vk not in seen:
+                                existing.setdefault("via_columns", []).append(v)
+                                seen.add(vk)
+                        existing["via_cards"] = sorted(
+                            set(existing.get("via_cards", [])) | set(entry.get("via_cards", []))
+                        )
+                        if entry.get("precision") == "column":
+                            existing["precision"] = "column"
+
             by_change.append(
                 {
                     **change.to_dict(),
                     "resolved": True,
                     "summary": impact["summary"],
                     "description": change_description,
+                    # Reached NAMES (+ mechanism) so a later reach predicate can attribute
+                    # what this specific change tripped — the counts in ``summary`` cannot.
+                    "reached_models": reached_models,
+                    "reached_exposures": reached_exposures,
+                    "reached_columns": reached_columns,
                 }
             )
 
