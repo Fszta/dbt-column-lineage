@@ -1,3 +1,25 @@
+## [0.17.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.16.1...v0.17.0) (2026-08-23)
+
+### Features
+
+* **cli:** add the policy init command ([fef0667](https://github.com/Fszta/dbt-column-lineage/commit/fef0667575d38447cb807b41e387ad9bdd0f4142))
+* **policy:** manifest-introspecting policy scaffold generator ([c0b01df](https://github.com/Fszta/dbt-column-lineage/commit/c0b01dfa57b5222bc27553ec114948fadafa2912))
+* **cli:** add the policy test command ([1f932ee](https://github.com/Fszta/dbt-column-lineage/commit/1f932eebdf9be64d7a534808b11a589202e1e32b))
+* **models:** add policy-init scaffold report schema ([e163def](https://github.com/Fszta/dbt-column-lineage/commit/e163def83d999ad76a194f13caf9cdd5940950f6))
+* **display:** render the policy-test backtest report ([92e32a2](https://github.com/Fszta/dbt-column-lineage/commit/92e32a29cb9690e9718c93bc2130c94e2e21892c))
+* **backtest:** replay a policy over changesets with per-rule aggregation ([1c9f23e](https://github.com/Fszta/dbt-column-lineage/commit/1c9f23e1f18740595c46519ba85d9bbbfc20ad71))
+* **changeset:** load changesets from json and add git-range helpers ([46cfd35](https://github.com/Fszta/dbt-column-lineage/commit/46cfd35a5837e799c7c38d3ee87ad8e521fb1ab2))
+* **models:** add backtest result schema ([b706f2e](https://github.com/Fszta/dbt-column-lineage/commit/b706f2e87f0c829737ae656b57d64125f5995a3a))
+* **display:** render applied and ineffective overrides in the report ([f9a633d](https://github.com/Fszta/dbt-column-lineage/commit/f9a633d07f4a2ba5152529921e5666e5d9edc271))
+* **policy:** cap policy rule hits with matching overrides ([86ed5cd](https://github.com/Fszta/dbt-column-lineage/commit/86ed5cd381cc4737815f47c4cee75e4994933559))
+* **verdict:** honor overrides in the gate ruling ([a1043b6](https://github.com/Fszta/dbt-column-lineage/commit/a1043b65cf4c8f76ba2717c1299d0cb350c73daf))
+* **changeset:** attach override directives to column changes ([2a9c0f3](https://github.com/Fszta/dbt-column-lineage/commit/2a9c0f3a51febdcb8c80102270dbfc0dd8b82eaf))
+* **parser:** parse -- lineage:allow-change/allow-break pragmas ([4d1e296](https://github.com/Fszta/dbt-column-lineage/commit/4d1e296fc9210dce41520c191b020cb9ed8980d2))
+* **models:** add override directive and rule-hit override fields ([a7ddaa0](https://github.com/Fszta/dbt-column-lineage/commit/a7ddaa0c598a5c11a73ccfd9c736f5400418fe6e))
+* **policy:** add built-in semantic-severity gate knobs ([07ae7fb](https://github.com/Fszta/dbt-column-lineage/commit/07ae7fbc1cb977acb5d92ca51852af74169630a4))
+* **verdict:** let the semantic axis lift a safe ruling to review ([7035986](https://github.com/Fszta/dbt-column-lineage/commit/70359869826f4f14091f84e981fce5c9d398d2c9))
+* **impact:** add --explain to surface why each column was flagged ([400e2f6](https://github.com/Fszta/dbt-column-lineage/commit/400e2f69c66e214588763cdf5bad8dd5f6d38fcc))
+
 ## [0.16.1](https://github.com/Fszta/dbt-column-lineage/compare/v0.16.0...v0.16.1) (2026-08-23)
 
 ### Bug Fixes
