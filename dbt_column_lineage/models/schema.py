@@ -638,6 +638,15 @@ class RuleHit(BaseModel):
     overridden: bool = False
     original_decision: Optional[GateDecision] = None
     override_reason: Optional[str] = None
+    # the backtest trust signal (backward-compatible, default False keeps serialization additive):
+    # True when this hit fired via a *fail-safe UNKNOWN* resolution (a blocking rule under
+    # ``fail_closed`` firing on an undecidable predicate) rather than a proven TRUE match. This is
+    # the headline "rage-block footgun" column in ``policy test`` — a rule that blocks mostly via
+    # fail-safe defaults, not real matches. NEVER set on builtin semantic-default hits (always
+    # proven) nor perturbed by override caps. ``unknown_cause`` splits missing-vs-error for the
+    # drill-down; the bool is the primary signal.
+    fired_on_unknown: bool = False
+    unknown_cause: Optional[Literal["missing", "error"]] = None
 
 
 class PolicyVerdict(BaseModel):
@@ -690,3 +699,83 @@ class MetabaseReachConfidence(BaseModel):
     cards_column_precise: int = 0  # reached via a column-precise card
     cards_table_only: int = 0  # reached only via a table-grain card
     level: Literal["full", "partial", "absent"] = "absent"
+
+
+# ===========================================================================
+# POLICY BACKTEST REPORT — the `policy test` trust instrument.
+#
+# Append-only block. ``policy test`` replays a candidate policy over a git range
+# (or a corpus of saved changesets) and reports, per rule, what the gate WOULD
+# have ruled: would-BLOCK / would-WARN PRs, total firings, and — the headline
+# trust column — how many firings were driven by a fail-safe UNKNOWN rather than a
+# proven match (the "rage-block footgun"). Typed so ``--format json`` feeds
+# a CI artifact / an agent over MCP with a stable schema and mypy stays honest.
+# ===========================================================================
+
+
+class BacktestFiredHit(BaseModel):
+    """One rule firing within a single replayed point — the typed per-PR drill-down row.
+
+    A small typed sub-model (rather than a loose dict) so the agent-facing JSON surface stays
+    stable and mypy keeps covering it: ``rule_id`` + the (capped) ``decision`` + whether the
+    firing came from a fail-safe UNKNOWN resolution.
+    """
+
+    rule_id: str
+    decision: GateDecision
+    fired_on_unknown: bool = False
+
+
+class BacktestRuleStat(BaseModel):
+    """Per-rule aggregate across the whole replayed range — the row a governance buyer reads.
+
+    ``matched_zero`` (dead rule) is TRUE iff the rule never fired at all across the range
+    (``fired_total == 0``). A rule that fired ONLY via fail-safe UNKNOWN is NOT ``matched_zero``
+    (it has firings) but has ``fired_on_unknown == fired_total`` — the renderer distinguishes the
+    two so a pure-fail-safe rule is never misread as healthy.
+    """
+
+    rule_id: str
+    would_block_prs: int = 0
+    would_warn_prs: int = 0
+    fired_total: int = 0
+    fired_on_unknown: int = 0
+    matched_zero: bool = False
+
+
+class BacktestPointResult(BaseModel):
+    """The outcome of replaying the policy against one point (a commit or a fixture changeset)."""
+
+    ref: str  # commit sha (git modes) or fixture filename (--changesets)
+    source: str  # human label for the changeset source (e.g. "git-diff (<sha>^..<sha>)")
+    total_changes: int
+    unmapped_changes: int = 0  # .sql paths that mapped to no model in the HEAD registry
+    parse_failures: List[str] = Field(default_factory=list)
+    decision: str  # allow / warn / block
+    blast_radius: int = 0
+    fired: List[BacktestFiredHit] = Field(default_factory=list)
+    sample_reach: List[str] = Field(default_factory=list)
+
+
+class BacktestReport(BaseModel):
+    """The assembled backtest: totals + per-rule aggregate + per-point drill-down + fidelity note.
+
+    ``fidelity_note`` is mode-branched and MUST stay honest: in every mode the backtest ships without a
+    per-commit base manifest, so the provable-break and semantic meaning-change BLOCK tiers are
+    NOT exercised. The note states that plainly and never names an unavailable flag.
+    """
+
+    mode: Literal["git-diff", "changesets"]
+    policy_source: str
+    base: Optional[str] = None
+    head: Optional[str] = None
+    prs_replayed: int = 0
+    prs_would_block: int = 0
+    prs_would_warn: int = 0
+    prs_skipped: int = 0  # points whose impact could not be computed (parse failures / errors)
+    avg_blast_radius: float = 0.0
+    rule_stats: List[BacktestRuleStat] = Field(default_factory=list)
+    points: List[BacktestPointResult] = Field(default_factory=list)
+    fidelity_note: str = ""
+    warnings: List[str] = Field(default_factory=list)
+    baseline_delta: Optional[Dict[str, Any]] = None

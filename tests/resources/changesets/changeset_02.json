@@ -1,0 +1,14 @@
+[
+  {
+    "model": "stg_accounts",
+    "column": "account_holder",
+    "kind": "logic_changed",
+    "detail": null,
+    "semantic": "meaning_changed",
+    "explain": {
+      "reason": "expression meaning changed",
+      "base": "holder",
+      "head": "upper(holder)"
+    }
+  }
+]

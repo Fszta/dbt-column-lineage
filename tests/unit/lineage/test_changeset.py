@@ -344,7 +344,7 @@ def test_git_changeset_fallback_tags_indeterminate(monkeypatch):
     monkeypatch.setattr(
         changeset,
         "_git_changed_sql_files",
-        lambda ref, repo_dir=None: ["models/orders.sql"],
+        lambda ref, repo_dir=None, git_head="HEAD": ["models/orders.sql"],
     )
     registry = _PathRegistry({"orders": _PathModel({"id": _Col("int")}, "models/orders.sql")})
     changes = build_git_changeset(registry, "origin/main")
@@ -915,7 +915,7 @@ def test_git_changed_models_maps_files_to_models(monkeypatch):
     monkeypatch.setattr(
         changeset,
         "_git_changed_sql_files",
-        lambda ref, repo_dir=None: ["models/orders.sql", "macros/helper.sql"],
+        lambda ref, repo_dir=None, git_head="HEAD": ["models/orders.sql", "macros/helper.sql"],
     )
     changed = changeset.git_changed_models(_registry_with_paths(), "origin/main")
     # orders maps to a model; the macro file has no model and is ignored.
@@ -1045,7 +1045,7 @@ def test_build_git_changeset_collects_stale_and_warnings():
     import dbt_column_lineage.lineage.changeset as cs
 
     orig = cs.git_changed_models
-    cs.git_changed_models = lambda head, git_base, repo_dir=None: {"orders"}
+    cs.git_changed_models = lambda head, git_base, repo_dir=None, git_head="HEAD": {"orders"}
     try:
         collect = OverrideResolution()
         changes = cs.build_git_changeset(reg, "origin/main", collect=collect)

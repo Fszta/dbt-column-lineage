@@ -1,0 +1,11 @@
+{
+  "changes": [
+    {
+      "model": "accounts_tiering",
+      "column": "account_tier",
+      "kind": "type_changed",
+      "detail": "INTEGER -> TEXT",
+      "semantic": null
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Test fixture — the naive PII guard that blocks via a fail-safe UNKNOWN.
+#
+# A BLOCKING rule that compares `meta.pii` to `true` with an equality operator. On a column
+# with NO `pii` meta key (the common case), `eq` on a missing key resolves to UNKNOWN_MISSING,
+# and under the default `on_missing_meta: fail_closed` a *blocking* rule FIRES anyway. So this
+# rule blocks every change while proving nothing — `policy test` must report it as
+# fail-safe-driven (fired_on_unknown == fired_total), locking in the fail-safe-footgun finding.
+#
+# Contrast with `meta: {key: pii, op: is_true}` (a TOTAL presence operator that is simply FALSE
+# on an untagged column and never fires) — that is the correct way to target PII.
+version: 1
+defaults:
+  on_missing_meta: fail_closed
+rules:
+  - id: naive-pii-guard
+    description: >
+      Naive PII guard — `meta.pii eq true`. Fires on any change whose column lacks a `pii` meta
+      key via the fail-safe UNKNOWN default rather than a proven match (the rage-block footgun).
+    scope: change
+    predicate:
+      meta: { key: pii, op: eq, value: true }
+    action:
+      - type: block

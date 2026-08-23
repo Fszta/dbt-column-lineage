@@ -328,6 +328,14 @@ governance gate never silently passes a risky change.
 The asymmetry is deliberate: **blocking rules bias toward firing; non-blocking rules bias toward
 staying silent** — the safety mechanism over-blocks but never manufactures spurious warnings.
 
+!!! tip "See what fail-safe would *actually* do before you arm it — `policy test`"
+    Fail-safe semantics are impossible to verify by reading the YAML: the same naive
+    `meta.pii is_true` guard can block every changed column under `fail_closed` and silently
+    allow everything under `skip`. **[`policy test`](#backtest-a-policy-before-you-arm-it-policy-test)**
+    replays a candidate policy over your git history and reports, per rule, how many firings were
+    driven by a fail-safe UNKNOWN rather than a proven match — so you never arm a rage-blocking or
+    silently-dead rule across a large repo.
+
 !!! warning "Gate on `change.breaking`, not `change.semantic == …`"
     `change.semantic` is always a *present* value, so `change.semantic eq meaning_changed`
     resolves to a plain `False` for an `indeterminate`/absent semantic — **no fail-closed bias**.
@@ -350,6 +358,118 @@ dashboards, not dbt-native exposures — combine `on_missing_meta: fail_open` wi
 in the reach `where`. Under `fail_closed`, dbt-native exposures (which lack the guard meta) would
 be treated as risk and block regardless; `fail_open` lets the guard do its job. See the
 [cross-boundary guide](metabase.md#isolating-metabase-only-rules) for the worked example.
+
+## Backtest a policy before you arm it — `policy test`
+
+A policy's fail-safe behaviour is unverifiable by inspection (see the [tip above](#fail-safe-defaults)),
+and a rule that never fires is a silent no-op. `policy test` makes both visible **offline**: it
+replays a candidate policy over your recent history and reports, per rule, what the gate *would*
+have ruled — before you make it a required check.
+
+```bash
+dbt-col-lineage policy test \
+  --manifest target/manifest.json --catalog target/catalog.json \
+  --policy policy.yml \
+  --last 30                                    # replay the last 30 commits
+```
+
+It is deterministic, offline, and **sequential** — no dbt run, no warehouse, no credentials. The
+head registry is built **once** (the one meaningful cost) and reused for every point, so replaying
+30–50 commits is cheap; per-point progress (`replaying i/N <ref>`) streams to stderr so a long run
+is observably alive.
+
+!!! note "`policy test` is a subcommand, not a flag"
+    `dbt-col-lineage policy test …` is dispatched on the leading `policy` word. It is entirely
+    separate from the **`--policy`** *option* on `dbt-col-lineage impact` (which gates a single
+    live PR) — the two never shadow each other.
+
+### Choosing what to replay
+
+Supply **exactly one** change source:
+
+| Source | Meaning |
+|---|---|
+| `--git-range <base>..<head>` | replay each commit in the range as one changeset (default head = `HEAD`). On squash-merge repos one commit ≈ one PR. |
+| `--last <N>` | sugar for `--git-range HEAD~N..HEAD` — the last `N` commits. |
+| `--changesets <dir>` | replay a directory of saved changeset JSONs (fixtures / a CI corpus). |
+
+Other options:
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--policy <path>` | *(required)* | the candidate policy to backtest. A present-but-invalid file **fails loudly** — never treated as "no policy". |
+| `--manifest` / `--catalog` | `target/manifest.json` / `target/catalog.json` | the **head** artifacts — the registry replayed against every point. |
+| `--repo-dir <dir>` | current directory | the git repo for `--git-range` / `--last`. Independent of the manifest/catalog paths (which may live under `target/`). |
+| `--adapter <dialect>` | auto-detected | override the sqlglot dialect. |
+| `--format table\|json\|markdown` | `table` | `table` for terminals; `json` / `markdown` for a CI artifact or an agent over MCP. |
+| `--fail-on none\|any-block\|regression` | `none` | exit-code gate — see [below](#gating-a-policy-change-pr-in-ci). |
+| `--baseline <path>` | — | a saved prior backtest JSON to diff against (required by `--fail-on regression`). |
+
+### The report — the trust instrument
+
+The per-rule aggregate is the artifact you arm the gate on. Every `table` / `markdown` run leads
+with a coverage-honest totals line — `N PR(s) replayed (E evaluated, K skipped) — B would BLOCK,
+W would WARN; avg blast radius …` — so a low-coverage run is never mistaken for a clean pass, then
+one row per rule:
+
+| rule_id | would-BLOCK PRs | would-WARN PRs | fired-total | fail-safe UNKNOWN | flag |
+|---|---|---|---|---|---|
+| provable-break-block | 2 | – | 2 | 0 | |
+| exposure-guard | – | 14 | 1315 | 0 | |
+| pii-guard (naive) | **18** | – | 3169 | **3169** | **FAIL-SAFE ONLY (never a proven match)** |
+| tier-guard | – | – | 0 | 0 | **DEAD (never fired)** |
+
+Two columns carry the whole point:
+
+- **fail-safe UNKNOWN** — firings that resolved via a fail-safe `UNKNOWN` (a blocking rule under
+  `fail_closed` firing on an undecidable predicate) rather than a proven `TRUE` match. A rule that
+  blocks *mostly* via fail-safe defaults is the **rage-block footgun**: it looks armed but is
+  really just blocking everything it can't decide. The **flag** column calls it out — `FAIL-SAFE
+  ONLY (never a proven match)` when every firing was fail-safe, or `partly fail-safe` when some
+  were.
+- **DEAD (never fired)** — a guard that never fired across the whole range is a silent no-op. This
+  is usually the honest signal that the `meta` key it inspects **isn't populated** on your models
+  ("your `pii-guard` matched 0 subjects across your last 50 PRs" → go tag your columns).
+
+`--format json` emits the full typed `BacktestReport`: the totals, the `rule_stats` above, and a
+per-point drill-down (`points[]`) carrying each commit's decision, blast radius, the rules it
+fired, a `sample_reach`, plus `unmapped_changes` and any per-point `parse_failures` — coverage
+honesty, never hidden.
+
+!!! danger "What a git-diff backtest does *not* prove (the fidelity note)"
+    Every run prints a **fidelity note**, and it is deliberately blunt. In the default git-diff
+    mode the tool diffs whole `.sql` files, so **every change is classified `indeterminate` by
+    construction** and the head registry is HEAD's replayed against older diffs (models added or
+    renamed since a commit surface as `unmapped_changes`). Rules keyed on reach / `meta` /
+    `change.kind` / `on_indeterminate` fire normally and **can block**. What this version does
+    **not** exercise: the **provable-break** block tier and the **semantic meaning-change** block
+    tier — both need a per-commit before-state. The note says so plainly; per-commit base-manifest
+    validation of those tiers ships in a later release. In `--changesets` mode the note is
+    branched too: the provable-break tier is still unexercised, and a `meaning_changed` block fires
+    only if a saved changeset already carried that classification.
+
+### Gating a policy-change PR in CI
+
+Because the backtest itself has an exit code, `policy test` can gate the PR that *changes the
+policy* — a policy that would newly block N historical PRs is a regression worth a human look.
+
+| `--fail-on` | Exit 1 when… |
+|---|---|
+| `none` (default) | never — report only. |
+| `any-block` | any replayed PR would block under the candidate policy. |
+| `regression` | any rule's would-BLOCK count **rose** versus `--baseline`. |
+
+`--fail-on regression` **requires** `--baseline`; running it without one exits 1 with a clear
+message rather than silently passing (a regression gate with no baseline validates nothing), and a
+malformed `--baseline` file is rejected loudly. Capture a baseline by saving a `--format json` run,
+then compare later runs against it:
+
+```bash
+dbt-col-lineage policy test --policy policy.yml --last 50 --format json > baseline.json
+# … on the policy-change PR:
+dbt-col-lineage policy test --policy policy.yml --last 50 \
+  --fail-on regression --baseline baseline.json
+```
 
 ## Reading the verdict
 

@@ -195,6 +195,14 @@ and the tool behaves exactly as before.
   dbt-col-lineage impact --base-manifest base/manifest.json --base-catalog base/catalog.json \
       --policy policy.yml --fail-on policy
   ```
+- **Backtest a policy before you arm it** — `dbt-col-lineage policy test` replays a candidate
+  policy over your recent git history (`--last 30`) or a saved changeset corpus and reports, per
+  rule, what the gate *would* have ruled — including how many firings were driven by a fail-safe
+  UNKNOWN rather than a proven match, and which rules never fired at all. Offline and deterministic.
+
+  ```bash
+  dbt-col-lineage policy test --policy policy.yml --last 30
+  ```
 - **Cross-boundary (Metabase) impact** — a separate credentialed `metabase-extract` step snapshots
   Metabase into `metabase_lineage.json`; the offline gate then answers *"will this column change
   break that dashboard?"* by folding dashboards into the same reach the policy engine scans.

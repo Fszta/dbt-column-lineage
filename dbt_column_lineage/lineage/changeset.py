@@ -16,7 +16,7 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from dbt_column_lineage.lineage.provider import LineageProvider
 from dbt_column_lineage.lineage.semantic_diff import (
@@ -564,19 +564,93 @@ def git_changed_models(
     head: LineageProvider,
     git_base: str,
     repo_dir: Optional[str] = None,
+    git_head: str = "HEAD",
 ) -> Set[str]:
-    """Return the set of models whose ``.sql`` file changed against ``git_base``.
+    """Return the set of models whose ``.sql`` file changed between ``git_base`` and ``git_head``.
 
     Files with no matching model (macros, tests, deleted files) are ignored, so
     this reflects only *model* edits — the unit the scope filter cares about.
+
+    ``git_head`` defaults to ``HEAD`` so existing callers (impact, explorer) are byte-identical;
+    the backtest passes a specific commit to replay a single historical point.
+    """
+    matched, _unmapped = git_changed_models_and_unmapped(head, git_base, git_head, repo_dir)
+    return matched
+
+
+def git_changed_models_and_unmapped(
+    head: LineageProvider,
+    git_base: str,
+    git_head: str = "HEAD",
+    repo_dir: Optional[str] = None,
+) -> Tuple[Set[str], List[str]]:
+    """Split changed ``.sql`` files into (models that mapped, paths that did NOT).
+
+    Reuses the same path->model map and git diff as :func:`git_changed_models` but also returns
+    the unmapped ``.sql`` paths so the backtest can report ``unmapped_changes`` honestly: the
+    HEAD registry replayed against an older diff cannot map models added/renamed since a commit
+    (spec honesty invariant). Non-model SQL (macros/tests/snapshots) shows up here too.
     """
     path_to_model = _path_to_model_map(head)
-    changed: Set[str] = set()
-    for changed_file in _git_changed_sql_files(git_base, repo_dir):
-        matched = path_to_model.get(_norm_path(changed_file))
-        if matched:
-            changed.add(matched)
-    return changed
+    matched: Set[str] = set()
+    unmapped: List[str] = []
+    for changed_file in _git_changed_sql_files(git_base, repo_dir, git_head):
+        model = path_to_model.get(_norm_path(changed_file))
+        if model:
+            matched.add(model)
+        else:
+            unmapped.append(changed_file)
+    return matched, unmapped
+
+
+def git_rev_list(base: str, head: str, repo_dir: Optional[str] = None) -> List[str]:
+    """Enumerate commits in ``base..head`` (oldest -> newest) that touch a ``.sql`` file.
+
+    Each surviving commit is replayed as one changeset (one commit ≈ one squash-merged PR).
+    Filtered to commits touching ``*.sql`` so a macro/doc-only commit does not become a
+    zero-change replay point. Raises :class:`RuntimeError` on git failure (mirrors
+    :func:`_git_changed_sql_files`).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--reverse", f"{base}..{head}", "--", "*.sql"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        raise RuntimeError(f"Failed to enumerate commits '{base}..{head}': {exc}") from exc
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def changes_from_dicts(entries: List[Dict[str, Any]]) -> List[ColumnChange]:
+    """Reconstruct :class:`ColumnChange` objects from the ``changeset.changes`` JSON shape.
+
+    Accepts the dicts produced by :meth:`ColumnChange.to_dict` (model/column/kind + optional
+    detail/semantic/explain). The ``override`` field is intentionally NOT restored — the backtest
+    backtest runs ``honor_overrides=False`` (it measures the RAW gate), and base/head
+    expressions/reason are not needed for policy evaluation. Unknown/malformed entries raise a
+    ``ValueError`` (via the enum constructors) so a corrupt corpus fails loudly.
+    """
+    changes: List[ColumnChange] = []
+    for entry in entries:
+        semantic_raw = entry.get("semantic")
+        semantic = SemanticChangeKind(semantic_raw) if semantic_raw else None
+        explain = entry.get("explain") or {}
+        changes.append(
+            ColumnChange(
+                model=str(entry["model"]),
+                column=str(entry["column"]),
+                kind=ChangeKind(entry["kind"]),
+                detail=entry.get("detail"),
+                semantic=semantic,
+                reason=explain.get("reason"),
+                base_expression=explain.get("base"),
+                head_expression=explain.get("head"),
+            )
+        )
+    return changes
 
 
 def build_git_changeset(
@@ -585,12 +659,16 @@ def build_git_changeset(
     repo_dir: Optional[str] = None,
     honor_overrides: bool = True,
     collect: Optional[OverrideResolution] = None,
+    git_head: str = "HEAD",
 ) -> List[ColumnChange]:
-    """Fallback changeset: diff ``.sql`` model files against ``git_base``.
+    """Fallback changeset: diff ``.sql`` model files between ``git_base`` and ``git_head``.
 
     When only one manifest is available we cannot diff columns, so every column
     of each touched model is reported as ``logic_changed`` — a coarse but honest
     signal. Files are mapped to models via each model's ``resource_path``.
+
+    ``git_head`` defaults to ``HEAD`` so existing callers are byte-identical; the backtest
+    passes a specific commit (with ``git_base`` = its parent) to replay one historical point.
 
     when ``honor_overrides`` (default), override pragmas from head SQL are attached to
     the logic changes; there are no provable breaks here so ``allow-break`` has nothing to
@@ -598,7 +676,7 @@ def build_git_changeset(
     directives and parse warnings are written to ``collect`` when supplied (the return type
     stays ``List[ColumnChange]`` so existing callers are unaffected).
     """
-    changed_models = git_changed_models(head, git_base, repo_dir)
+    changed_models = git_changed_models(head, git_base, repo_dir, git_head)
     if not changed_models:
         return []
 
@@ -644,10 +722,12 @@ def _norm_path(path: str) -> str:
     return re.sub(r"^\./", "", path.strip()).lstrip("/")
 
 
-def _git_changed_sql_files(git_base: str, repo_dir: Optional[str]) -> List[str]:
+def _git_changed_sql_files(
+    git_base: str, repo_dir: Optional[str], git_head: str = "HEAD"
+) -> List[str]:
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-only", f"{git_base}...HEAD", "--", "*.sql"],
+            ["git", "diff", "--name-only", f"{git_base}...{git_head}", "--", "*.sql"],
             cwd=repo_dir,
             capture_output=True,
             text=True,
