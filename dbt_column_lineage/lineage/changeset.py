@@ -71,15 +71,30 @@ class ColumnChange:
     kind: ChangeKind
     detail: Optional[str] = None
     semantic: Optional[SemanticChangeKind] = None
+    # Why a ``logic_changed`` column was flagged: the human-readable semantic reason plus the
+    # two compared defining expressions. Populated only for logic changes (structural kinds
+    # leave them ``None``), and surfaced by ``--explain`` / the JSON ``explain`` block.
+    reason: Optional[str] = None
+    base_expression: Optional[str] = None
+    head_expression: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Optional[str]]:
-        return {
+    def to_dict(self) -> Dict[str, object]:
+        payload: Dict[str, object] = {
             "model": self.model,
             "column": self.column,
             "kind": self.kind.value,
             "detail": self.detail,
             "semantic": self.semantic.value if self.semantic else None,
         }
+        # Only attach the nested ``explain`` block when we actually computed a reason (i.e. a
+        # logic change). Structural add/remove/type entries stay lean and JSON-backward-compatible.
+        if self.reason is not None:
+            payload["explain"] = {
+                "reason": self.reason,
+                "base": self.base_expression,
+                "head": self.head_expression,
+            }
+        return payload
 
 
 def _normalize_sql(sql: Optional[str]) -> Optional[str]:
@@ -105,6 +120,21 @@ def _registry_dialect(registry: object) -> Optional[str]:
         return None
     dialect = getter()
     return dialect if isinstance(dialect, str) else None
+
+
+@dataclass
+class _ColumnDiff:
+    """The classification of one signature-differing column, with the data behind it.
+
+    Carries the ``SemanticChangeKind`` verdict *and* the discarded evidence — the human
+    reason and the two compared defining expressions — so ``--explain`` can answer "why was
+    this column flagged?" instead of surfacing a bare enum.
+    """
+
+    kind: SemanticChangeKind
+    reason: Optional[str]
+    base_expression: Optional[str]
+    head_expression: Optional[str]
 
 
 class ChangesetBuilder:
@@ -203,12 +233,16 @@ class ChangesetBuilder:
             if self._logic_changed(model_name):
                 classified = self._logic_changed_columns(base_model, head_model)
                 for column in sorted(classified):
+                    diff = classified[column]
                     record(
                         ColumnChange(
                             model_name,
                             column,
                             ChangeKind.LOGIC_CHANGED,
-                            semantic=classified[column],
+                            semantic=diff.kind,
+                            reason=diff.reason,
+                            base_expression=diff.base_expression,
+                            head_expression=diff.head_expression,
                         )
                     )
 
@@ -246,7 +280,7 @@ class ChangesetBuilder:
             return False
         return base_sql != head_sql
 
-    def _logic_changed_columns(self, base_model, head_model) -> Dict[str, SemanticChangeKind]:
+    def _logic_changed_columns(self, base_model, head_model) -> Dict[str, "_ColumnDiff"]:
         """Which output columns changed derivation, each with a semantic classification.
 
         The model's compiled SQL differs, but usually only a few columns are responsible.
@@ -257,7 +291,8 @@ class ChangesetBuilder:
         (whitespace / comments / identifier case / redundant parens) yields identical
         signatures and is suppressed — where the old string compare would have flagged it.
 
-        Returns a ``{column -> SemanticChangeKind}`` map (breaking / non-breaking axis).
+        Returns a ``{column -> _ColumnDiff}`` map (breaking / non-breaking axis, plus the
+        reason and compared expressions behind the verdict).
         Conservative fallbacks preserve correctness where a precise diff isn't possible:
         - if NEITHER side has any parsed per-column lineage, flag all head columns as
           ``INDETERMINATE`` (nothing to diff precisely → fail-safe breaking);
@@ -270,9 +305,17 @@ class ChangesetBuilder:
         base_sigs = self._column_signatures(base_model)
         head_sigs = self._column_signatures(head_model)
         if not base_sigs and not head_sigs:
-            return {column: SemanticChangeKind.INDETERMINATE for column in head_model.columns}
+            return {
+                column: _ColumnDiff(
+                    kind=SemanticChangeKind.INDETERMINATE,
+                    reason="no per-column lineage available to diff — treated as breaking (fail-safe)",
+                    base_expression=None,
+                    head_expression=None,
+                )
+                for column in head_model.columns
+            }
 
-        changed: Dict[str, SemanticChangeKind] = {}
+        changed: Dict[str, _ColumnDiff] = {}
         for column in head_model.columns:
             base_sig = base_sigs.get(column)
             head_sig = head_sigs.get(column)
@@ -289,22 +332,41 @@ class ChangesetBuilder:
             )
         return changed
 
-    def _classify_change(self, base_exprs: List[str], head_exprs: List[str]) -> SemanticChangeKind:
-        """Classify a signature-differing column into ``MEANING_CHANGED`` / ``INDETERMINATE``.
+    def _classify_change(self, base_exprs: List[str], head_exprs: List[str]) -> "_ColumnDiff":
+        """Classify a signature-differing column, keeping the reason and compared expressions.
 
         Fail-safe: if any involved defining expression is unparseable we cannot prove *how*
         it changed, so we stay conservative (``INDETERMINATE`` → breaking). For the common
-        single-entry column we defer to ``compare_expressions`` for precision; a multi-entry
-        (UNION) column with all-parseable branches is a real meaning change.
+        single-entry column we defer to ``compare_expressions`` for precision (and reuse its
+        ``reason``); a multi-entry (UNION) column with all-parseable branches is a real
+        meaning change.
         """
         if self._any_unparseable(base_exprs) or self._any_unparseable(head_exprs):
-            return SemanticChangeKind.INDETERMINATE
+            return _ColumnDiff(
+                kind=SemanticChangeKind.INDETERMINATE,
+                reason="could not prove the change — an involved expression did not parse",
+                base_expression=" | ".join(e for e in base_exprs if e) or None,
+                head_expression=" | ".join(e for e in head_exprs if e) or None,
+            )
         if len(base_exprs) == 1 and len(head_exprs) == 1:
             diff = compare_expressions(base_exprs[0], head_exprs[0], self._dialect)
-            if diff.kind is SemanticChangeKind.INDETERMINATE:
-                return SemanticChangeKind.INDETERMINATE
-            return SemanticChangeKind.MEANING_CHANGED
-        return SemanticChangeKind.MEANING_CHANGED
+            kind = (
+                SemanticChangeKind.INDETERMINATE
+                if diff.kind is SemanticChangeKind.INDETERMINATE
+                else SemanticChangeKind.MEANING_CHANGED
+            )
+            return _ColumnDiff(
+                kind=kind,
+                reason=diff.reason,
+                base_expression=base_exprs[0] or None,
+                head_expression=head_exprs[0] or None,
+            )
+        return _ColumnDiff(
+            kind=SemanticChangeKind.MEANING_CHANGED,
+            reason="multi-branch (e.g. UNION) derivation changed",
+            base_expression=" | ".join(base_exprs) or None,
+            head_expression=" | ".join(head_exprs) or None,
+        )
 
     def _any_unparseable(self, expressions: List[str]) -> bool:
         return any(

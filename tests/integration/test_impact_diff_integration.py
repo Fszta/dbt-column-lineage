@@ -48,8 +48,62 @@ def base_artifacts(dbt_artifacts, tmp_path):
     return {"catalog": str(base_catalog), "manifest": str(base_manifest)}
 
 
+@pytest.fixture
+def logic_change_base(dbt_artifacts, tmp_path):
+    """A base whose stg_accounts derives account_id differently -> a logic change.
+
+    Head keeps ``cast(id as integer) as account_id``; the base wraps it in ``abs(...)``, so both
+    sides carry a parseable defining expression and the per-column diff flags account_id as a
+    real *meaning change* (not the fail-safe), carrying an explain reason + base→head exprs.
+    """
+    catalog = copy.deepcopy(_load(dbt_artifacts["catalog_path"]))
+    manifest = copy.deepcopy(_load(dbt_artifacts["manifest_path"]))
+    node = manifest["nodes"]["model.test_project.stg_accounts"]
+    node["compiled_code"] = node["compiled_code"].replace(
+        "cast(id as integer) as account_id", "abs(cast(id as integer)) as account_id"
+    )
+    base_catalog = tmp_path / "catalog.json"
+    base_manifest = tmp_path / "manifest.json"
+    base_catalog.write_text(json.dumps(catalog))
+    base_manifest.write_text(json.dumps(manifest))
+    return {"catalog": str(base_catalog), "manifest": str(base_manifest)}
+
+
 def _run_impact(args):
     return CliRunner().invoke(impact, args)
+
+
+def test_impact_explain_annotates_changed_column(dbt_artifacts, logic_change_base):
+    args = [
+        "--manifest",
+        str(dbt_artifacts["manifest_path"]),
+        "--catalog",
+        str(dbt_artifacts["catalog_path"]),
+        "--base-manifest",
+        logic_change_base["manifest"],
+        "--base-catalog",
+        logic_change_base["catalog"],
+    ]
+    # Default human report: no explain annotation.
+    plain = _run_impact(args)
+    assert plain.exit_code == 0, plain.output
+    assert "_why:_" not in plain.output
+
+    # --explain surfaces the semantic reason under the changed column.
+    explained = _run_impact([*args, "--explain"])
+    assert explained.exit_code == 0, explained.output
+    assert "_why:_" in explained.output
+    assert "meaning changed" in explained.output
+
+    # JSON always carries the explain block regardless of the flag.
+    json_result = _run_impact([*args, "--format", "json"])
+    assert json_result.exit_code == 0, json_result.output
+    payload = json.loads(json_result.output)
+    logic_entries = [
+        c for c in payload["by_change"] if c.get("kind") == "logic_changed" and "explain" in c
+    ]
+    assert logic_entries, payload["by_change"]
+    assert logic_entries[0]["explain"]["reason"]
 
 
 def test_impact_requires_a_change_source(dbt_artifacts):
