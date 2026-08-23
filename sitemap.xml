@@ -1,67 +1,67 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/</loc>
+         <loc>https://fszta.github.io/parrant/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/changelog/</loc>
+         <loc>https://fszta.github.io/parrant/changelog/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/explorer/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/explorer/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/glossary/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/glossary/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/metabase/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/metabase/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/overview/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/overview/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/policy-gate/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/policy-gate/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/policy-recipes/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/policy-recipes/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/semantic-categorization/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/semantic-categorization/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/gotchas/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/concepts/gotchas/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/guardrails/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/concepts/guardrails/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/how-it-works/</loc>
+         <loc>https://fszta.github.io/parrant/decision-engine/concepts/how-it-works/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/features/impact-analysis/</loc>
+         <loc>https://fszta.github.io/parrant/features/impact-analysis/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/getting-started/installation/</loc>
+         <loc>https://fszta.github.io/parrant/getting-started/installation/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/getting-started/quickstart/</loc>
+         <loc>https://fszta.github.io/parrant/getting-started/quickstart/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://fszta.github.io/dbt-column-lineage/reference/json-output/</loc>
+         <loc>https://fszta.github.io/parrant/reference/json-output/</loc>
          <lastmod>2026-08-23</lastmod>
     </url>
 </urlset>

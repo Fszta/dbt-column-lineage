@@ -48,7 +48,7 @@ jobs:
           cp target/manifest.json target/catalog.json ../artifacts/base/
 
       - name: Column-level impact assessment
-        uses: Fszta/dbt-column-lineage@v0 # floating major; use @v0.8.0 to pin exactly
+        uses: Fszta/parrant@v0 # floating major; use @v0.8.0 to pin exactly
         with:
           manifest: artifacts/head/manifest.json
           catalog: artifacts/head/catalog.json
