@@ -170,6 +170,28 @@ sticky PR comment and apply the `--fail-on` gate.
 
 ---
 
+## Beyond the blast radius: a decision engine
+
+The impact report is the foundation; on top of it the tool now turns a PR into a **decision**,
+on the principle *"diff cheaply, rebuild selectively."* All of this is additive — skip the flags
+and the tool behaves exactly as before.
+
+- **Semantic categorization** — every changed column is labelled breaking vs **provably
+  cosmetic**, so a refactor that doesn't change any value doesn't get flagged.
+- **A metadata-agnostic policy gate** — you author rules (`predicate → block/warn/build/test/notify`)
+  over *any* dbt `meta`, the change kind, the semantic signal, and the lineage reach. The tool
+  ships the engine; you ship the rules. `critical` / `pii` are example configs, never built-ins.
+
+  ```bash
+  dbt-col-lineage impact --base-manifest base/manifest.json --base-catalog base/catalog.json \
+      --policy policy.yml --fail-on policy
+  ```
+- **Cross-boundary (Metabase) impact** — a separate credentialed `metabase-extract` step snapshots
+  Metabase into `metabase_lineage.json`; the offline gate then answers *"will this column change
+  break that dashboard?"* by folding dashboards into the same reach the policy engine scans.
+
+Full guides: **[Decision Engine docs](https://fszta.github.io/dbt-column-lineage/decision-engine/overview/)**.
+
 ## Compatibility
 
 Works with **any [sqlglot](https://github.com/tobymao/sqlglot) dialect** via `--adapter`
