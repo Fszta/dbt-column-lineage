@@ -372,6 +372,66 @@ def test_column_change_to_dict_carries_semantic_key():
     assert logic.to_dict()["semantic"] == "meaning_changed"
 
 
+def test_to_dict_no_explain_key_on_structural_change():
+    # Structural add/remove/type entries carry no reason, so no `explain` block is attached
+    # (keeps them lean + JSON backward-compatible).
+    structural = ColumnChange("m", "a", ChangeKind.TYPE_CHANGED, detail="int -> bigint")
+    assert "explain" not in structural.to_dict()
+
+
+def test_to_dict_explain_block_on_meaning_change():
+    base = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")])})},
+        compiled={"m": "select up.a as a from up"},
+    )
+    head = _FakeRegistry(
+        {
+            "m": _Model(
+                {"a": _LinCol("text", [_Lin({"up.a", "up.z"}, "derived", "coalesce(up.a, up.z)")])}
+            )
+        },
+        compiled={"m": "select coalesce(up.a, up.z) as a from up"},
+    )
+    a_change = next(c for c in ChangesetBuilder(base, head).build() if c.column == "a")
+    explain = a_change.to_dict()["explain"]
+    assert isinstance(explain, dict)
+    assert explain["reason"] == "expression meaning changed"
+    assert explain["base"] == "up.a"
+    assert explain["head"] == "coalesce(up.a, up.z)"
+
+
+def test_to_dict_explain_block_on_indeterminate_unparseable():
+    base = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")])})},
+        compiled={"m": "select up.a as a from up"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "derived", "up.a +")])})},
+        compiled={"m": "select up.a + as a from up"},
+    )
+    a_change = next(c for c in ChangesetBuilder(base, head).build() if c.column == "a")
+    explain = a_change.to_dict()["explain"]
+    assert a_change.semantic == SemanticChangeKind.INDETERMINATE
+    assert "did not parse" in explain["reason"]
+
+
+def test_to_dict_explain_fail_safe_when_no_lineage():
+    # No per-column lineage anywhere -> fail-safe INDETERMINATE with the "no per-column
+    # lineage available to diff" reason.
+    base = _FakeRegistry(
+        {"m": _Model({"a": _Col("text")})},
+        compiled={"m": "select 1 as a"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"a": _Col("text")})},
+        compiled={"m": "select 9 as a"},
+    )
+    a_change = next(c for c in ChangesetBuilder(base, head).build() if c.column == "a")
+    explain = a_change.to_dict()["explain"]
+    assert "no per-column lineage available to diff" in explain["reason"]
+    assert explain["base"] is None and explain["head"] is None
+
+
 # --- get_changeset_impact (severity-aware aggregation) ---------------------
 
 
@@ -484,6 +544,35 @@ def test_markdown_empty_changeset():
     assert "No column changes" in md
     # attribution footer present even on the empty report
     assert "github.com/Fszta/dbt-column-lineage" in md
+
+
+def test_markdown_explain_renders_reason_and_expressions():
+    aggregated = _impact([], [], [])
+    aggregated["by_change"] = [
+        {
+            "model": "s",
+            "column": "c",
+            "kind": "logic_changed",
+            "detail": None,
+            "semantic": "meaning_changed",
+            "explain": {
+                "reason": "expression meaning changed",
+                "base": "up.a",
+                "head": "coalesce(up.a, up.z)",
+            },
+            "resolved": True,
+        }
+    ]
+    report = build_changeset_report(
+        "two-manifest", [ColumnChange("s", "c", ChangeKind.LOGIC_CHANGED)], aggregated
+    )
+    # explain=False -> no reason surfaced (output unchanged from today).
+    assert "expression meaning changed" not in render_changeset_markdown(report)
+    # explain=True -> reason and the base→head expression line appear.
+    md = render_changeset_markdown(report, explain=True)
+    assert "expression meaning changed" in md
+    assert "up.a" in md and "coalesce(up.a, up.z)" in md
+    assert "→" in md
 
 
 def test_markdown_appends_attribution_footer():

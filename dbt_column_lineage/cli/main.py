@@ -384,6 +384,13 @@ def _build_explore_change_context(
 )
 @click.option("--adapter", help="Override sqlglot dialect (e.g., tsql, snowflake, bigquery).")
 @click.option(
+    "--explain",
+    is_flag=True,
+    default=False,
+    help="Show why each column was flagged (the semantic reason and the base→head "
+    "expressions). Affects the human report only; the JSON output always carries it.",
+)
+@click.option(
     "--ci",
     is_flag=True,
     help="CI mode: post/update a sticky impact comment on the PR and apply the "
@@ -440,6 +447,7 @@ def impact(
     scope_git: Optional[str],
     format: str,
     adapter: Optional[str],
+    explain: bool,
     ci: bool,
     fail_on: str,
     policy_path: Optional[str],
@@ -619,7 +627,7 @@ def impact(
         if format == "json":
             click.echo(json.dumps(report, indent=2, sort_keys=False))
         else:
-            click.echo(render_changeset_markdown(report))
+            click.echo(render_changeset_markdown(report, explain=explain))
 
     except Exception as e:
         click.echo(f"Error: {str(e)}", err=True)
@@ -629,7 +637,7 @@ def impact(
     # the report is a hard error, but the CI gate deciding to fail the check
     # (exit 1) is a normal outcome we don't want to mask as "Error: 1".
     if ci:
-        _run_ci(report, fail_on, github_token, repo, pr_number)
+        _run_ci(report, fail_on, github_token, repo, pr_number, explain=explain)
 
 
 def _relation_name_resolver(registry: Any):
@@ -661,6 +669,7 @@ def _run_ci(
     token: Optional[str],
     repo: Optional[str],
     pr_number: Optional[int],
+    explain: bool = False,
 ) -> None:
     """Post the sticky PR comment (best-effort) and exit per the severity gate."""
     from dbt_column_lineage.lineage.ci import (
@@ -676,7 +685,7 @@ def _run_ci(
     # trips (non-zero exit) below.
     write_github_outputs(report)
 
-    body = render_changeset_markdown(report)
+    body = render_changeset_markdown(report, explain=explain)
     context = resolve_context(token, repo, pr_number)
     if context is None:
         click.echo(

@@ -242,8 +242,21 @@ def _render_policy_section(verdict: Dict[str, Any]) -> List[str]:
     return out
 
 
-def render_changeset_markdown(report: Dict[str, Any]) -> str:
-    """Render a changeset impact report (from ``build_changeset_report``) as Markdown."""
+def _truncate_expr(raw: str, limit: int = 120) -> str:
+    """One-line, length-capped rendering of a defining expression for the explain view."""
+    collapsed = " ".join(raw.split())
+    if len(collapsed) > limit:
+        return collapsed[: limit - 1].rstrip() + "…"
+    return collapsed
+
+
+def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> str:
+    """Render a changeset impact report (from ``build_changeset_report``) as Markdown.
+
+    When ``explain`` is True, each changed column is annotated with the semantic reason it
+    was flagged and (when available) a compact ``base → head`` expression line. The default
+    (``explain=False``) leaves the output byte-for-byte as before.
+    """
     changeset = report.get("changeset", {})
     summary = report.get("summary", {})
 
@@ -263,6 +276,13 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
 
     by_change = report.get("by_change", [])
     changed_nodes = sorted({(c.get("model", "?"), c.get("column", "?")) for c in by_change})
+    # (model, column) -> the explain block a logic change carried, so `--explain` can annotate
+    # each changed column with WHY it was flagged. Structural changes carry no explain block.
+    explain_by_node: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for change in by_change:
+        block = change.get("explain")
+        if isinstance(block, dict):
+            explain_by_node[(change.get("model", "?"), change.get("column", "?"))] = block
     by_kind = changeset.get("by_kind", {})
 
     affected_columns = report.get("affected_columns", [])
@@ -321,13 +341,25 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         kind_txt = ", ".join(f"{_kind_label(k)}: {v}" for k, v in sorted(by_kind.items()))
     out.append(f"**Changed:** {_plural(total_changes, 'column')} — {kind_txt}")
     if changed_nodes:
-        rows = [f"- `{model}.{column}`" for model, column in changed_nodes]
-        if len(rows) <= 10:
+        rows: List[str] = []
+        for model, column in changed_nodes:
+            rows.append(f"- `{model}.{column}`")
+            if explain:
+                block = explain_by_node.get((model, column))
+                if block is not None:
+                    reason = block.get("reason")
+                    if reason:
+                        rows.append(f"  - _why:_ {reason}")
+                    base = (block.get("base") or "").strip()
+                    head = (block.get("head") or "").strip()
+                    if base or head:
+                        rows.append(f"  - `{_truncate_expr(base)}` → `{_truncate_expr(head)}`")
+        if len(changed_nodes) <= 10:
             out += [""] + rows
         else:
             out += [
                 "",
-                f"<details><summary>Show {_plural(len(rows), 'changed column')}</summary>",
+                f"<details><summary>Show {_plural(len(changed_nodes), 'changed column')}</summary>",
                 "",
             ]
             out += rows + ["", "</details>"]
