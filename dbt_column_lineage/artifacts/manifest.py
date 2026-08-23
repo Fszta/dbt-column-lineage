@@ -231,6 +231,57 @@ class ManifestReader:
 
         return None
 
+    @staticmethod
+    def _merged_meta(
+        top_meta: Optional[Dict[str, Any]], config_meta: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Merge a node's two dbt meta locations, ``config.meta`` winning over top-level.
+
+        dbt exposes user-authored meta at both ``node.meta`` (legacy) and
+        ``node.config.meta`` (canonical in dbt 1.x). When a key is present in both, the
+        ``config`` value is authoritative (it is what dbt itself resolves). Neither
+        present yields an empty dict — meta is *absent*, never guessed.
+        """
+        merged: Dict[str, Any] = {}
+        if isinstance(top_meta, dict):
+            merged.update(top_meta)
+        if isinstance(config_meta, dict):
+            merged.update(config_meta)
+        return merged
+
+    def get_model_meta(self, model_name: str) -> Dict[str, Any]:
+        """Merged user-authored dbt ``meta`` for a model (``config.meta`` over ``meta``).
+
+        This is arbitrary consumer metadata — ANY key an author declared — captured
+        generically; no key is privileged. Returns an empty dict for an unknown model or
+        one with no meta.
+        """
+        node = self._find_node(model_name)
+        if not node:
+            return {}
+        config = node.get("config") or {}
+        return self._merged_meta(node.get("meta"), config.get("meta"))
+
+    def get_column_meta(self, model_name: str) -> Dict[str, Dict[str, Any]]:
+        """Per-column merged user meta for a model, keyed by lowercased column name.
+
+        Each column's meta merges ``columns.<c>.config.meta`` over ``columns.<c>.meta``
+        (config wins), mirroring :meth:`get_model_meta`. Column keys are lowercased to
+        match the codebase's case-insensitive column naming. Returns an empty dict for an
+        unknown model; a declared column with no meta maps to an empty dict.
+        """
+        node = self._find_node(model_name)
+        if not node:
+            return {}
+        result: Dict[str, Dict[str, Any]] = {}
+        for col_name, col_data in (node.get("columns") or {}).items():
+            col_data = col_data or {}
+            col_config = col_data.get("config") or {}
+            result[col_name.lower()] = self._merged_meta(
+                col_data.get("meta"), col_config.get("meta")
+            )
+        return result
+
     def get_model_path(self, model_name: str) -> Optional[str]:
         """Get the path to the model from the manifest."""
         node = self._find_node(model_name)

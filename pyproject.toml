@@ -1,6 +1,6 @@
 [project]
 name = "dbt-col-lineage"
-version = "0.15.0"
+version = "0.14.0"
 description = "Impact analysis for dbt projects using column-level data lineage"
 authors = [
     {name = "Fszta"}
@@ -14,7 +14,8 @@ dependencies = [
     "graphviz (>=0.20.3,<0.21.0)",
     "fastapi (>=0.116.0,<1.0.0)",
     "uvicorn (>=0.34.0,<0.35.0)",
-    "requests (>=2.32.0,<3.0.0)"
+    "requests (>=2.32.0,<3.0.0)",
+    "pyyaml (>=6.0.3,<7.0.0)"
 ]
 
 [tool.poetry.scripts]
@@ -44,6 +45,7 @@ mkdocs-material = ">=9.5.0,<10.0.0"
 mkdocs-click = ">=0.8.1,<0.9.0"
 requests = ">=2.32.0,<3.0.0"
 types-requests = ">=2.32.0,<3.0.0"
+types-pyyaml = "^6.0.12.20260815"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
