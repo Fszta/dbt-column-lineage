@@ -52,7 +52,14 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          PREV_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          # Previous release tag = highest existing vMAJOR.MINOR.PATCH tag.
+          # Do NOT use `git describe`: the floating major tag (v0) matches a bare
+          # 'v*' glob and, combined with --abbrev=0, makes describe emit the long
+          # `vX.Y.Z-<n>-g<sha>` form. That bogus ref then became the changelog
+          # range and the compare link, blanking the generated section. A sorted
+          # tag list is deterministic and immune to both the floating tag and the
+          # long-form quirk.
+          PREV_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)
           if [ -n "${{ inputs.custom_version }}" ]; then
             poetry version "${{ inputs.custom_version }}"
           else

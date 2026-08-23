@@ -1,4 +1,29 @@
-## [0.16.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.15.0-12-g17e2632087040ec4fb4a86d6a2c1133b626388fe...v0.16.0) (2026-08-23)
+## [0.16.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.15.0...v0.16.0) (2026-08-23)
+
+### Features
+
+* interactive lineage & impact explorer + CLI wiring ([3b16305](https://github.com/Fszta/dbt-column-lineage/commit/3b16305aeef09273590655e1746dfe0cf8a6ff4d))
+* cross-boundary impact into BI dashboards (Metabase connector) ([b37f0d4](https://github.com/Fszta/dbt-column-lineage/commit/b37f0d4c6c3aec77b469867e78a08527ef386e73))
+* metadata-agnostic policy gate ([581eaf5](https://github.com/Fszta/dbt-column-lineage/commit/581eaf5412b0f2dd20d3f24386bb9896a5b4689b))
+* semantic change categorization on a swappable lineage provider ([301d8c2](https://github.com/Fszta/dbt-column-lineage/commit/301d8c2a76f66c79a1b4193795b5b289ae077759))
+
+## [0.15.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.14.0...v0.15.0) (2026-08-21)
+
+### Features
+
+* **explorer:** render dbt descriptions as Markdown in the model card ([faeefaf](https://github.com/Fszta/dbt-column-lineage/commit/faeefaf95d36690d32b7676eb4afb58d5f212dbb))
+* **explorer:** add "Show tests" toggle for dbt tests in graph + impact panel ([a0eb15f](https://github.com/Fszta/dbt-column-lineage/commit/a0eb15f3256930fa64813c5f5fd6c33e26e9922a))
+* **explorer:** cap fan-out with "+N more" progressive disclosure ([e348f07](https://github.com/Fszta/dbt-column-lineage/commit/e348f072d4153dc9119f4b8cd00d25f78e748470))
+* **impact:** test-aware SAFE/REVIEW/BLOCK verdict, CI gate, owner routing ([4165d1b](https://github.com/Fszta/dbt-column-lineage/commit/4165d1b5e3c722f07a595f9e0fe0c34826c17ef8))
+* **artifacts:** ingest dbt test nodes and expose column/model/reference test indexes ([dca799b](https://github.com/Fszta/dbt-column-lineage/commit/dca799b02831b9b73ee528bdc470e90918d4fe3f))
+* **explorer:** render row-set nodes with predicate hover + click card (frontend) ([ac2a78e](https://github.com/Fszta/dbt-column-lineage/commit/ac2a78ee0717a9c8843f95dc00ec042e5099e3b7))
+* **explorer:** expose row-set dependents as distinct graph nodes (backend) ([acc77ec](https://github.com/Fszta/dbt-column-lineage/commit/acc77ec99f174025c710a1a005af668bff35490b))
+* **impact:** surface model and column descriptions in the JSON output and explorer ([b64e74a](https://github.com/Fszta/dbt-column-lineage/commit/b64e74a66818e5d0ceaa40c3897e924e45c6f7a1))
+
+### Bug Fixes
+
+* **impact:** propagate row-set dependents along the value chain ([085c967](https://github.com/Fszta/dbt-column-lineage/commit/085c967408d3763a7d73d4e478338f83ae9e6a65))
+* **artifacts:** recover compiled SQL by filename when target/compiled drifts ([d1067be](https://github.com/Fszta/dbt-column-lineage/commit/d1067be9c4d2288c38d8fd306fff1a7569dc24e9))
 
 ## [0.14.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.13.0...v0.14.0) (2026-08-20)
 

@@ -38,6 +38,10 @@ def main() -> int:
 
     new_version = sys.argv[1].lstrip("v")
     prev_tag = sys.argv[2] if len(sys.argv) > 2 else ""
+    # Defensively collapse a `git describe` long-form ref (vX.Y.Z-<n>-g<sha>)
+    # back to the bare tag: a stray long form here silently narrows the log
+    # range to (almost) nothing and produces an empty changelog section.
+    prev_tag = re.sub(r"-\d+-g[0-9a-f]+$", "", prev_tag)
 
     server = os.environ.get("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
     repo = os.environ.get("GITHUB_REPOSITORY", "Fszta/dbt-column-lineage")
@@ -55,6 +59,10 @@ def main() -> int:
         if not m:
             continue
         typ, scope, bang, desc = (m.group("type"), m.group("scope"), m.group("bang"), m.group("desc"))
+        # Release/CI plumbing is never user-facing: drop it even when a commit is
+        # mis-typed as feat/fix (e.g. `fix(ci): ...`) instead of `ci: ...`.
+        if scope in ("ci", "release"):
+            continue
         link = f"([{full[:7]}]({repo_url}/commit/{full}))"
         scope_s = f"**{scope}:** " if scope else ""
         bullet = f"* {scope_s}{desc} {link}"
