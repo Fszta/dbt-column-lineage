@@ -1,10 +1,10 @@
 # Impact Analysis
 
-**The core feature of DBT Column Lineage** - understand the downstream effects of changing a column before you make the change.
+**The core feature of Parrant** - understand the downstream effects of changing a column before you make the change.
 
 ## Overview
 
-Impact Analysis is the primary reason to use DBT Column Lineage. It helps you answer the critical question: **"What happens if I change this column?"**
+Impact Analysis is the primary reason to use Parrant. It helps you answer the critical question: **"What happens if I change this column?"**
 
 Column-level lineage is the tool that enables this analysis. By tracking how data flows through your transformations at the column level, we can show you exactly what will be affected when you modify a column.
 
@@ -18,7 +18,7 @@ When you select a column in the Interactive Explorer, you can analyze its impact
 
 1. Start the Interactive Explorer:
    ```bash
-   dbt-col-lineage --explore
+   parrant --explore
    ```
 
 2. Select a model and column from the sidebar
@@ -45,7 +45,7 @@ The impact analysis categorizes columns into:
 
 Run the same impact analysis on every pull request. The action diffs the base- and
 head-branch dbt artifacts and posts a sticky column-level blast-radius comment on the PR.
-See the [copy-paste workflow](https://github.com/Fszta/dbt-column-lineage/blob/main/docs/examples/impact-pr-check.yml)
+See the [copy-paste workflow](https://github.com/Fszta/parrant/blob/main/docs/examples/impact-pr-check.yml)
 to wire it up.
 
 ### Outputs
@@ -67,7 +67,7 @@ Give the action an `id` and read `steps.<id>.outputs.*` in a later step:
 ```yaml
       - name: Column-level impact assessment
         id: impact
-        uses: Fszta/dbt-column-lineage@v0
+        uses: Fszta/parrant@v0
         with:
           manifest: artifacts/head/manifest.json
           catalog: artifacts/head/catalog.json

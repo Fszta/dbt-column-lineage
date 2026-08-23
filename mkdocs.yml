@@ -1,16 +1,16 @@
-site_name: DBT Column Lineage
+site_name: Parrant
 site_description: Impact analysis for dbt projects using column-level data lineage
-site_url: https://fszta.github.io/dbt-column-lineage/
-repo_url: https://github.com/Fszta/dbt-column-lineage
-repo_name: Fszta/dbt-column-lineage
+site_url: https://fszta.github.io/parrant/
+repo_url: https://github.com/Fszta/parrant
+repo_name: Fszta/parrant
 site_author: Fszta
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/Fszta/dbt-column-lineage
+      link: https://github.com/Fszta/parrant
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/dbt-col-lineage/
+      link: https://pypi.org/project/parrant/
   generator: false
 
 theme:

@@ -93,13 +93,13 @@ title: A change-impact decision engine for dbt
   <div class="term">
     <div class="bar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">bash</span></div>
 <pre><span class="c"># install</span>
-<span class="g">$</span> <span class="w">pip install</span> dbt-col-lineage
+<span class="g">$</span> <span class="w">pip install</span> parrant
 
 <span class="c"># explore lineage + impact in the browser</span>
-<span class="g">$</span> <span class="w">dbt-col-lineage</span> --explore
+<span class="g">$</span> <span class="w">parrant</span> --explore
 
 <span class="c"># turn a PR into a decision: gate on your policy</span>
-<span class="g">$</span> <span class="w">dbt-col-lineage</span> impact --base-manifest <span class="a">base/manifest.json</span> \
+<span class="g">$</span> <span class="w">parrant</span> impact --base-manifest <span class="a">base/manifest.json</span> \
     --policy <span class="a">policy.yml</span> --fail-on <span class="a">policy</span></pre>
   </div>
 </div></section>
@@ -107,7 +107,7 @@ title: A change-impact decision engine for dbt
 <div class="foot band"><div class="wrap">
   <span class="brand">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-    dbt-col-lineage
+    parrant
   </span>
   <span class="mono">MIT &middot; a decision engine for dbt teams who ship with confidence</span>
 </div></div>

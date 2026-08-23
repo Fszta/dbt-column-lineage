@@ -19,8 +19,8 @@ how it clears and lifts itself on the next push, so the gate is an exit path, no
 ## Quick start
 
 !!! tip "Scaffold the policy — don't start from a blank file"
-    `dbt-col-lineage policy init` reads your manifest + catalog and writes a heavily-commented,
-    safe-by-construction `./dbt-col-lineage.policy.yml` keyed only to signals it confirmed exist,
+    `parrant policy init` reads your manifest + catalog and writes a heavily-commented,
+    safe-by-construction `./parrant.policy.yml` keyed only to signals it confirmed exist,
     so it runs green on day one. Start there rather than authoring from scratch — see
     [`policy init`](#scaffold-a-starter-policy-policy-init) below and the
     [Policy recipes](policy-recipes.md) page for the blessed copy-paste rules it emits.
@@ -28,7 +28,7 @@ how it clears and lifts itself on the next push, so the gate is an exit path, no
 Author (or scaffold) a `policy.yml`, then gate on it:
 
 ```bash
-dbt-col-lineage impact \
+parrant impact \
   --manifest target/manifest.json --catalog target/catalog.json \
   --base-manifest base/manifest.json --base-catalog base/catalog.json \
   --policy policy.yml \
@@ -39,7 +39,7 @@ dbt-col-lineage impact \
 - `--fail-on policy` makes the check **exit 1** when the verdict is `block` (and only `block`).
 
 **Resolution order** (first found): the explicit `--policy PATH`, then a
-`./dbt-col-lineage.policy.yml` in the working directory. No policy found → the engine is inert
+`./parrant.policy.yml` in the working directory. No policy found → the engine is inert
 and the tool falls back to the legacy `safe`/`review`/`block` verdict (fully backward compatible).
 
 !!! danger "A broken policy fails loudly"
@@ -375,12 +375,12 @@ page: it introspects your manifest + catalog and writes a heavily-commented,
 **safe-by-construction** starter policy keyed *only* to signals the scan confirmed exist.
 
 ```bash
-dbt-col-lineage policy init \
+parrant policy init \
   --manifest target/manifest.json --catalog target/catalog.json
-# → wrote ./dbt-col-lineage.policy.yml
+# → wrote ./parrant.policy.yml
 ```
 
-The default output path is `./dbt-col-lineage.policy.yml` — exactly the path
+The default output path is `./parrant.policy.yml` — exactly the path
 [`impact` and `policy test` auto-resolve](#quick-start), so the generated file is picked up with no
 `--policy` flag. **The file is yours** — it is code scaffolded into your repo, not a tool-managed
 preset that can change under you. Edit it freely.
@@ -414,7 +414,7 @@ policy, never a fake guard.
 | `--manifest <path>` | `target/manifest.json` | the dbt manifest to scan (run dbt first). |
 | `--catalog <path>` | `target/catalog.json` | the dbt catalog to scan. |
 | `--adapter <dialect>` | auto-detected | override the sqlglot dialect (e.g. `tsql`, `snowflake`, `bigquery`). |
-| `-o`, `--output <path>` | `./dbt-col-lineage.policy.yml` | where to write the generated policy (the path `load_policy` auto-resolves). |
+| `-o`, `--output <path>` | `./parrant.policy.yml` | where to write the generated policy (the path `load_policy` auto-resolves). |
 | `--force` | off | overwrite an existing file at `--output` instead of refusing. |
 | `--stdout` | off | print the generated policy to stdout instead of writing a file (never touches disk). |
 
@@ -434,7 +434,7 @@ replays a candidate policy over your recent history and reports, per rule, what 
 have ruled — before you make it a required check.
 
 ```bash
-dbt-col-lineage policy test \
+parrant policy test \
   --manifest target/manifest.json --catalog target/catalog.json \
   --policy policy.yml \
   --last 30                                    # replay the last 30 commits
@@ -446,8 +446,8 @@ head registry is built **once** (the one meaningful cost) and reused for every p
 is observably alive.
 
 !!! note "`policy test` is a subcommand, not a flag"
-    `dbt-col-lineage policy test …` is dispatched on the leading `policy` word. It is entirely
-    separate from the **`--policy`** *option* on `dbt-col-lineage impact` (which gates a single
+    `parrant policy test …` is dispatched on the leading `policy` word. It is entirely
+    separate from the **`--policy`** *option* on `parrant impact` (which gates a single
     live PR) — the two never shadow each other.
 
 ### Choosing what to replay
@@ -532,9 +532,9 @@ malformed `--baseline` file is rejected loudly. Capture a baseline by saving a `
 then compare later runs against it:
 
 ```bash
-dbt-col-lineage policy test --policy policy.yml --last 50 --format json > baseline.json
+parrant policy test --policy policy.yml --last 50 --format json > baseline.json
 # … on the policy-change PR:
-dbt-col-lineage policy test --policy policy.yml --last 50 \
+parrant policy test --policy policy.yml --last 50 \
   --fail-on regression --baseline baseline.json
 ```
 
@@ -708,7 +708,7 @@ over history (a rising `allow-break` volume is a signal the gate is mis-tuned, n
 With no pragma present, the output is byte-identical to the default run.
 
 ```bash
-dbt-col-lineage impact \
+parrant impact \
   --manifest target/manifest.json --catalog target/catalog.json \
   --base-manifest base/manifest.json --base-catalog base/catalog.json \
   --fail-on tests --no-overrides        # ignore every -- lineage:allow-* pragma
@@ -719,7 +719,7 @@ dbt-col-lineage impact \
 The composite action exposes a `policy` input and policy outputs:
 
 ```yaml
-- uses: Fszta/dbt-column-lineage@v0
+- uses: Fszta/parrant@v0
   with:
     manifest: artifacts/head/manifest.json
     catalog: artifacts/head/catalog.json

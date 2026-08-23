@@ -82,7 +82,7 @@ Concretely: a PR retypes `stg_accounts.account_holder`. Run the gate offline aga
 artifacts (this is the whole decision — no dbt run, no warehouse):
 
 ```bash
-dbt-col-lineage impact \
+parrant impact \
   --manifest target/manifest.json   --catalog target/catalog.json \
   --base-manifest base/manifest.json --base-catalog base/catalog.json \
   --metabase metabase_lineage.json \

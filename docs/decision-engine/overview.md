@@ -1,6 +1,6 @@
 # From lineage tool to decision engine
 
-dbt-col-lineage started as a **column-level lineage tool** — trace any column upstream and
+parrant started as a **column-level lineage tool** — trace any column upstream and
 down, and see a change's blast radius. It still does all of that. What's new is a layer *on
 top* of the lineage: the tool now turns a pull request into a **change-impact decision**.
 

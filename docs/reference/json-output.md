@@ -5,7 +5,7 @@ object. It is the surface designed for **programmatic consumers** — CI scripts
 agents that need to reason about a change rather than read a report.
 
 ```bash
-dbt-col-lineage --select stg_accounts.account_id+ \
+parrant --select stg_accounts.account_id+ \
   --manifest target/manifest.json \
   --catalog target/catalog.json \
   --format json

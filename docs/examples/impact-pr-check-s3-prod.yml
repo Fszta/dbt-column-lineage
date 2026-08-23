@@ -55,7 +55,7 @@ jobs:
 
       # --- impact --------------------------------------------------------
       - name: Column-level impact assessment
-        uses: Fszta/dbt-column-lineage@v0
+        uses: Fszta/parrant@v0
         with:
           manifest: target/manifest.json
           catalog: target/catalog.json

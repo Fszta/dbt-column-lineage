@@ -1,1 +1,254 @@
-../CHANGELOG.md
+## [0.16.1](https://github.com/Fszta/parrant/compare/v0.16.0...v0.16.1) (2026-08-23)
+
+### Bug Fixes
+
+* **semantic-diff:** stop reporting NULL-unsound boolean rewrites as equivalent ([b0dd07d](https://github.com/Fszta/parrant/commit/b0dd07db3e35862113b79ee658d96a47d05f9563))
+
+## [0.16.0](https://github.com/Fszta/parrant/compare/v0.15.0...v0.16.0) (2026-08-23)
+
+### Features
+
+* interactive lineage & impact explorer + CLI wiring ([3b16305](https://github.com/Fszta/parrant/commit/3b16305aeef09273590655e1746dfe0cf8a6ff4d))
+* cross-boundary impact into BI dashboards (Metabase connector) ([b37f0d4](https://github.com/Fszta/parrant/commit/b37f0d4c6c3aec77b469867e78a08527ef386e73))
+* metadata-agnostic policy gate ([581eaf5](https://github.com/Fszta/parrant/commit/581eaf5412b0f2dd20d3f24386bb9896a5b4689b))
+* semantic change categorization on a swappable lineage provider ([301d8c2](https://github.com/Fszta/parrant/commit/301d8c2a76f66c79a1b4193795b5b289ae077759))
+
+## [0.15.0](https://github.com/Fszta/parrant/compare/v0.14.0...v0.15.0) (2026-08-21)
+
+### Features
+
+* **explorer:** render dbt descriptions as Markdown in the model card ([faeefaf](https://github.com/Fszta/parrant/commit/faeefaf95d36690d32b7676eb4afb58d5f212dbb))
+* **explorer:** add "Show tests" toggle for dbt tests in graph + impact panel ([a0eb15f](https://github.com/Fszta/parrant/commit/a0eb15f3256930fa64813c5f5fd6c33e26e9922a))
+* **explorer:** cap fan-out with "+N more" progressive disclosure ([e348f07](https://github.com/Fszta/parrant/commit/e348f072d4153dc9119f4b8cd00d25f78e748470))
+* **impact:** test-aware SAFE/REVIEW/BLOCK verdict, CI gate, owner routing ([4165d1b](https://github.com/Fszta/parrant/commit/4165d1b5e3c722f07a595f9e0fe0c34826c17ef8))
+* **artifacts:** ingest dbt test nodes and expose column/model/reference test indexes ([dca799b](https://github.com/Fszta/parrant/commit/dca799b02831b9b73ee528bdc470e90918d4fe3f))
+* **explorer:** render row-set nodes with predicate hover + click card (frontend) ([ac2a78e](https://github.com/Fszta/parrant/commit/ac2a78ee0717a9c8843f95dc00ec042e5099e3b7))
+* **explorer:** expose row-set dependents as distinct graph nodes (backend) ([acc77ec](https://github.com/Fszta/parrant/commit/acc77ec99f174025c710a1a005af668bff35490b))
+* **impact:** surface model and column descriptions in the JSON output and explorer ([b64e74a](https://github.com/Fszta/parrant/commit/b64e74a66818e5d0ceaa40c3897e924e45c6f7a1))
+
+### Bug Fixes
+
+* **impact:** propagate row-set dependents along the value chain ([085c967](https://github.com/Fszta/parrant/commit/085c967408d3763a7d73d4e478338f83ae9e6a65))
+* **artifacts:** recover compiled SQL by filename when target/compiled drifts ([d1067be](https://github.com/Fszta/parrant/commit/d1067be9c4d2288c38d8fd306fff1a7569dc24e9))
+
+## [0.14.0](https://github.com/Fszta/parrant/compare/v0.13.0...v0.14.0) (2026-08-20)
+
+### ⚠ BREAKING CHANGES
+
+* drops support for Python 3.9; the minimum supported version is now Python 3.10.
+
+### Features
+
+* **ci:** note when structural checks are skipped without a catalog ([23b88fc](https://github.com/Fszta/parrant/commit/23b88fc083083a3e772a5d0f08586bb2ea9457a8))
+* **cli:** add --version flag ([bce9d67](https://github.com/Fszta/parrant/commit/bce9d67b90998a0e6279cf328df3449e35b1bce2))
+* **action:** add PR-comment credit, outputs, and pip cache ([d6e1031](https://github.com/Fszta/parrant/commit/d6e103166de33ec750b2f826d526db38a41ab082))
+* **impact:** restructure the CI impact PR comment for reviewer-first triage ([286e403](https://github.com/Fszta/parrant/commit/286e403dbc930c9c1ab03f2c9e9232776ed78565))
+
+### Bug Fixes
+
+* **parser:** expand adapter-to-dialect mapping and warn on unknown dialect ([a195fc7](https://github.com/Fszta/parrant/commit/a195fc7a6290af28c618f2d65c6d83cf29fcabbc))
+* **parser:** trace all UNION branches in column lineage ([2844bba](https://github.com/Fszta/parrant/commit/2844bbaf5a0f7092bd9b24a2825b2e108059497d))
+
+## [0.13.0](https://github.com/Fszta/parrant/compare/v0.12.0...v0.13.0) (2026-08-19)
+
+
+### Features
+
+* **docs:** realistic two-chain lineage graph + emphasize column/impact ([986c7b8](https://github.com/Fszta/parrant/commit/986c7b879112adf08f49fc6e6b11204f962f3069))
+* **docs:** redesign documentation site to match explorer design system ([c6b17ab](https://github.com/Fszta/parrant/commit/c6b17abae450dfe08e3c1b46ada3a775e82a0e8d)), closes [#5E6AD2](https://github.com/Fszta/parrant/issues/5E6AD2)
+* **explorer:** align app frontend with the docs design system ([b8cf0b1](https://github.com/Fszta/parrant/commit/b8cf0b1e1bcbaa14a9f5aeaba923aad38eaffa68))
+
+
+### Bug Fixes
+
+* **explorer:** dimensional database icon in the tree ([101d794](https://github.com/Fszta/parrant/commit/101d79439e662d3bedc53ece85d25c64a3d029e2))
+
+## [0.12.0](https://github.com/Fszta/parrant/compare/v0.11.0...v0.12.0) (2026-08-18)
+
+
+### Features
+
+* **changeset:** per-column logic-change precision ([1d0a843](https://github.com/Fszta/parrant/commit/1d0a843749351eb9dc4895ecf6c8b1dbdd2cbcb2))
+* **comment:** criticality-structured PR comment ([d686012](https://github.com/Fszta/parrant/commit/d686012d3f0269203616388f34709f54d7c411da))
+* **explorer:** generic 'recomputed / output changes' wording ([6c046bd](https://github.com/Fszta/parrant/commit/6c046bdfa83154da7dfa5c912ef08228bbfb38d3))
+* **impact:** surface predicate/row-set dependents as a distinct severity ([4b118e3](https://github.com/Fszta/parrant/commit/4b118e3263d0950c1a99c06441f68e3426778409))
+* **parser:** resolve predicate (filter/join) column dependencies ([168ccda](https://github.com/Fszta/parrant/commit/168ccdaa5c6113a7d0696f5e7f2841cd32268369))
+
+
+### Bug Fixes
+
+* seed model universe from manifest so uncatalogued models are analyzable ([#69](https://github.com/Fszta/parrant/issues/69)) ([78e372b](https://github.com/Fszta/parrant/commit/78e372b7786baa579a0f29d0bb88cdc9abf8a331))
+
+## [0.11.0](https://github.com/Fszta/parrant/compare/v0.10.0...v0.11.0) (2026-08-18)
+
+
+### Features
+
+* **explorer:** add design token system and dark-mode foundation ([9018328](https://github.com/Fszta/parrant/commit/9018328480b1e80f71b1a3a7e821c1af8123ec33))
+* **explorer:** modernize graph canvas and node cards ([b6a5e70](https://github.com/Fszta/parrant/commit/b6a5e7047592cd1eaf6744bf706273e5b2408606))
+* **explorer:** redesign impact panel and relationship summary ([b59959a](https://github.com/Fszta/parrant/commit/b59959a00050d73608365eecc5b1b7bcc36306ef))
+* **explorer:** restyle sidebar, tree, controls and primary button ([95f4121](https://github.com/Fszta/parrant/commit/95f4121c7536e6f8d2d0c5a38b7091407ff8317e))
+* **explorer:** surface impact confidence & coverage in the UI ([086c30c](https://github.com/Fszta/parrant/commit/086c30c7cc22cfac2fbf06134334ebd0afc2caab))
+* **explorer:** thermal-rail highlight and edge hierarchy on select ([aeb03e6](https://github.com/Fszta/parrant/commit/aeb03e6c395565365555bc7c01d36cc4c79fd9a9))
+* **explorer:** wire theme toggle, brand mark and empty state markup ([3265f49](https://github.com/Fszta/parrant/commit/3265f491e3114ec1109ce6c430e7a7cce85502b0))
+* **impact:** add coverage & confidence signal ([1451806](https://github.com/Fszta/parrant/commit/14518063eb2ebb9d4f20a760b95e44da997fb392))
+* **ui:** explorer readability & interaction polish ([f7cee98](https://github.com/Fszta/parrant/commit/f7cee9808f8ad286a270fde3c4ac66fad980b578))
+
+
+### Bug Fixes
+
+* declare requests as a runtime dependency ([#68](https://github.com/Fszta/parrant/issues/68)) ([a22488f](https://github.com/Fszta/parrant/commit/a22488f10b3e737dfedb7054c45d68591e105f4e))
+
+## [0.10.0](https://github.com/Fszta/parrant/compare/v0.9.0...v0.10.0) (2026-08-14)
+
+
+### Features
+
+* **impact:** --scope-git to restrict two-manifest diff to branch-changed models ([f089445](https://github.com/Fszta/parrant/commit/f0894455098b47c6fdf4a6ee4ec9a3a0d5988209))
+
+
+### Bug Fixes
+
+* **ci:** pin Poetry to 2.1.3 in publish workflow ([5f4181e](https://github.com/Fszta/parrant/commit/5f4181e533bf2ce5706e9b04b22af2a7383f07af))
+
+## [0.9.0](https://github.com/Fszta/parrant/compare/v0.8.0...v0.9.0) (2026-08-14)
+
+
+### Features
+
+* **cli:** add machine-readable --format json for AI-first consumption ([9211c1f](https://github.com/Fszta/parrant/commit/9211c1facbbf49bf1e3fba06c05dc3b53f1e01b8))
+* **impact:** add diff-driven impact command ([b7eb165](https://github.com/Fszta/parrant/commit/b7eb165ca824527e4c4822efbb454bdb4c776314))
+* **impact:** CI mode with sticky PR comment and severity gate ([dd787af](https://github.com/Fszta/parrant/commit/dd787af998388fba0d7743147a86c3bb601a64c8))
+* **ui:** set initial state when no model is selected ([fc92a03](https://github.com/Fszta/parrant/commit/fc92a03088b2b765d7199824266d132ce19f5c82))
+
+
+### Bug Fixes
+
+* **catalog:** read schema/database/name from node metadata ([c2c9053](https://github.com/Fszta/parrant/commit/c2c9053476119f17e0816ee6c1a381a18b4f68ea))
+* **display:** handle exposures/sources sets in downstream output ([c2b8712](https://github.com/Fszta/parrant/commit/c2b8712c7d73cde856ca5dd909b8c6ebef8bb9da))
+* **manifest:** fall back to on-disk compiled SQL when manifest lacks compiled_code ([1a1af9a](https://github.com/Fszta/parrant/commit/1a1af9a3fed38bcfc28301e41de3c611860d4be8))
+* **parser:** resolve transitive CTE aliases to the base model ([0be42ea](https://github.com/Fszta/parrant/commit/0be42ea158a782c4c1e64bbe71df6104143a59b1))
+
+## [0.8.0](https://github.com/Fszta/parrant/compare/v0.7.0...v0.8.0) (2025-11-30)
+
+
+### Features
+
+* add model details card component ([cf5aa7b](https://github.com/Fszta/parrant/commit/cf5aa7b49dfa62719fbf1e0742eca2d9a99b923c))
+* add model details endpoint with desc and tags ([4cdac70](https://github.com/Fszta/parrant/commit/4cdac70d30b0cd762f5239d132ce9818f3bb11e8))
+* **lineage:** add expand upstream lineage capability ([ef89f35](https://github.com/Fszta/parrant/commit/ef89f352567379dbf93aa0f2d01a083881dfbaca))
+* make col relationship summary card collapsible ([21a6135](https://github.com/Fszta/parrant/commit/21a613574f7fb299e5e7cd91bf280d28e442c146))
+* **ui:** add glassmorphism effect and polish interactions ([017b253](https://github.com/Fszta/parrant/commit/017b253f105b09d98fda183908161bdad0f1aa1e))
+* **ui:** enhance explorer tree with badges, node count and search highlight ([f73d88b](https://github.com/Fszta/parrant/commit/f73d88b3303c2970ffe9a4a6ac684ba486dd3ce7))
+* **ui:** improve graph viz with better shaddow and hover states ([636df01](https://github.com/Fszta/parrant/commit/636df0135c7e2e003711e7ff7cf084a4e1f7c67b))
+
+
+### Bug Fixes
+
+* **lineage:** align exposure edges horizontally with model edges ([38fed02](https://github.com/Fszta/parrant/commit/38fed021bb899497703978ff7361ab0166685a00))
+* return full upstream lineage chain in api, not only n-1 ([0ece04a](https://github.com/Fszta/parrant/commit/0ece04a88902ee3c9eb41a04ac1f9767cf4eb2e4))
+
+## [0.7.0](https://github.com/Fszta/parrant/compare/v0.6.0...v0.7.0) (2025-11-28)
+
+
+### Features
+
+* **folder-tree:** add tooltip for truncated models ([8043352](https://github.com/Fszta/parrant/commit/80433521975d9f509e28abb09ed3947ed76dcbe1))
+* **impact-analysis:** group transformations by model with toggle ([60e5044](https://github.com/Fszta/parrant/commit/60e5044bd55bb70fa8fcee042b13c812335fad9f))
+* **lineage:** add tooltips for truncated column and model names ([fdf141e](https://github.com/Fszta/parrant/commit/fdf141e65facc845e2dbc70216b16fd808182281))
+* **snapshots:** add dbt snapshots support ([a84bf63](https://github.com/Fszta/parrant/commit/a84bf6314e07b29547e1c830aa17185f4492d16d))
+
+
+### Bug Fixes
+
+* **impact-analysis:** close buttons for impact/relationship summary cards ([6b9ddf1](https://github.com/Fszta/parrant/commit/6b9ddf127677037d8aecb949b700131027236dce))
+* **impact-analysis:** truncate long names and fix badge pos ([f9e77b2](https://github.com/Fszta/parrant/commit/f9e77b283fa14294f9e6d913bcc57121216a2fab))
+
+## [0.6.0](https://github.com/Fszta/parrant/compare/v0.5.0...v0.6.0) (2025-11-26)
+
+
+### Features
+
+* add column relationship summary card to lineage view ([e3b1ce9](https://github.com/Fszta/parrant/commit/e3b1ce97cb3046d3176b5a29a40102621f3fc286))
+* add expand/collapse functionality for lineage graph ([#25](https://github.com/Fszta/parrant/issues/25)) ([f9a88a6](https://github.com/Fszta/parrant/commit/f9a88a6f0f3e299f11c498b2aad56a533408d4fd))
+* add search input and filtering to column selector ([ab6c8c2](https://github.com/Fszta/parrant/commit/ab6c8c294612132f8f4ad9528c0efa710fabd170))
+* add strip_sql_comments utility function ([28cdf95](https://github.com/Fszta/parrant/commit/28cdf95dffa5090d63dcafcd7bf6f144232dbec6))
+* improve SQL parser with forward references, EXCLUDE clause, and nested subquery support ([#24](https://github.com/Fszta/parrant/issues/24)) ([4a2bc73](https://github.com/Fszta/parrant/commit/4a2bc739c64596bf201d7a94b3b0cd4e94013a1e))
+
+
+### Bug Fixes
+
+* handle uppercase source ([85abcee](https://github.com/Fszta/parrant/commit/85abcee2f9ee9afb5469a057cb760aad596aa033))
+* non deterministic behavior ([7b27132](https://github.com/Fszta/parrant/commit/7b271326f40bbb758a087a75cde9ca8201453e26))
+* strip SQL comments in parser ([db91629](https://github.com/Fszta/parrant/commit/db9162911f943e57776511fc58d8a5cb340d9025))
+* strip SQL comments in service layer ([4f617c4](https://github.com/Fszta/parrant/commit/4f617c40e35c06ef7f4791390b26e0d799a1f863))
+
+## [0.5.0](https://github.com/Fszta/parrant/compare/v0.4.0...v0.5.0) (2025-11-16)
+
+
+### Features
+
+* add exposures to lineage ([#18](https://github.com/Fszta/parrant/issues/18)) ([a03f26c](https://github.com/Fszta/parrant/commit/a03f26ccb5e3f41f60d303413ba09f699c9bbe49))
+* add impact analysis to understand downstream effects of col changes ([#21](https://github.com/Fszta/parrant/issues/21)) ([1352fb4](https://github.com/Fszta/parrant/commit/1352fb4e7317d5322a779a9955bfd1b6100de11e))
+* enhance explore panel ui ([#19](https://github.com/Fszta/parrant/issues/19)) ([0a0e5d6](https://github.com/Fszta/parrant/commit/0a0e5d6a82a8f90e0688021494429565272131c1))
+
+
+### Bug Fixes
+
+* position nodes based on data flow, not selected node ([#15](https://github.com/Fszta/parrant/issues/15)) ([66805ec](https://github.com/Fszta/parrant/commit/66805ecdacc2d7280d70341e3be7e127129ff1e5))
+
+## [0.4.0](https://github.com/Fszta/parrant/compare/v0.3.1...v0.4.0) (2025-11-13)
+
+
+### Features
+
+* add explorable dbt project folder tree ([#11](https://github.com/Fszta/parrant/issues/11)) ([689902c](https://github.com/Fszta/parrant/commit/689902cf46177ce808390be61a81f88aaf5d8dab))
+* add mssqlserver / tsql adapter support ([#13](https://github.com/Fszta/parrant/issues/13)) ([30632fd](https://github.com/Fszta/parrant/commit/30632fd9899f421b98cfd955aab8f41208627ef1))
+
+## [0.3.1](https://github.com/Fszta/parrant/compare/v0.3.0...v0.3.1) (2025-04-12)
+
+
+### Bug Fixes
+
+* **lineage:** overlapping model boxes ([#6](https://github.com/Fszta/parrant/issues/6)) ([b582bea](https://github.com/Fszta/parrant/commit/b582bea14077e0122e6d9e090cf1d16d0711b202))
+
+## [0.3.0](https://github.com/Fszta/parrant/compare/v0.2.1...v0.3.0) (2025-04-09)
+
+
+### Features
+
+* add dialect support for SQL parser ([#5](https://github.com/Fszta/parrant/issues/5)) ([a1060e7](https://github.com/Fszta/parrant/commit/a1060e7ef9f5142ed2ea2912e7075c6da4a3887c))
+
+## [0.2.1](https://github.com/Fszta/parrant/compare/v0.2.0...v0.2.1) (2025-04-08)
+
+
+### Bug Fixes
+
+* model box drag behavior ([#3](https://github.com/Fszta/parrant/issues/3)) ([bcab221](https://github.com/Fszta/parrant/commit/bcab221dabcda80738aa13f5f9a5145ae4f4bc13))
+
+## [0.2.0](https://github.com/Fszta/parrant/compare/v0.1.1...v0.2.0) (2025-04-08)
+
+
+### Features
+
+* add explore CLI command for interactive lineage visualization ([#1](https://github.com/Fszta/parrant/issues/1)) ([f804bbc](https://github.com/Fszta/parrant/commit/f804bbc19ad2dfdc90d63cdaed88802646745d00))
+
+## [0.1.1](https://github.com/Fszta/parrant/compare/20ee116563dd2eff3233abb279531105168e5c2a...v0.1.1) (2025-03-30)
+
+
+### Features
+
+* add cli with display format ([7243593](https://github.com/Fszta/parrant/commit/72435938c430343ee22987437db71e9b063f5a78))
+* add html lineage ([dec8602](https://github.com/Fszta/parrant/commit/dec86028fd90eef934046c1b0bf54ae2ddd2a92f))
+* handle select star ([023a4e4](https://github.com/Fszta/parrant/commit/023a4e46d554077934943146069a62f7fd49bd71))
+* handle star refs ([a5795de](https://github.com/Fszta/parrant/commit/a5795de5f91d2ed2896ca3e8ccfbfaaa9b18efd9))
+* improve html display ([006a560](https://github.com/Fszta/parrant/commit/006a560b354a632597bbfb0668f91e00a2d689db))
+* support html render ([d6a067d](https://github.com/Fszta/parrant/commit/d6a067db7c6cb877c32203e64d291bdd682c3f22))
+
+
+### Bug Fixes
+
+* raw table name ([20ee116](https://github.com/Fszta/parrant/commit/20ee116563dd2eff3233abb279531105168e5c2a))
+* test csv file name ([60b8853](https://github.com/Fszta/parrant/commit/60b885307ae823c716287194184ef4e5f33c4ef7))
+* use source name instead of identifier ([2e83693](https://github.com/Fszta/parrant/commit/2e8369398db0b4ec40b48eb34d19e1f7d6e5dc43))
+
