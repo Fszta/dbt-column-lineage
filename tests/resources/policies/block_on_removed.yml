@@ -1,0 +1,17 @@
+# Test fixture — a deterministic, metadata-free blocking rule.
+#
+# Fires on any REMOVED column, using only the `change` axis (no reach/meta needed), so the
+# CLI/CI wiring can be exercised end-to-end without depending on the test project's dbt meta.
+version: 1
+rules:
+  - id: block-on-removed
+    description: Any removed column blocks (wiring fixture — not a real governance rule).
+    scope: change
+    predicate:
+      change: { field: kind, op: eq, value: removed }
+    action:
+      - type: block
+      - type: notify
+        channel: slack
+        target: "#eng"
+        message: "Column removed on {change.model}.{change.column}"

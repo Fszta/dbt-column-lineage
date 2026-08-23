@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set
 
-from dbt_column_lineage.artifacts.registry import ModelRegistry
+from dbt_column_lineage.lineage.provider import LineageAndMetadataProvider, LineageProvider
 from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
 from dbt_column_lineage.models.schema import BreakFinding, TestNode
 
@@ -24,7 +24,7 @@ from dbt_column_lineage.models.schema import BreakFinding, TestNode
 _COLUMN_GONE_KINDS = (ChangeKind.REMOVED,)
 
 
-def _column_missing_in_head(head: ModelRegistry, model: str, column: str) -> bool:
+def _column_missing_in_head(head: LineageProvider, model: str, column: str) -> bool:
     """True when ``model.column`` no longer exists in the head registry.
 
     This is the guard that keeps a break *provable*: we only flag a test as broken when the
@@ -40,8 +40,8 @@ def _column_missing_in_head(head: ModelRegistry, model: str, column: str) -> boo
 
 def classify_provable_breaks(
     changes: List[ColumnChange],
-    head_registry: ModelRegistry,
-    base_registry: Optional[ModelRegistry] = None,
+    head_registry: LineageAndMetadataProvider,
+    base_registry: Optional[LineageAndMetadataProvider] = None,
 ) -> List[BreakFinding]:
     """Return the dbt tests that a changeset provably breaks (BREAK-TEST).
 

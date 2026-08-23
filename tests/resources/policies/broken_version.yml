@@ -1,0 +1,4 @@
+# Test fixture — a present-but-invalid policy (unsupported major version). load_policy must
+# raise PolicyConfigError so the run fails LOUDLY rather than degrading to "no policy".
+version: 99
+rules: []

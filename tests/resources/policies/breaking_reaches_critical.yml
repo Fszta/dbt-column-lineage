@@ -1,0 +1,23 @@
+# Example (b) — a breaking change reaching a critical mart.
+#
+# PURE CONSUMER CONFIG expressing `critical:true` gating. It is breaking-aware: a
+# proven-equivalent refactor (semantic == equivalent) that reaches a critical mart
+# does NOT block. A breaking change that reaches a critical mart blocks AND schedules
+# a selective rebuild of only the descendants that actually recompute.
+version: 1
+rules:
+  - id: breaking-reaches-critical
+    description: A breaking change that reaches a critical mart must block.
+    scope: change
+    predicate:
+      all:
+        - change: { field: breaking, op: is_true } # semantic != equivalent (fail-safe)
+        - reach:
+            kind: model
+            where:
+              meta: { key: critical, op: is_true }
+    action:
+      - type: block
+      - type: add-to-build-set
+        include: reached
+        mechanism: [derived_recompute, rowset_filter] # rebuild only what recomputes

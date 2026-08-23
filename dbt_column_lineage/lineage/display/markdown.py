@@ -14,6 +14,9 @@ from typing import Any, Dict, List, Tuple
 
 # Fold long dashboard lists so a huge blast radius stays scrollable.
 _MAX_DASHBOARDS_INLINE = 8
+# Cap the affected-column chain shown per cross-boundary dashboard: enough to
+# be actionable ("go straight to `revenue`"), not a wall of columns on a wide `select *`.
+_MAX_VIA_COLUMNS_INLINE = 4
 # Truncate a single SQL expression past this many chars (a 2000-char JSON_OBJECT on one
 # line forces horizontal scroll and makes the whole disclosure useless).
 _MAX_SQL_CHARS = 400
@@ -122,6 +125,121 @@ def _confidence_reason_words(confidence: Dict[str, Any]) -> str:
     if no_column_info:
         return " (they expose no column-level information)"
     return ""
+
+
+# Policy gate decision → a one-glyph severity marker (amber reserved for the one blocking
+# band, per DESIGN.md's rationed-colour rule).
+_POLICY_DECISION_MARKER = {
+    "block": "⛔",
+    "warn": "🟡",
+    "allow": "🟢",
+}
+# Order decisions block-first so the reviewer reads the reason it blocked before anything else.
+_POLICY_DECISION_ORDER = ["block", "warn", "allow"]
+
+
+def _policy_hit_line(hit: Dict[str, Any]) -> str:
+    """One line for a fired rule: the rule id, the subject change, and the matched reach.
+
+    Deliberately references node NAMES only — the blast radius already has its own section
+    above, and re-listing it here would duplicate (and risk contradicting) that report.
+    """
+    rule_id = hit.get("rule_id", "?")
+    model = hit.get("change_model")
+    column = hit.get("change_column")
+    if model and column:
+        subject = f"`{model}.{column}`"
+    elif model:
+        subject = f"`{model}`"
+    else:
+        subject = "_changeset_"  # aggregate-scope rule: no single subject
+    reach = hit.get("matched_reach") or []
+    reach_txt = ""
+    if reach:
+        names = ", ".join(f"`{name}`" for name in reach)
+        reach_txt = f" → reaches {names}"
+    return f"- **{rule_id}** — {subject}{reach_txt}"
+
+
+def _render_policy_section(verdict: Dict[str, Any]) -> List[str]:
+    """Render the policy-engine verdict: fired rules grouped by decision (block first),
+    the selective build/test sets, and the notify intents for the consumer's CI to route.
+
+    Rendered ONLY when a policy is present (the caller guards on ``report['policy_verdict']``).
+    Does NOT re-list the downstream blast radius — the impact section owns that.
+    """
+    decision = str(verdict.get("decision", "allow"))
+    marker = _POLICY_DECISION_MARKER.get(decision, "🟢")
+    hits = verdict.get("hits") or []
+    out: List[str] = [f"### {marker} Policy verdict — {decision.upper()}", ""]
+
+    if decision == "block":
+        # A block must state its EXIT, not just the obstacle: reframe it as
+        # "block-until". The gate re-runs on every push and clears itself once the change stops
+        # tripping the rules below — so a reviewer sees the release path, not a dead end. This is
+        # pure messaging over the existing verdict; no override input is consulted.
+        out += [
+            "> **Blocked until the change stops tripping the rules below.** This gate re-runs on "
+            "every push and clears itself — no manual override needed. Clear it by any of: "
+            "reverting or proving-equivalent the breaking change; evolving the downstream model / "
+            "schema to absorb it; or stopping it from reaching the flagged object.",
+            "",
+        ]
+
+    if not hits:
+        out.append("No policy rule fired against this change.")
+    else:
+        by_decision: Dict[str, List[Dict[str, Any]]] = {}
+        for hit in hits:
+            by_decision.setdefault(str(hit.get("decision", "allow")), []).append(hit)
+        for band in _POLICY_DECISION_ORDER:
+            band_hits = by_decision.get(band)
+            if not band_hits:
+                continue
+            band_marker = _POLICY_DECISION_MARKER.get(band, "🟢")
+            out.append(f"**{band_marker} {band.capitalize()} ({len(band_hits)})**")
+            out.append("")
+            out += [_policy_hit_line(hit) for hit in band_hits]
+            out.append("")
+
+    build_set = verdict.get("build_set") or []
+    test_set = verdict.get("test_set") or []
+    if build_set or test_set:
+        if build_set:
+            out.append(
+                f"**Selective build set ({len(build_set)}):** "
+                + ", ".join(f"`{name}`" for name in build_set)
+            )
+        if test_set:
+            out.append(
+                f"**Selective test set ({len(test_set)}):** "
+                + ", ".join(f"`{name}`" for name in test_set)
+            )
+        out.append("")
+
+    notifications = verdict.get("notifications") or []
+    if notifications:
+        out.append(f"**Notifications ({len(notifications)})** — routed by your CI:")
+        out.append("")
+        for note in notifications:
+            channel = note.get("channel") or "?"
+            target = note.get("target") or "?"
+            message = note.get("message") or ""
+            out.append(f"- `{channel}` → **{target}**: {message}")
+        out.append("")
+
+    # Honesty counters — a fail-closed block driven by unknowns should read as such.
+    unresolved = int(verdict.get("unresolved_reach_count", 0) or 0)
+    skipped = int(verdict.get("skipped_missing_meta", 0) or 0)
+    honesty: List[str] = []
+    if unresolved:
+        honesty.append(f"{_plural(unresolved, 'change')} had unresolved reach (treated fail-safe)")
+    if skipped:
+        honesty.append(f"{_plural(skipped, 'rule evaluation')} skipped for missing meta")
+    if honesty:
+        out += ["<sub>" + " · ".join(honesty) + "</sub>", ""]
+
+    return out
 
 
 def render_changeset_markdown(report: Dict[str, Any]) -> str:
@@ -298,7 +416,27 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
             name = exp.get("name", "?")
             url = exp.get("url")
             head = f"- **[{name}]({url})**" if url else f"- **{name}**"
-            return head + _owner_suffix(exp)
+            # Cross-boundary provenance: a dashboard reached PAST dbt's edge via the
+            # Metabase artifact is tagged so a reviewer knows it's not a dbt-native exposure,
+            # and whether the reach is column-precise or coarse (table-grain).
+            tag = ""
+            if exp.get("source") == "metabase":
+                precision = exp.get("precision")
+                grain = " (table-grain)" if precision == "table" else ""
+                tag = f" — via **Metabase**{grain}"
+                # F4: name WHICH column(s) of the dashboard the change hits, so the reviewer
+                # goes straight to the field instead of hunting the whole board. Distinct
+                # `model.column`, deterministically ordered, capped. Empty on a table-grain
+                # reach (no proven column) — the "(table-grain)" tag already says why.
+                via = exp.get("via_columns") or []
+                cols = sorted({f"{v['model']}.{v['column']}" for v in via if isinstance(v, dict)})
+                if cols:
+                    shown = ", ".join(f"`{c}`" for c in cols[:_MAX_VIA_COLUMNS_INLINE])
+                    extra = len(cols) - _MAX_VIA_COLUMNS_INLINE
+                    if extra > 0:
+                        shown += f" +{extra} more"
+                    tag += f" · affects {shown}"
+            return head + tag + _owner_suffix(exp)
 
         if apps:
             out.append(
@@ -330,6 +468,11 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
             )
             out.append(f"- **`{model}`**: {names}")
         out += ["", "</details>", ""]
+
+    # --- 🛡️ Policy verdict (only when a policy ran) --------------------------------------
+    policy_verdict = report.get("policy_verdict")
+    if isinstance(policy_verdict, dict):
+        out += _render_policy_section(policy_verdict)
 
     # --- Footer: confidence + coverage (small, plain, honest) ----------------------------
     footer: List[str] = []
@@ -369,6 +512,20 @@ def render_changeset_markdown(report: Dict[str, Any]) -> str:
         footer.append(
             f"{_plural(unresolved, 'change')} could not be traced downstream (e.g. a removed column)."
         )
+    # Cross-boundary (Metabase) reach honesty: a stale or coarse snapshot must read as such so a
+    # fail-closed policy block driven by it is explainable, never a fabricated certainty.
+    metabase = report.get("metabase")
+    if isinstance(metabase, dict) and metabase.get("level") != "absent":
+        reached = metabase.get("dashboards_reached", 0)
+        table_only = metabase.get("cards_table_only", 0)
+        bits = f"Metabase reach: {_plural(reached, 'dashboard')}"
+        if table_only:
+            bits += f" ({table_only} table-grain, not column-precise)"
+        if metabase.get("stale"):
+            age = metabase.get("snapshot_age_hours")
+            age_txt = f" ({age:.0f}h old)" if isinstance(age, (int, float)) else ""
+            bits += f" — ⚠️ snapshot is STALE{age_txt}; treat this reach as degraded"
+        footer.append(bits + ".")
     if footer:
         out += ["<sub>" + " · ".join(footer) + "</sub>", ""]
 
