@@ -10,7 +10,7 @@ from typing import Dict, List, Tuple
 
 from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
 from dbt_column_lineage.lineage.verdict import classify_provable_breaks, decide_verdict
-from dbt_column_lineage.models.schema import BreakFinding, TestNode
+from dbt_column_lineage.models.schema import BreakFinding, SemanticChangeKind, TestNode
 
 
 @dataclass
@@ -231,3 +231,46 @@ def test_verdict_safe_when_nothing_recomputes():
         decide_verdict([], {"critical_count": 0, "filter_count": 0, "affected_exposures": 0})
         == "safe"
     )
+
+
+_NO_REACH = {"critical_count": 0, "filter_count": 0, "affected_exposures": 0}
+
+
+def _logic_change(semantic: SemanticChangeKind) -> ColumnChange:
+    return ColumnChange(
+        model="orders", column="total", kind=ChangeKind.LOGIC_CHANGED, semantic=semantic
+    )
+
+
+def test_verdict_meaning_changed_lifts_safe_to_review():
+    changes = [_logic_change(SemanticChangeKind.MEANING_CHANGED)]
+    assert decide_verdict([], _NO_REACH, changes) == "review"
+
+
+def test_verdict_indeterminate_lifts_safe_to_review():
+    changes = [_logic_change(SemanticChangeKind.INDETERMINATE)]
+    assert decide_verdict([], _NO_REACH, changes) == "review"
+
+
+def test_verdict_equivalent_stays_safe():
+    # EQUIVALENT is normally never emitted, but if it appears it must not escalate.
+    changes = [_logic_change(SemanticChangeKind.EQUIVALENT)]
+    assert decide_verdict([], _NO_REACH, changes) == "safe"
+
+
+def test_verdict_structural_change_without_semantic_stays_safe():
+    # A removed/added column carries no semantic; the semantic axis leaves it untouched here
+    # (its own severity is conveyed elsewhere, not by this axis).
+    changes = [ColumnChange(model="orders", column="total", kind=ChangeKind.REMOVED)]
+    assert decide_verdict([], _NO_REACH, changes) == "safe"
+
+
+def test_verdict_meaning_shift_never_blocks():
+    # BLOCK stays reserved for provable breaks; a meaning shift can only reach review.
+    changes = [_logic_change(SemanticChangeKind.MEANING_CHANGED)]
+    assert decide_verdict([], _NO_REACH, changes) != "block"
+
+
+def test_verdict_omitting_changes_is_backward_compatible():
+    # Legacy 2-arg calls keep the pre-semantic behavior.
+    assert decide_verdict([], _NO_REACH) == "safe"

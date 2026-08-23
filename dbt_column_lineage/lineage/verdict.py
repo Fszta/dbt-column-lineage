@@ -118,13 +118,42 @@ def classify_provable_breaks(
     return findings
 
 
-def decide_verdict(breaks: List[BreakFinding], summary: Dict[str, Any]) -> str:
-    """Collapse breaks + blast-radius summary into a single ruling.
+def _has_meaning_shift(changes: Optional[List[ColumnChange]]) -> bool:
+    """True when any change carries a proven-or-unprovable meaning shift.
+
+    An ``EQUIVALENT`` edit is never emitted as a change, so a *set* ``semantic`` is always
+    either ``MEANING_CHANGED`` (the AST diff proved the derivation's meaning moved) or
+    ``INDETERMINATE`` (it could not be proven safe) — both ``is_breaking``. Either warrants
+    a human look, even when nothing downstream is recomputed.
+    """
+    if not changes:
+        return False
+    return any(c.semantic is not None and c.semantic.is_breaking for c in changes)
+
+
+def decide_verdict(
+    breaks: List[BreakFinding],
+    summary: Dict[str, Any],
+    changes: Optional[List[ColumnChange]] = None,
+) -> str:
+    """Collapse breaks + blast-radius summary + semantic axis into a single ruling.
 
     - ``block``: at least one provable break — objective enough to fail a gate.
-    - ``review``: no provable break, but the change recomputes downstream logic, shifts a
-      row-set, or reaches a business-facing exposure — a human should look.
-    - ``safe``: nothing downstream is recomputed and no exposure is touched.
+    - ``review``: no provable break, but *either* the change recomputes downstream logic,
+      shifts a row-set, or reaches a business-facing exposure, *or* the semantic diff found
+      a column whose meaning changed (``MEANING_CHANGED``) or couldn't be proven safe
+      (``INDETERMINATE``) — a human should look.
+    - ``safe``: nothing downstream is recomputed, no exposure is touched, and every changed
+      column's derivation is a proven ``EQUIVALENT`` (or non-logic) edit.
+
+    The semantic axis only ever lifts ``safe`` → ``review``; it never drives ``block``. BLOCK
+    stays reserved for provable test breaks so the current conservative canonicalizer — which
+    can over-classify a redundant-paren or commutative-reorder rewrite as ``MEANING_CHANGED``
+    — cannot hard-fail a cosmetic edit. Teams that trust their categorization can opt a
+    meaning shift into a hard block through the policy engine.
+
+    ``changes`` is optional for backward compatibility; without it the semantic axis is
+    simply invisible (the pre-existing breaks + blast-radius behavior).
     """
     if breaks:
         return "block"
@@ -133,4 +162,4 @@ def decide_verdict(breaks: List[BreakFinding], summary: Dict[str, Any]) -> str:
         or summary.get("filter_count", 0)
         or summary.get("affected_exposures", 0)
     )
-    return "review" if reaches_review else "safe"
+    return "review" if reaches_review or _has_meaning_shift(changes) else "safe"

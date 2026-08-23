@@ -86,3 +86,33 @@ def test_filter_only_changeset_is_review_not_safe(dbt_artifacts):
     assert summary["filter_count"] >= 1
     # No provable break (logic change), but a row-set shift → REVIEW, never SAFE.
     assert decide_verdict([], summary) == "review"
+
+
+def test_meaning_change_on_leaf_column_is_review_not_safe(dbt_artifacts):
+    """A proven meaning shift with zero downstream reach must still be REVIEW, not SAFE.
+
+    ``flagged_transaction_metrics.flagged_transaction_count`` is a terminal mart column:
+    nothing selects, filters, or exposes it, so the blast-radius summary is empty. Before the
+    semantic axis fed the verdict, that read as SAFE even though the derivation's meaning
+    changed. It must now escalate to REVIEW purely on the semantic classification.
+    """
+    from dbt_column_lineage.lineage.changeset import ChangeKind, ColumnChange
+    from dbt_column_lineage.models.schema import SemanticChangeKind
+
+    svc = LineageService(Path(dbt_artifacts["catalog_path"]), Path(dbt_artifacts["manifest_path"]))
+    changes = [
+        ColumnChange(
+            "flagged_transaction_metrics",
+            "flagged_transaction_count",
+            ChangeKind.LOGIC_CHANGED,
+            semantic=SemanticChangeKind.MEANING_CHANGED,
+        )
+    ]
+    summary = svc.get_changeset_impact(changes)["summary"]
+    # Confirm the column genuinely has no blast radius, so the escalation is purely semantic.
+    assert not summary.get("critical_count")
+    assert not summary.get("filter_count")
+    assert not summary.get("affected_exposures")
+
+    assert decide_verdict([], summary) == "safe"  # legacy 2-arg path: semantic invisible
+    assert decide_verdict([], summary, changes) == "review"  # semantic axis lifts it
