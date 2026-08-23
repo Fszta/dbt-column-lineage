@@ -10,10 +10,11 @@ through the existing traversal core, deduplicating downstream nodes.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -23,7 +24,12 @@ from dbt_column_lineage.lineage.semantic_diff import (
     canonical_key,
     compare_expressions,
 )
-from dbt_column_lineage.models.schema import SemanticChangeKind
+from dbt_column_lineage.models.schema import (
+    OverrideDirective,
+    OverrideVerb,
+    SemanticChangeKind,
+)
+from dbt_column_lineage.parser.sql_parser import parse_override_directives
 from dbt_column_lineage.parser.sql_parser_utils import strip_sql_comments
 
 logger = logging.getLogger(__name__)
@@ -77,6 +83,10 @@ class ColumnChange:
     reason: Optional[str] = None
     base_expression: Optional[str] = None
     head_expression: Optional[str] = None
+    # the override pragma acknowledging this change, when one resolved to it. Excluded from
+    # equality/hashing (``compare=False``) so it never perturbs the sort key or dedup, and so a
+    # frozen ``ColumnChange`` stays hashable even though ``OverrideDirective`` (pydantic) is not.
+    override: Optional[OverrideDirective] = field(default=None, compare=False)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -93,6 +103,16 @@ class ColumnChange:
                 "reason": self.reason,
                 "base": self.base_expression,
                 "head": self.head_expression,
+            }
+        # Only attach ``override`` when one is present, so JSON stays byte-stable when absent.
+        # Flows into service.by_change automatically (by_change spreads change.to_dict()).
+        if self.override is not None:
+            payload["override"] = {
+                "verb": self.override.verb.value,
+                "column": self.override.column,
+                "reason": self.override.reason,
+                "source_line": self.override.source_line,
+                "scope": self.override.scope,
             }
         return payload
 
@@ -120,6 +140,99 @@ def _registry_dialect(registry: object) -> Optional[str]:
         return None
     dialect = getter()
     return dialect if isinstance(dialect, str) else None
+
+
+@dataclass
+class OverrideResolution:
+    """Collected side-outputs of override resolution: stale directives + parse warnings.
+
+    ``stale`` holds directives whose target column is NOT in the changeset (a dead excuse to
+    prune); ``warnings`` holds human strings for malformed / reasonless / unknown-verb pragmas.
+    Used as an out-param by :func:`build_git_changeset` (a free function) so its return type
+    stays ``List[ColumnChange]`` and existing callers are unaffected.
+    """
+
+    stale: List[Dict[str, object]] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
+
+def _stale_record(directive: OverrideDirective) -> Dict[str, object]:
+    """The report skeleton for a stale (no matching change) override."""
+    record = directive.to_record()
+    return record
+
+
+def _attach_override(change: ColumnChange, directive: OverrideDirective) -> ColumnChange:
+    """Attach ``directive`` to ``change`` (frozen => ``dataclasses.replace``), hard-wins.
+
+    Precedence when a column already carries an override: an existing hard ``allow-break`` is
+    NEVER downgraded by a later soft ``allow-change`` (the strongest verb wins so the audit
+    trail keeps the loudest acknowledgement). Any other combination is last-wins.
+    """
+    existing = change.override
+    if (
+        existing is not None
+        and existing.verb is OverrideVerb.ALLOW_BREAK
+        and directive.verb is OverrideVerb.ALLOW_CHANGE
+    ):
+        return change
+    return dataclasses.replace(change, override=directive)
+
+
+def resolve_overrides(
+    model_to_sql: Dict[str, Optional[str]],
+    changes: List[ColumnChange],
+) -> Tuple[List[ColumnChange], List[Dict[str, object]], List[str]]:
+    """Attach override pragmas parsed from each model's head SQL to the matching changes.
+
+    Shared by :class:`ChangesetBuilder` and :func:`build_git_changeset` so both entry points
+    resolve overrides identically. Returns ``(changes, stale, warnings)``:
+      * model-scope directive => attached to EVERY changed column of that model; stale when the
+        model has zero changed columns;
+      * column-scope directive => attached to the (case-insensitive) matching changed column;
+        stale when the named/adjacency-resolved column is not in the changeset (or unresolved).
+    Names are lowercased to match the ``ColumnChange`` keys.
+    """
+    result = list(changes)
+    changes_by_model: Dict[str, List[int]] = {}
+    for idx, change in enumerate(result):
+        changes_by_model.setdefault(change.model.lower(), []).append(idx)
+
+    stale: List[Dict[str, object]] = []
+    warnings: List[str] = []
+
+    for model_name, sql in model_to_sql.items():
+        if not sql:
+            # No compiled/raw SQL for this model => no pragmas seen (honest no-op, not a stale).
+            continue
+        directives, parse_warnings = parse_override_directives(sql)
+        for warning in parse_warnings:
+            warnings.append(f"{model_name}: {warning}")
+        if not directives:
+            continue
+        idxs = changes_by_model.get(model_name.lower(), [])
+        for directive in directives:
+            located = directive.model_copy(update={"model": model_name})
+            if located.scope == "model" and located.column is None:
+                if not idxs:
+                    stale.append(_stale_record(located))
+                    continue
+                for i in idxs:
+                    result[i] = _attach_override(result[i], located)
+                continue
+            # column scope (explicit column= or line-adjacency; column may be None => stale).
+            target = None
+            if located.column is not None:
+                for i in idxs:
+                    if result[i].column.lower() == located.column:
+                        target = i
+                        break
+            if target is None:
+                stale.append(_stale_record(located))
+                continue
+            result[target] = _attach_override(result[target], located)
+
+    return result, stale, warnings
 
 
 @dataclass
@@ -151,6 +264,7 @@ class ChangesetBuilder:
         base: LineageProvider,
         head: LineageProvider,
         dialect: Optional[str] = None,
+        honor_overrides: bool = True,
     ):
         self.base = base
         self.head = head
@@ -158,6 +272,11 @@ class ChangesetBuilder:
         # Snowflake identifier folding). Resolve it from the head registry when not given,
         # defensively so the 2-arg call and stubs without ``get_dialect`` keep working.
         self._dialect = dialect if dialect is not None else _registry_dialect(head)
+        # when True (default), parse override pragmas from head SQL and attach them.
+        # ``--no-overrides`` sets this False to compute the raw gate (audit / the backtest).
+        self.honor_overrides = honor_overrides
+        self.stale_overrides: List[Dict[str, object]] = []
+        self.override_warnings: List[str] = []
 
     def build(self) -> List[ColumnChange]:
         # (model, column) -> ColumnChange, keeping the highest-priority kind.
@@ -246,7 +365,25 @@ class ChangesetBuilder:
                         )
                     )
 
-        return sorted(chosen.values(), key=lambda c: (c.model, c.column, c.kind.value))
+        chosen_changes = list(chosen.values())
+        if self.honor_overrides:
+            chosen_changes = self._apply_overrides(chosen_changes)
+        return sorted(chosen_changes, key=lambda c: (c.model, c.column, c.kind.value))
+
+    def _apply_overrides(self, changes: List[ColumnChange]) -> List[ColumnChange]:
+        """Parse override pragmas from each changed model's head SQL and attach them.
+
+        Compiled dbt SQL preserves ``--`` comments, so the head compiled SQL is the pragma
+        source. Records stale directives / parse warnings on ``self`` for the report.
+        """
+        model_to_sql: Dict[str, Optional[str]] = {
+            model_name: self._safe_compiled_sql(self.head, model_name)
+            for model_name in {change.model for change in changes}
+        }
+        resolved, stale, warnings = resolve_overrides(model_to_sql, changes)
+        self.stale_overrides = stale
+        self.override_warnings = warnings
+        return resolved
 
     def _both_catalog_backed(self, model_name: str) -> bool:
         """True when the model has a real catalog entry in BOTH base and head.
@@ -446,12 +583,20 @@ def build_git_changeset(
     head: LineageProvider,
     git_base: str,
     repo_dir: Optional[str] = None,
+    honor_overrides: bool = True,
+    collect: Optional[OverrideResolution] = None,
 ) -> List[ColumnChange]:
     """Fallback changeset: diff ``.sql`` model files against ``git_base``.
 
     When only one manifest is available we cannot diff columns, so every column
     of each touched model is reported as ``logic_changed`` — a coarse but honest
     signal. Files are mapped to models via each model's ``resource_path``.
+
+    when ``honor_overrides`` (default), override pragmas from head SQL are attached to
+    the logic changes; there are no provable breaks here so ``allow-break`` has nothing to
+    demote, but ``allow-change`` still suppresses the meaning-shift/reach review. Stale
+    directives and parse warnings are written to ``collect`` when supplied (the return type
+    stays ``List[ColumnChange]`` so existing callers are unaffected).
     """
     changed_models = git_changed_models(head, git_base, repo_dir)
     if not changed_models:
@@ -472,7 +617,17 @@ def build_git_changeset(
                 semantic=SemanticChangeKind.INDETERMINATE,
             )
 
-    return sorted(chosen.values(), key=lambda c: (c.model, c.column))
+    changes = sorted(chosen.values(), key=lambda c: (c.model, c.column))
+    if honor_overrides:
+        model_to_sql: Dict[str, Optional[str]] = {
+            model_name: ChangesetBuilder._safe_compiled_sql(head, model_name)
+            for model_name in changed_models
+        }
+        changes, stale, warnings = resolve_overrides(model_to_sql, changes)
+        if collect is not None:
+            collect.stale = stale
+            collect.warnings = warnings
+    return changes
 
 
 def scope_changes_to_models(changes: List[ColumnChange], models: Set[str]) -> List[ColumnChange]:

@@ -219,9 +219,31 @@ by unknowns reads as such rather than as fabricated certainty.
 
 ---
 
+## 9. Override pragmas — the audited escape hatch
+
+**Code:** `OverrideDirective` / `OverrideVerb` (`models/schema.py`), `ColumnChange.override` ·
+**JSON:** the report's `overrides` / `ineffective_overrides` / `stale_overrides` /
+`override_warnings` blocks · **UI/CI:** the Markdown override section and the action's
+`overrides_applied` output.
+
+An in-code SQL comment in the head model that acknowledges one changed column, with a mandatory
+reason — the supported way to lower a verdict without disarming the gate. Full behaviour:
+[policy guide → overriding a verdict](policy-gate.md#overriding-a-verdict-the-in-code-escape-hatch).
+
+| Term | Meaning |
+|---|---|
+| `-- lineage:allow-change` | Downgrades a REVIEW / WARN contribution for its column to *allow*. **Cannot** touch a provable break. |
+| `-- lineage:allow-break` | The only verb that can downgrade a provable BLOCK — to REVIEW (no-policy gate) or WARN (policy gate), never to *safe*. |
+| Honored override | A pragma that matched a real change and lowered its severity — listed in `overrides` and counted by `overrides_applied`. |
+| Ineffective override | Matched a real changed column but changed nothing (e.g. `allow-break` on an `added` column) — surfaced with a fix hint. |
+| Stale override | Named / resolved to a column that isn't in the changeset at all — a dead excuse to prune. |
+| Dropped pragma | Malformed / reasonless / unknown-verb — ignored with a loud warning, ruling unchanged. |
+
+---
+
 ## See also
 
 - [Overview](overview.md) — how the layers fit together.
 - [Semantic categorization](semantic-categorization.md) — the AST-diff engine (§1–2).
-- [Policy gate](policy-gate.md) — rules, actions, decisions, fail-safe (§3–7).
+- [Policy gate](policy-gate.md) — rules, actions, decisions, fail-safe, override pragmas (§3–9).
 - [Cross-boundary (Metabase)](metabase.md) — reach kinds and precision (§3).

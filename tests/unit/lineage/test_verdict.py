@@ -274,3 +274,179 @@ def test_verdict_meaning_shift_never_blocks():
 def test_verdict_omitting_changes_is_backward_compatible():
     # Legacy 2-arg calls keep the pre-semantic behavior.
     assert decide_verdict([], _NO_REACH) == "safe"
+
+
+# --- overrides: decide_verdict + applied/ineffective override records ----
+
+from dbt_column_lineage.models.schema import OverrideDirective, OverrideVerb  # noqa: E402
+from dbt_column_lineage.lineage.verdict import (  # noqa: E402
+    applied_overrides,
+    ineffective_overrides,
+    unexcused_break_count,
+)
+
+
+def _directive(verb, column=None, scope="column", reason="because"):
+    return OverrideDirective(verb=verb, column=column, reason=reason, scope=scope, source_line=2)
+
+
+def _removed_change(model="orders", column="customer_id", override=None):
+    return ColumnChange(model=model, column=column, kind=ChangeKind.REMOVED, override=override)
+
+
+def _logic_change_ov(semantic, override=None, model="orders", column="total"):
+    return ColumnChange(
+        model=model,
+        column=column,
+        kind=ChangeKind.LOGIC_CHANGED,
+        semantic=semantic,
+        override=override,
+    )
+
+
+def test_allow_break_demotes_lone_break_to_review():
+    ov = _directive(OverrideVerb.ALLOW_BREAK, column="customer_id")
+    change = _removed_change(override=ov)
+    # A single provable break, acknowledged by allow-break -> floors at review, never safe.
+    assert decide_verdict([_finding()], _NO_REACH, [change]) == "review"
+
+
+def test_allow_change_cannot_downgrade_a_provable_break():
+    # HEADLINE FAIL-SAFE: the soft verb must NOT silence a break -> stays block.
+    ov = _directive(OverrideVerb.ALLOW_CHANGE, column="customer_id")
+    change = _removed_change(override=ov)
+    assert decide_verdict([_finding()], _NO_REACH, [change]) == "block"
+
+
+def test_allow_break_beats_allow_change_precedence_stays_review():
+    # Two pragmas on the same break column: hard (allow-break) wins -> demoted to review,
+    # never safe, never block.
+    from dbt_column_lineage.lineage.changeset import resolve_overrides
+
+    hard = 'select\n  -- lineage:allow-change column=customer_id reason="soft"\n  -- lineage:allow-break column=customer_id reason="hard"\n  x\n'
+    change = _removed_change()
+    resolved, _stale, _warn = resolve_overrides({"orders": hard}, [change])
+    assert resolved[0].override.verb is OverrideVerb.ALLOW_BREAK
+    assert decide_verdict([_finding()], _NO_REACH, resolved) == "review"
+
+
+def test_unexcused_break_count_drops_with_allow_break():
+    ov = _directive(OverrideVerb.ALLOW_BREAK, column="customer_id")
+    change = _removed_change(override=ov)
+    assert unexcused_break_count([_finding()], [change]) == 0
+    # allow-change does NOT excuse a break.
+    change2 = _removed_change(override=_directive(OverrideVerb.ALLOW_CHANGE, column="customer_id"))
+    assert unexcused_break_count([_finding()], [change2]) == 1
+    # no changes / no override -> count unchanged.
+    assert unexcused_break_count([_finding()], None) == 1
+
+
+def test_reach_review_suppressed_only_when_all_reaching_overridden():
+    ov = _directive(OverrideVerb.ALLOW_CHANGE, column="total")
+    change = _logic_change_ov(SemanticChangeKind.EQUIVALENT, override=ov)
+    by_change = [
+        {
+            "model": "orders",
+            "column": "total",
+            "kind": "logic_changed",
+            "resolved": True,
+            "reached_columns": [{"model": "m", "column": "c", "mechanism": "derived_recompute"}],
+            "reached_exposures": [],
+        }
+    ]
+    summary = {"critical_count": 1, "filter_count": 0, "affected_exposures": 0}
+    # Every reaching change is overridden -> review suppressed to safe.
+    assert decide_verdict([], summary, [change], by_change=by_change) == "safe"
+
+
+def test_reach_review_never_suppressed_in_fallback_without_by_change():
+    # by_change absent -> reach review CANNOT be suppressed (fail-safe), even with an override.
+    ov = _directive(OverrideVerb.ALLOW_CHANGE, column="total")
+    change = _logic_change_ov(SemanticChangeKind.EQUIVALENT, override=ov)
+    summary = {"critical_count": 0, "filter_count": 0, "affected_exposures": 1}
+    assert decide_verdict([], summary, [change], by_change=None) == "review"
+
+
+def test_reach_review_stands_when_one_reaching_change_unacknowledged():
+    ack = _logic_change_ov(
+        SemanticChangeKind.EQUIVALENT,
+        override=_directive(OverrideVerb.ALLOW_CHANGE, column="total"),
+        column="total",
+    )
+    unack = _logic_change_ov(SemanticChangeKind.EQUIVALENT, override=None, column="other")
+    by_change = [
+        {
+            "model": "orders",
+            "column": "total",
+            "kind": "logic_changed",
+            "resolved": True,
+            "reached_columns": [{"model": "m", "column": "c", "mechanism": "rowset_filter"}],
+            "reached_exposures": [],
+        },
+        {
+            "model": "orders",
+            "column": "other",
+            "kind": "logic_changed",
+            "resolved": True,
+            "reached_columns": [{"model": "m", "column": "d", "mechanism": "derived_recompute"}],
+            "reached_exposures": [],
+        },
+    ]
+    summary = {"critical_count": 2, "filter_count": 0, "affected_exposures": 0}
+    assert decide_verdict([], summary, [ack, unack], by_change=by_change) == "review"
+
+
+def test_verdict_parity_no_override_matches_legacy():
+    # With no pragma present, threading by_change must not change the string vs legacy.
+    change = _logic_change_ov(SemanticChangeKind.MEANING_CHANGED, override=None)
+    by_change = [
+        {
+            "model": "orders",
+            "column": "total",
+            "kind": "logic_changed",
+            "resolved": True,
+            "reached_columns": [{"model": "m", "column": "c", "mechanism": "derived_recompute"}],
+            "reached_exposures": [],
+        },
+    ]
+    summary = {"critical_count": 1, "filter_count": 0, "affected_exposures": 0}
+    assert decide_verdict([], summary, [change]) == "review"
+    assert decide_verdict([], summary, [change], by_change=by_change) == "review"
+
+
+def test_applied_overrides_records_break_demotion():
+    ov = _directive(OverrideVerb.ALLOW_BREAK, column="customer_id")
+    change = _removed_change(override=ov)
+    records = applied_overrides([change], [_finding()], by_change=[])
+    assert len(records) == 1
+    assert records[0]["downgraded_from"] == "block"
+    assert records[0]["downgraded_to"] == "review"
+    assert records[0]["verb"] == "allow-break"
+    assert records[0]["reason"] == "because"
+
+
+def test_applied_overrides_skips_allow_change_on_break():
+    ov = _directive(OverrideVerb.ALLOW_CHANGE, column="customer_id")
+    change = _removed_change(override=ov)
+    assert applied_overrides([change], [_finding()], by_change=[]) == []
+    # ...and it surfaces as ineffective with a "use allow-break" hint.
+    ineff = ineffective_overrides([change], [_finding()], by_change=[])
+    assert len(ineff) == 1
+    assert "allow-break" in ineff[0]["hint"]
+
+
+def test_ineffective_override_on_added_column_gets_rename_hint():
+    ov = _directive(OverrideVerb.ALLOW_BREAK, column="amount_eur")
+    change = ColumnChange(model="orders", column="amount_eur", kind=ChangeKind.ADDED, override=ov)
+    ineff = ineffective_overrides([change], [], by_change=[])
+    assert len(ineff) == 1
+    assert "REMOVED old column" in ineff[0]["hint"]
+
+
+def test_applied_overrides_records_reach_suppression():
+    ov = _directive(OverrideVerb.ALLOW_CHANGE, column="total")
+    change = _logic_change_ov(SemanticChangeKind.MEANING_CHANGED, override=ov)
+    records = applied_overrides([change], [], by_change=[])
+    assert len(records) == 1
+    assert records[0]["downgraded_from"] == "review"
+    assert records[0]["downgraded_to"] == "safe"

@@ -60,6 +60,7 @@ The action exposes the impact result so later workflow steps can react to it:
 | `provable_breaks` | Number of dbt tests the change orphans (will fail on the next `dbt build`). |
 | `verdict` | Overall ruling — `safe`, `review`, or `block`. |
 | `tripped_level` | Highest severity band reached — `none`, `any`, `critical`, `exposures`, or `tests`. |
+| `overrides_applied` | Number of honored `-- lineage:allow-*` override pragmas that lowered the ruling on this run (`0` when none). |
 
 Give the action an `id` and read `steps.<id>.outputs.*` in a later step:
 

@@ -1092,3 +1092,120 @@ def test_semantic_knobs_fold_into_user_rules_most_severe_wins():
     assert verdict.decision is GateDecision.BLOCK
     assert any(h.rule_id == "builtin:on_meaning_changed" for h in verdict.hits)
     assert any(h.rule_id == "warn-any-logic" for h in verdict.hits)
+
+
+# --- override caps -------------------------------------------------------
+
+from dbt_column_lineage.lineage.policy import (  # noqa: E402
+    applied_policy_overrides,
+    ineffective_policy_overrides,
+)
+from dbt_column_lineage.models.schema import OverrideDirective, OverrideVerb  # noqa: E402
+
+
+def _ov(verb, column, reason="ack"):
+    return OverrideDirective(verb=verb, column=column, reason=reason, scope="column", source_line=2)
+
+
+def _break(model="orders", column="customer_id"):
+    return BreakFinding(
+        break_kind="break_test",
+        change_model=model,
+        change_column=column,
+        change_kind="removed",
+        test_name="not_null",
+        test_unique_id="test.pkg.x",
+    )
+
+
+def test_allow_break_caps_provable_break_block_to_warn():
+    policy = _fixture("provable_break.yml")
+    change = ColumnChange(
+        "orders",
+        "customer_id",
+        ChangeKind.REMOVED,
+        override=_ov(OverrideVerb.ALLOW_BREAK, "customer_id"),
+    )
+    engine = _engine(policy, FakeRegistry(), _impact(), breaks=[_break()])
+    verdict = engine.evaluate([change])
+    assert verdict.decision is GateDecision.WARN
+    capped = [h for h in verdict.hits if h.overridden]
+    assert len(capped) == 1
+    assert capped[0].original_decision is GateDecision.BLOCK
+    assert capped[0].override_reason == "ack"
+
+
+def test_allow_change_cannot_cap_provable_break_block():
+    # HEADLINE FAIL-SAFE for the policy path: the soft verb must NOT silence a break block.
+    policy = _fixture("provable_break.yml")
+    change = ColumnChange(
+        "orders",
+        "customer_id",
+        ChangeKind.REMOVED,
+        override=_ov(OverrideVerb.ALLOW_CHANGE, "customer_id"),
+    )
+    engine = _engine(policy, FakeRegistry(), _impact(), breaks=[_break()])
+    verdict = engine.evaluate([change])
+    assert verdict.decision is GateDecision.BLOCK
+    assert not any(h.overridden for h in verdict.hits)
+
+
+def test_allow_change_caps_non_break_block_to_allow():
+    # A block from a NON-break rule (removed-column governance) is soft-capped by allow-change.
+    policy = _fixture("block_on_removed.yml")
+    change = ColumnChange(
+        "orders",
+        "customer_id",
+        ChangeKind.REMOVED,
+        override=_ov(OverrideVerb.ALLOW_CHANGE, "customer_id"),
+    )
+    engine = _engine(policy, FakeRegistry(), _impact(), breaks=[])  # no provable break
+    verdict = engine.evaluate([change])
+    assert verdict.decision is GateDecision.ALLOW
+    assert any(h.overridden and h.original_decision is GateDecision.BLOCK for h in verdict.hits)
+
+
+def test_applied_policy_overrides_shape_matches_default_gate():
+    policy = _fixture("block_on_removed.yml")
+    change = ColumnChange(
+        "orders",
+        "customer_id",
+        ChangeKind.REMOVED,
+        override=_ov(OverrideVerb.ALLOW_CHANGE, "customer_id"),
+    )
+    verdict = _engine(policy, FakeRegistry(), _impact(), breaks=[]).evaluate([change])
+    records = applied_policy_overrides(verdict, [change])
+    assert len(records) == 1
+    r = records[0]
+    assert set(
+        [
+            "model",
+            "column",
+            "verb",
+            "reason",
+            "downgraded_from",
+            "downgraded_to",
+            "source_line",
+            "scope",
+        ]
+    ) <= set(r.keys())
+    assert r["verb"] == "allow-change"
+    assert r["downgraded_from"] == "block"
+    assert r["downgraded_to"] == "allow"
+    assert r["source_line"] == 2
+
+
+def test_ineffective_policy_overrides_surfaces_allow_change_on_break():
+    policy = _fixture("provable_break.yml")
+    change = ColumnChange(
+        "orders",
+        "customer_id",
+        ChangeKind.REMOVED,
+        override=_ov(OverrideVerb.ALLOW_CHANGE, "customer_id"),
+    )
+    verdict = _engine(policy, FakeRegistry(), _impact(), breaks=[_break()]).evaluate([change])
+    # It capped nothing (block stayed) -> not in applied, but IS in ineffective with a hint.
+    assert applied_policy_overrides(verdict, [change]) == []
+    ineff = ineffective_policy_overrides(verdict, [change], breaks=[_break()])
+    assert len(ineff) == 1
+    assert "allow-break" in ineff[0]["hint"]

@@ -80,7 +80,16 @@ edit the same comment instead of spamming the thread).
 
 The action also emits step outputs for your own gating/reporting: `affected_models`,
 `affected_columns`, `affected_exposures`, `provable_breaks`, `verdict` (`safe`/`review`/`block`),
-and `tripped_level`.
+`tripped_level`, and `overrides_applied`.
+
+**Escape hatch, not off-switch.** When the gate flags a change the author knows is fine, an
+in-code **override pragma** in the head model acknowledges *that one change* with a mandatory
+reason — `-- lineage:allow-change reason="…"`, or `-- lineage:allow-break reason="…"` for the
+one thing that can lower a provable-break block. It lives in the PR's SQL (diffable, reviewed,
+logged), so the first false positive tunes the gate instead of disarming it repo-wide. Every
+honored override is surfaced in the PR comment and counted in `overrides_applied`; run
+`dbt-col-lineage impact --no-overrides` (or set the action's `no-overrides: true`) to see the raw
+gate. See the [override guide](https://github.com/Fszta/dbt-column-lineage/blob/main/docs/decision-engine/policy-gate.md#overriding-a-verdict-the-in-code-escape-hatch).
 
 Pin `@v0` for updates within the current major (like `actions/checkout@v4`), or an
 exact release — `@v0.13.0` — for reproducible builds. The action installs the CLI

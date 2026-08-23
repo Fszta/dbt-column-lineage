@@ -8,12 +8,19 @@ from typing import Any, Dict, List, Optional
 from dbt_column_lineage.lineage.changeset import (
     ChangesetBuilder,
     ColumnChange,
+    OverrideResolution,
     build_changeset_report,
     build_git_changeset,
     git_changed_models,
     scope_changes_to_models,
 )
-from dbt_column_lineage.lineage.verdict import classify_provable_breaks, decide_verdict
+from dbt_column_lineage.lineage.verdict import (
+    applied_overrides,
+    break_is_overridden,
+    classify_provable_breaks,
+    decide_verdict,
+    ineffective_overrides,
+)
 from dbt_column_lineage.lineage.display import TextDisplay, DotDisplay, JsonDisplay
 from dbt_column_lineage.lineage.display.html.explore import LineageExplorer
 from dbt_column_lineage.lineage.display.markdown import render_changeset_markdown
@@ -101,6 +108,14 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
     help="(--explore only) Path to a metabase_lineage.json so the explorer can surface "
     "cross-boundary dashboard reach. Consumed OFFLINE — no Metabase credentials.",
 )
+@click.option(
+    "--no-overrides",
+    "no_overrides",
+    is_flag=True,
+    default=False,
+    help="(--explore only) Ignore `-- lineage:allow-*` override pragmas so the explorer "
+    "shows the raw gate as if none were present.",
+)
 def cli(
     select: str,
     explore: bool,
@@ -115,6 +130,7 @@ def cli(
     git_base: Optional[str],
     policy_path: Optional[str],
     metabase_path: Optional[str],
+    no_overrides: bool,
 ) -> None:
     """DBT Column Lineage - Generate column-level lineage for DBT models."""
     if not select and not explore:
@@ -143,6 +159,7 @@ def cli(
                 git_base=git_base,
                 policy_path=policy_path,
                 metabase_path=metabase_path,
+                no_overrides=no_overrides,
             )
             if change_report is not None:
                 lineage_explorer.set_change_context(change_report)
@@ -240,6 +257,7 @@ def _build_explore_change_context(
     git_base: Optional[str],
     policy_path: Optional[str],
     metabase_path: Optional[str],
+    no_overrides: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Assemble the changeset report the explorer surfaces, or ``None`` when no change
     source was supplied (pure-explore mode).
@@ -251,6 +269,10 @@ def _build_explore_change_context(
     """
     if not base_manifest and not git_base:
         return None
+
+    honor_overrides = not no_overrides
+    stale_overrides: List[Dict[str, object]] = []
+    override_warnings: List[str] = []
 
     base_service: Optional[LineageService] = None
     if base_manifest:
@@ -269,11 +291,23 @@ def _build_explore_change_context(
         base_service = LineageService(
             Path(resolved_base_catalog), Path(base_manifest), adapter=adapter
         )
-        builder = ChangesetBuilder(base_service.registry, head_service.registry)
+        builder = ChangesetBuilder(
+            base_service.registry, head_service.registry, honor_overrides=honor_overrides
+        )
         changes = builder.build()
+        stale_overrides = builder.stale_overrides
+        override_warnings = builder.override_warnings
         source = "two-manifest"
     elif git_base:
-        changes = build_git_changeset(head_service.registry, git_base)
+        override_collector = OverrideResolution()
+        changes = build_git_changeset(
+            head_service.registry,
+            git_base,
+            honor_overrides=honor_overrides,
+            collect=override_collector,
+        )
+        stale_overrides = override_collector.stale
+        override_warnings = override_collector.warnings
         source = f"git-diff ({git_base})"
     else:
         # Unreachable given the guard above, but keeps the changeset source well-typed.
@@ -309,10 +343,15 @@ def _build_explore_change_context(
         head_service.registry,
         base_service.registry if base_service else None,
     )
-    report["provable_breaks"] = [b.model_dump() for b in breaks]
+    by_change_list = aggregated.get("by_change") if isinstance(aggregated, dict) else None
     summary_obj = report.get("summary", {})
     summary: Dict[str, Any] = summary_obj if isinstance(summary_obj, dict) else {}
-    report["verdict"] = decide_verdict(breaks, summary, changes)
+    report["verdict"] = decide_verdict(breaks, summary, changes, by_change=by_change_list)
+    # Mirror the impact() gate: unexcused (blocking) breaks only; excused ones surface as
+    # allow-break override records so the explorer shows the same signals as CI.
+    blocking_breaks = [b for b in breaks if not break_is_overridden(b, changes)]
+    report["provable_breaks"] = [b.model_dump() for b in blocking_breaks]
+    summary["provable_break_count"] = len(blocking_breaks)
 
     if policy is not None:
         verdict = evaluate_policy(
@@ -324,6 +363,18 @@ def _build_explore_change_context(
             metabase_reach=metabase_reach,
         )
         report["policy_verdict"] = verdict.model_dump(mode="json")
+        from dbt_column_lineage.lineage.policy import (
+            applied_policy_overrides,
+            ineffective_policy_overrides,
+        )
+
+        report["overrides"] = applied_policy_overrides(verdict, changes)
+        report["ineffective_overrides"] = ineffective_policy_overrides(verdict, changes, breaks)
+    else:
+        report["overrides"] = applied_overrides(changes, breaks, by_change_list)
+        report["ineffective_overrides"] = ineffective_overrides(changes, breaks, by_change_list)
+    report["stale_overrides"] = stale_overrides
+    report["override_warnings"] = override_warnings
 
     if metabase_lineage is not None:
         from dbt_column_lineage.metabase.reach import build_reach_confidence
@@ -391,6 +442,14 @@ def _build_explore_change_context(
     "expressions). Affects the human report only; the JSON output always carries it.",
 )
 @click.option(
+    "--no-overrides",
+    "no_overrides",
+    is_flag=True,
+    default=False,
+    help="Ignore `-- lineage:allow-change` / `-- lineage:allow-break` override pragmas and "
+    "compute the RAW gate as if none were present (audit / measure override reliance).",
+)
+@click.option(
     "--ci",
     is_flag=True,
     help="CI mode: post/update a sticky impact comment on the PR and apply the "
@@ -448,6 +507,7 @@ def impact(
     format: str,
     adapter: Optional[str],
     explain: bool,
+    no_overrides: bool,
     ci: bool,
     fail_on: str,
     policy_path: Optional[str],
@@ -491,6 +551,12 @@ def impact(
                 )
                 metabase_reach = MetabaseReach.build(metabase_lineage, relation_index)
 
+        honor_overrides = not no_overrides
+        # Override side-outputs (populated by the changeset build below): stale directives
+        # (no matching change) and parse warnings (malformed pragmas). Empty under --no-overrides.
+        stale_overrides: List[Dict[str, object]] = []
+        override_warnings: List[str] = []
+
         base_service: Optional[LineageService] = None
         changes: List[ColumnChange]
         # Whether structural checks (added/removed/type_changed) could run. They need a
@@ -524,8 +590,12 @@ def impact(
             base_service = LineageService(
                 Path(resolved_base_catalog), Path(base_manifest), adapter=adapter
             )
-            builder = ChangesetBuilder(base_service.registry, head_service.registry)
+            builder = ChangesetBuilder(
+                base_service.registry, head_service.registry, honor_overrides=honor_overrides
+            )
             changes = builder.build()
+            stale_overrides = builder.stale_overrides
+            override_warnings = builder.override_warnings
             structural_checks_available = builder.structural_diff_available()
             source = "two-manifest"
 
@@ -537,7 +607,15 @@ def impact(
                 changes = scope_changes_to_models(changes, scoped_models)
                 source = f"two-manifest scoped to git-diff ({scope_git})"
         elif git_base:
-            changes = build_git_changeset(head_service.registry, git_base)
+            override_collector = OverrideResolution()
+            changes = build_git_changeset(
+                head_service.registry,
+                git_base,
+                honor_overrides=honor_overrides,
+                collect=override_collector,
+            )
+            stale_overrides = override_collector.stale
+            override_warnings = override_collector.warnings
             source = f"git-diff ({git_base})"
         else:
             click.echo(
@@ -564,6 +642,10 @@ def impact(
                 err=True,
             )
 
+        # surface malformed-pragma warnings LOUDLY on stderr (also rendered in the report).
+        for warning in override_warnings:
+            click.echo(f"Override warning: {warning}", err=True)
+
         aggregated = head_service.get_changeset_impact(
             changes, base_service=base_service, metabase=metabase_reach
         )
@@ -578,12 +660,18 @@ def impact(
             head_service.registry,
             base_service.registry if base_service else None,
         )
-        report["provable_breaks"] = [b.model_dump() for b in breaks]
+        by_change_list = aggregated.get("by_change") if isinstance(aggregated, dict) else None
         summary_obj = report.get("summary", {})
         summary: Dict[str, Any] = summary_obj if isinstance(summary_obj, dict) else {}
-        report["verdict"] = decide_verdict(breaks, summary, changes)
-        # Expose the count in the summary so the CI gate (--fail-on tests) can read it.
-        summary["provable_break_count"] = len(breaks)
+        report["verdict"] = decide_verdict(breaks, summary, changes, by_change=by_change_list)
+        # a break excused by an allow-break override is DEMOTED — it must not keep the
+        # gate armed. Split the breaks so report/gate reflect only the UNEXCUSED (blocking)
+        # ones; excused breaks surface in the overrides section (block -> review). With no
+        # override present this is byte-identical to the old ``[b for b in breaks]`` behavior.
+        blocking_breaks = [b for b in breaks if not break_is_overridden(b, changes)]
+        report["provable_breaks"] = [b.model_dump() for b in blocking_breaks]
+        # Expose the (effective) count in the summary so the CI gate (--fail-on tests) reads it.
+        summary["provable_break_count"] = len(blocking_breaks)
         # Honesty: break detection only sees catalog-backed models and tests it could
         # attribute to a column. Surface the blind spots so a SAFE ruling reads as a lower
         # bound, not a guarantee.
@@ -608,6 +696,20 @@ def impact(
             # the report is JSON-dumped and also rendered by markdown, both of which expect plain
             # strings (a raw model_dump() leaves enum members and renders as "GateDecision.BLOCK").
             report["policy_verdict"] = verdict.model_dump(mode="json")
+            # Override records come from the CAPPED hits under a policy (uniform shape).
+            from dbt_column_lineage.lineage.policy import (
+                applied_policy_overrides,
+                ineffective_policy_overrides,
+            )
+
+            report["overrides"] = applied_policy_overrides(verdict, changes)
+            report["ineffective_overrides"] = ineffective_policy_overrides(verdict, changes, breaks)
+        else:
+            # No policy: the default gate owns the override records.
+            report["overrides"] = applied_overrides(changes, breaks, by_change_list)
+            report["ineffective_overrides"] = ineffective_overrides(changes, breaks, by_change_list)
+        report["stale_overrides"] = stale_overrides
+        report["override_warnings"] = override_warnings
 
         # Cross-boundary honesty block: when the Metabase artifact was joined, attach
         # the reach-confidence (snapshot staleness + column-precise vs table-only) so a

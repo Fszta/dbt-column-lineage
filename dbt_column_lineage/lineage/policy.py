@@ -49,6 +49,7 @@ from dbt_column_lineage.models.schema import (
     MissingMetaPolicy,
     Notification,
     Operator,
+    OverrideVerb,
     Policy,
     PolicyVerdict,
     Predicate,
@@ -59,6 +60,7 @@ from dbt_column_lineage.models.schema import (
     SemanticChangeKind,
     StructuralCondition,
 )
+from dbt_column_lineage.lineage.verdict import ineffective_override_record
 
 
 class PolicyConfigError(Exception):
@@ -325,10 +327,10 @@ def _to_mechanism(raw: Optional[str]) -> Optional[Mechanism]:
 class ImpactView:
     """Per-change reach, derived once from ``get_changeset_impact``'s enriched ``by_change``.
 
-    ``reached(change, kind, mechanism)`` returns the downstream objects a given change touches,
-    optionally filtered by mechanism. This is the ONLY reach source the engine reads. A change
-    whose impact could not be resolved (``by_change.resolved == False``) carries no reach keys;
-:meth:`is_resolved` reports that so the engine can fail-safe.
+        ``reached(change, kind, mechanism)`` returns the downstream objects a given change touches,
+        optionally filtered by mechanism. This is the ONLY reach source the engine reads. A change
+        whose impact could not be resolved (``by_change.resolved == False``) carries no reach keys;
+    :meth:`is_resolved` reports that so the engine can fail-safe.
     """
 
     def __init__(self, changeset_impact: Dict[str, Any]) -> None:
@@ -515,6 +517,11 @@ class PolicyEngine:
         Total and deterministic: never raises on rule content (config errors surface at load).
         An undecidable predicate resolves per the rule's ``MissingMetaPolicy``.
         """
+        # index the changeset by (model, column) lowercased so override caps are O(1).
+        self._change_by_key: Dict[Tuple[str, str], ColumnChange] = {
+            (c.model.lower(), c.column.lower()): c for c in changes
+        }
+
         hits: List[RuleHit] = []
         build_set: set[str] = set()
         test_set: set[str] = set()
@@ -550,6 +557,10 @@ class PolicyEngine:
                 notifications.extend(notes)
 
         hits.extend(self._semantic_default_hits(changes))
+
+        # apply override pragmas as a post-evaluation cap on each hit's contribution,
+        # BEFORE combining — so ``_combine_decision`` naturally uses the capped decisions.
+        self._apply_override_caps(hits)
 
         decision = self._combine_decision(hits)
         deduped_notes = _dedup_notifications(notifications)
@@ -736,7 +747,7 @@ class PolicyEngine:
             return _tri((subject.model.lower(), subject.column.lower()) in self._break_keys)
         if not self._impact.is_resolved(subject):
             trace.saw_unresolved_reach = True
-            return Tri.UNKNOWN_MISSING # unresolved reach -> on_missing_meta
+            return Tri.UNKNOWN_MISSING  # unresolved reach -> on_missing_meta
         if cond.fact == "touches_exposure":
             return _tri(bool(self._impact.reached(subject, ReachKind.EXPOSURE)))
         # reaches_anything
@@ -827,6 +838,47 @@ class PolicyEngine:
             message=message,
         )
 
+    # -- override caps --------------------------------------------------
+
+    def _apply_override_caps(self, hits: List[RuleHit]) -> None:
+        """Cap each subject-scoped hit whose change carries an override (mutates in place).
+
+        - ``allow-break`` caps a BLOCK to WARN (the only verb that may touch a block).
+        - ``allow-change`` caps a WARN/BLOCK to ALLOW, EXCEPT it must NOT silence a BLOCK on a
+          change that is itself a provable break — only ``allow-break`` can, and only to WARN.
+
+        The provable-break guard is approximated as "hit.decision == BLOCK AND (model, column)
+        in break_keys". This over-protects (an unrelated non-break BLOCK on a change that also
+        happens to be a break stays armed under allow-change), which errs toward keeping the
+        gate armed — the intended fail-safe direction. Aggregate-scope hits (no subject) are
+        never capped.
+        """
+        for hit in hits:
+            if hit.change_model is None or hit.change_column is None:
+                continue  # aggregate-scope hit: never capped
+            change = self._change_by_key.get((hit.change_model.lower(), hit.change_column.lower()))
+            if change is None or change.override is None:
+                continue
+            override = change.override
+            is_break = (
+                hit.change_model.lower(),
+                hit.change_column.lower(),
+            ) in self._break_keys
+            if override.verb is OverrideVerb.ALLOW_BREAK:
+                if hit.decision is GateDecision.BLOCK:
+                    hit.original_decision = hit.decision
+                    hit.decision = GateDecision.WARN
+                    hit.overridden = True
+                    hit.override_reason = override.reason
+            else:  # allow-change (soft): cannot silence a provable break's block
+                if is_break and hit.decision is GateDecision.BLOCK:
+                    continue
+                if hit.decision.severity > GateDecision.ALLOW.severity:
+                    hit.original_decision = hit.decision
+                    hit.decision = GateDecision.ALLOW
+                    hit.overridden = True
+                    hit.override_reason = override.reason
+
     # -- combination ---------------------------------------------------------
 
     def _combine_decision(self, hits: List[RuleHit]) -> GateDecision:
@@ -889,6 +941,60 @@ def _dedup_notifications(notes: List[Notification]) -> List[Notification]:
 # --- top-level convenience (for wiring) ----------------------------------
 
 
+def applied_policy_overrides(
+    verdict: PolicyVerdict, changes: List[ColumnChange]
+) -> List[Dict[str, Any]]:
+    """Honored-override records derived from capped policy hits, in the SAME shape the default
+    gate emits (``applied_overrides``). Cross-references ``ColumnChange.override`` for the verb /
+    source_line / scope that ``RuleHit`` does not carry, so both report paths are uniform."""
+    by_key = {(c.model.lower(), c.column.lower()): c for c in changes}
+    records: List[Dict[str, Any]] = []
+    for hit in verdict.hits:
+        if not hit.overridden:
+            continue
+        change = by_key.get((str(hit.change_model).lower(), str(hit.change_column).lower()))
+        override = change.override if change is not None else None
+        records.append(
+            {
+                "model": hit.change_model,
+                "column": hit.change_column,
+                "verb": override.verb.value if override else "",
+                "reason": hit.override_reason or (override.reason if override else ""),
+                "downgraded_from": (hit.original_decision.value if hit.original_decision else None),
+                "downgraded_to": hit.decision.value,
+                "source_line": override.source_line if override else None,
+                "scope": override.scope if override else None,
+                "rule_id": hit.rule_id,
+            }
+        )
+    return records
+
+
+def ineffective_policy_overrides(
+    verdict: PolicyVerdict,
+    changes: List[ColumnChange],
+    breaks: Optional[List[BreakFinding]] = None,
+) -> List[Dict[str, Any]]:
+    """Override records that landed on a real changed column but capped NO hit — surfaced so an
+    ineffective pragma (e.g. allow-change on a break, or an override where no rule fired) is
+    never silently ignored. Same shape as the default gate's ``ineffective_overrides``."""
+    break_keys = {(b.change_model.lower(), b.change_column.lower()) for b in (breaks or [])}
+    capped = {
+        (str(h.change_model).lower(), str(h.change_column).lower())
+        for h in verdict.hits
+        if h.overridden
+    }
+    records: List[Dict[str, Any]] = []
+    for change in changes:
+        if change.override is None:
+            continue
+        key = (change.model.lower(), change.column.lower())
+        if key in capped:
+            continue  # effective
+        records.append(ineffective_override_record(change, key in break_keys))
+    return records
+
+
 def evaluate_policy(
     changes: List[ColumnChange],
     changeset_impact: Dict[str, Any],
@@ -918,8 +1024,10 @@ __all__ = [
     "PolicyConfigError",
     "PolicyEngine",
     "ReachedObject",
+    "applied_policy_overrides",
     "build_impact_view",
     "evaluate_policy",
+    "ineffective_policy_overrides",
     "load_policy",
     "parse_policy",
 ]

@@ -48,6 +48,13 @@ inputs:
     description: "Override the sqlglot dialect (e.g. snowflake, bigquery, tsql)"
     required: false
     default: ""
+  no-overrides:
+    description: >-
+      Ignore `-- lineage:allow-change` / `-- lineage:allow-break` override pragmas and compute
+      the RAW gate as if none were present (set 'true' for the backtest / override-reliance
+      audit). Default 'false' honors the pragmas.
+    required: false
+    default: "false"
   github-token:
     description: "Token used to post the sticky PR comment (needs pull-requests: write)"
     default: ${{ github.token }}
@@ -96,6 +103,11 @@ outputs:
   test_set_size:
     description: "Number of models in the policy engine's selective test set."
     value: ${{ steps.impact.outputs.test_set_size }}
+  overrides_applied:
+    description: >-
+      Number of honored override pragmas (allow-change / allow-break) that lowered a
+      contribution on this change. 0 when none.
+    value: ${{ steps.impact.outputs.overrides_applied }}
 
 runs:
   using: "composite"
@@ -136,4 +148,5 @@ runs:
         [ -n "${{ inputs.scope-git }}" ] && args+=(--scope-git "${{ inputs.scope-git }}")
         [ -n "${{ inputs.adapter }}" ] && args+=(--adapter "${{ inputs.adapter }}")
         [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
+        [ "${{ inputs.no-overrides }}" = "true" ] && args+=(--no-overrides)
         dbt-col-lineage "${args[@]}"

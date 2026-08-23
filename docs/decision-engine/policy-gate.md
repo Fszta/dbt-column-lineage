@@ -370,15 +370,19 @@ exactly this, so the person hitting it sees the exit path.
 All three are **self-clearing** — they need no new tool feature, because the predicate simply
 evaluates to false on the next run. That is the whole release model today.
 
-!!! note "Manual-override release paths are deliberately not built (yet)"
-    Two *other* exit paths are conceivable — **block-until-acknowledged** (an owner signs off via
-    a PR label the gate honors) and **block-until-proven** (a `/data-diff` result proves the
-    values are unchanged). Both require the gate to consume a **new external input**, which would
-    cut against the offline / zero-credential guarantee and add an override concept the engine
-    deliberately omits in v1 (a `warn` can never cancel a `block`; see
-    [how rules combine](#how-multiple-rules-combine-into-one-verdict)). They are noted here as
-    possible future work, **not** currently available — the self-clearing paths above are the
-    supported way to release a block.
+!!! note "The audited release path: an in-code override"
+    Beyond self-clearing, there is one supported way to *acknowledge* a fired verdict without
+    changing the code that tripped it: an **[override pragma](#overriding-a-verdict-the-in-code-escape-hatch)**
+    (`-- lineage:allow-change` / `-- lineage:allow-break`). It lives in the PR's own SQL, so it
+    stays offline / zero-credential and is diffed and reviewed like any code — and it only ever
+    *lowers* severity (it is a post-evaluation cap, not a rule; a `warn` action still can never
+    cancel a `block` action inside the engine — see
+    [how rules combine](#how-multiple-rules-combine-into-one-verdict)).
+
+    Two *external-input* release paths remain deliberately unbuilt: **block-until-acknowledged**
+    (an owner signs off via a PR label the gate honors) and **block-until-proven** (a `/data-diff`
+    result). Both would require the gate to consume a new external input, cutting against the
+    offline / zero-credential guarantee — noted as possible future work, **not** available today.
 
 ### Exit code
 
@@ -425,6 +429,104 @@ that). A `block` verdict leads with a one-line **"blocked until…"** note stati
 clears (see [above](#a-block-is-a-block-until-not-a-dead-end)), so the PR comment carries the
 release path, not just the obstacle.
 
+## Overriding a verdict — the in-code escape hatch
+
+A gate with no escape hatch gets turned off, not tuned. The moment the verdict flags a change the
+author knows is fine ("yes, this recomputes downstream — it's intended, and downstream was updated
+in the same PR"), the tempting move is to disarm the whole gate (`--fail-on none`). An **override
+pragma** is the alternative: an inline SQL comment in the head model that acknowledges *one specific
+change*, with a mandatory reason. It is **explicit, in the diff, reviewed like any other code, and
+logged** — never a silent global off-switch.
+
+```sql
+select
+  -- lineage:allow-change reason="renamed from amount_cents; all downstream refs updated in this PR"
+  amount as amount_eur,
+  ...
+```
+
+Two verbs, deliberately distinct so a soft acknowledgement can **never** silence a hard break:
+
+| Pragma | What it downgrades | Can it touch a provable break? |
+|---|---|---|
+| `-- lineage:allow-change [column=<col>] reason="…"` | a REVIEW / WARN contribution for that column to *allow* (the common case). | **No** — never. |
+| `-- lineage:allow-break [column=<col>] reason="…"` | a provable BLOCK — the only verb that can — down to REVIEW (no-policy gate) or WARN (policy gate). | Yes, and only that far — **never to safe**. A provably-broken test always leaves a visible mark + audit record. |
+
+`reason=` is **mandatory**: an override with no non-empty reason is dropped and warned (an override
+that isn't justified has no audit value).
+
+### Scope resolution
+
+Which changed column a pragma excuses, in priority order:
+
+1. an explicit `column=<name>` argument, else
+2. the column whose SELECT expression the comment is attached to / immediately precedes, else
+3. **model scope** — a pragma placed above the model's first statement with no `column=` arg excuses
+   every changed column in that model (logged as a model-level override, so the broader reach is
+   visible).
+
+Pragmas are **head-only** by design: the override lives in the PR's own SQL, so it is diffable and
+reviewed like any code. Source lines in the report are relative to the **compiled** SQL.
+
+!!! danger "Fail-safe invariants (non-negotiable — this is a gate)"
+    - An override only ever **lowers** severity, never raises it.
+    - `allow-change` **cannot** touch a provable BLOCK — only `allow-break` can, and only
+      BLOCK→REVIEW/WARN, never →safe.
+    - On the same column, `allow-break` **wins** over `allow-change` (hard beats soft).
+    - A malformed / reasonless / unknown-verb pragma is **dropped with a loud warning** and never
+      changes the ruling silently.
+    - On a rename, adjacency resolves to the *new* column name, so a break stays armed unless you
+      name the old column explicitly (`column=<old_name>`) or use model scope. Overriding the wrong
+      side is a no-op, not an accidental unblock.
+
+### It moves `--fail-on tests` (the whole point)
+
+An `allow-break` that acknowledges a provable break **excuses that break** from the gate: the
+excused break drops out of `provable_breaks` / `provable_break_count`, so `--fail-on tests` (and
+`--fail-on policy` on a provable-break rule) clears — exit 0 — while the acknowledgement stays
+visible in the report. `allow-change` never excuses a break. Run with
+[`--no-overrides`](#auditing-override-reliance) to see the raw gate the override cleared.
+
+### Every honored override is logged
+
+Nothing is ever silently suppressed. A honored override is surfaced on every surface:
+
+- **JSON** — the impact report gains four blocks:
+
+    | Block | Contents |
+    |---|---|
+    | `overrides` | honored overrides: `{model, column, verb, reason, downgraded_from, downgraded_to, source_line, scope}` |
+    | `ineffective_overrides` | pragmas that landed on a *real* changed column but changed nothing, with a fix `hint` (e.g. `allow-break` on an added column) |
+    | `stale_overrides` | pragmas with **no matching change** at all — dead excuses to prune |
+    | `override_warnings` | dropped malformed / reasonless / unknown-verb pragmas (strings) |
+
+    Under the policy engine, a capped `RuleHit` also carries `overridden: true`,
+    `original_decision`, and `override_reason`, so the verdict says exactly which rule the override
+    suppressed.
+
+- **Markdown / PR comment** — an override section renders, in order: **⚠️ Override pragmas IGNORED**
+  first and unfolded (a dropped pragma must be noticed), then **⚠️ Overrides applied** (each with
+  its `from → to` delta and reason), **⚠️ Overrides with no effect** (ineffective, with the hint),
+  and a folded **Stale overrides** list to prune. A capped policy hit reads
+  *"override suppressed WARN (reason: …)"* inline.
+
+- **Action** — the composite action emits an `overrides_applied` output (count of honored
+  overrides). See [In CI](#in-ci-github-action).
+
+### Auditing override reliance
+
+`impact --no-overrides` evaluates the changeset **as if no pragma were present** — the raw gate.
+Use it to answer "what would the gate say without the excuses?" and to measure override reliance
+over history (a rising `allow-break` volume is a signal the gate is mis-tuned, not merely escaped).
+With no pragma present, the output is byte-identical to the default run.
+
+```bash
+dbt-col-lineage impact \
+  --manifest target/manifest.json --catalog target/catalog.json \
+  --base-manifest base/manifest.json --base-catalog base/catalog.json \
+  --fail-on tests --no-overrides        # ignore every -- lineage:allow-* pragma
+```
+
 ## In CI (GitHub Action)
 
 The composite action exposes a `policy` input and policy outputs:
@@ -441,4 +543,9 @@ The composite action exposes a `policy` input and policy outputs:
 ```
 
 Outputs for downstream steps: `policy_decision` (`block`/`warn`/`allow`), `build_set_size`,
-`test_set_size` — for example, feed the build set into a selective `dbt build`.
+`test_set_size` — for example, feed the build set into a selective `dbt build`. The action also
+emits `overrides_applied`: the number of honored override pragmas that lowered the ruling on this
+run (always present; `0` when none fired).
+
+To evaluate the **raw gate** in CI — ignoring every `-- lineage:allow-*` pragma, e.g. to backtest
+override reliance — set the `no-overrides` input to `true` (threads through to `--no-overrides`).

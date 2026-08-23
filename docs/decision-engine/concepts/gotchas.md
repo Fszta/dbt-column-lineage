@@ -79,8 +79,11 @@ fired.
 A `block` is an exit path, not a wall. The gate is stateless and re-runs on **every push**, so a
 block lifts the moment the change stops tripping the rule — revert it, make it a proven-`equivalent`
 refactor, evolve the downstream/schema to absorb it, or stop it reaching the flagged object. No
-manual override, ticket, or re-approval. The verdict states how to clear it. (In v1 there is
-deliberately **no** priority/suppression mechanism — a `warn` can never cancel a `block`.)
+ticket or re-approval, and no external input. The verdict states how to clear it. Inside the engine
+there is deliberately **no** priority/suppression between rules — a `warn` action can never cancel a
+`block` action. The one audited way to *acknowledge* a fired verdict without changing the code is an
+in-code [override pragma](../policy-gate.md#overriding-a-verdict-the-in-code-escape-hatch), which
+lives in the PR's SQL and only ever lowers severity.
 
 ## 7. `block`/`warn` the *action* vs `block`/`warn` the *decision*
 
