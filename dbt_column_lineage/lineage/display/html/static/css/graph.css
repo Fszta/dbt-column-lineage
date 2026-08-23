@@ -225,6 +225,52 @@
     pointer-events: none;
 }
 
+/* ===== change-context graph marks =====
+   All only render when the explorer is launched with a change context
+   (--base-manifest / --policy / --metabase). Absent otherwise → no marks. */
+
+/* Breaking column mark — the shared amber caution spark (DESIGN.md: amber once).
+   A quiet dot, never a fill; equivalent/unchanged columns get nothing. */
+.column-breaking-dot {
+  fill: var(--accent);
+  stroke: none;
+}
+
+/* Subject-node ring — the policy verdict on the column being explored.
+   block escalates to red (the one hard signal); warn shares the amber slot. */
+.column-subject-ring {
+  stroke-width: 1.75px;
+}
+
+.column-subject-ring.policy-block {
+  stroke: var(--error);
+}
+
+.column-subject-ring.policy-warn {
+  stroke: var(--accent);
+}
+
+/* dbt → BI boundary LANE — a soft indigo-family zone (no new hue) enclosing
+   the reached BI dashboards, so "past the dbt edge" reads as a distinct band rather than an
+   easy-to-miss hairline. Muted fill + dashed border so the graph stays the hero; the CSS
+   variables carry it through light and dark themes. */
+.bi-lane {
+  fill: color-mix(in srgb, var(--primary) 6%, transparent);
+  stroke: color-mix(in srgb, var(--primary) 34%, transparent);
+  stroke-width: 1.25px;
+  stroke-dasharray: 4 5;
+  stroke-linecap: round;
+}
+
+.bi-lane-label {
+  fill: color-mix(in srgb, var(--primary) 78%, var(--text-muted));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-anchor: start;
+}
+
 .edge {
   stroke: var(--slate-300);
     stroke-width: 1.5px;
@@ -482,4 +528,149 @@
   padding: 1px 6px;
   border-radius: 4px;
   margin-right: 4px;
+}
+
+/* F6: structured hover card for a reached Metabase dashboard node. Replaces the unreadable
+   single-line nowrap tooltip. Surface card in the indigo family (no new hue), reachable so the
+   link is clickable; theme-variable driven for light + dark. */
+.bi-hovercard {
+  position: absolute;
+  z-index: 10001;
+  max-width: 300px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px var(--shadow);
+  font-family: var(--font-sans);
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+
+.bi-hovercard.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bi-hc-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--primary) 72%, var(--text-muted));
+  margin-bottom: 4px;
+}
+
+/* Monochrome Metabase logomark in the hover-card eyebrow — indigo, not brand blue. */
+.bi-hc-eyebrow .metabase-logo {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.bi-hc-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 7px;
+  word-break: break-word;
+}
+
+.bi-hc-tier {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--ring-soft);
+  color: var(--primary);
+}
+
+.bi-hc-meta {
+  margin-bottom: 5px;
+}
+
+.bi-hc-precision {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  padding: 1px 7px;
+  border-radius: 5px;
+}
+
+.bi-hc-precision-column {
+  color: var(--primary);
+  background: var(--ring-soft);
+}
+
+.bi-hc-precision-table {
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+}
+
+.bi-hc-cards {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.bi-hc-fields {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+.bi-hc-fields-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.bi-hc-field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--ring-soft);
+}
+
+.bi-hc-field code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--primary);
+}
+
+.bi-hc-role {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.bi-hc-link {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.bi-hc-link:hover {
+  text-decoration: underline;
 }

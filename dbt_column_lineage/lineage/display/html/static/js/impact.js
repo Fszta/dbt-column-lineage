@@ -23,10 +23,135 @@ const ImpactModule = (function() {
         return `
             <div class="column-test-guardrails">
                 <span class="test-guardrails-label">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 0.5 L10.5 2.1 V5.1 C10.5 7.9 8.5 9.8 6 10.5 C3.5 9.8 1.5 7.9 1.5 5.1 V2.1 Z"></path><path d="M3.9 5.3 L5.5 6.9 L8.3 3.7"></path></svg>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d=" 0.5 L10.5 2.1 V5.1 C10.5 7.9 8.5 9.8 6 10.5 C3.5 9.8 1.5 7.9 1.5 5.1 V2.1 Z"></path><path d=".9 5.3 L5.5 6.9 L8.3 3.7"></path></svg>
                     Tests
                 </span>
                 <span class="test-pill-group">${pills}</span>
+            </div>`;
+    }
+
+    // Semantic categorization folds onto the ONE shared amber "caution" axis: a
+    // breaking change is the amber spark; a proven-equivalent change is de-emphasized
+    // (neutral slate + an indigo check — the good news is "nothing to see"). Fail-safe:
+    // an indeterminate / unknown semantic always reads as breaking (never "safe").
+    function isBreakingCol(col) {
+        if (!col) return false;
+        if (col.breaking === true) return true;
+        if (col.breaking === false) return false;
+        return !!col.semantic && col.semantic !== 'equivalent';
+    }
+
+    function hasSemantic(col) {
+        return !!col && (col.breaking === true || col.breaking === false || !!col.semantic);
+    }
+
+    // Compact per-column semantic badge for the column cards (breaking vs proven-equivalent).
+    function semanticBadgeHtml(col) {
+        if (!hasSemantic(col)) return '';
+        if (isBreakingCol(col)) {
+            const indeterminate = col.semantic === 'indeterminate';
+            const label = indeterminate ? 'BREAKING?' : 'BREAKING';
+            const title = indeterminate
+                ? 'Could not prove equivalence — treated as breaking (value may differ downstream)'
+                : 'Meaning changed — value may differ downstream';
+            return `<span class="semantic-badge semantic-breaking" title="${escapeHtml(title)}"><span class="semantic-dot"></span>${label}</span>`;
+        }
+        return `<span class="semantic-badge semantic-equivalent" title="Proven equivalent — cosmetic-only change"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>EQUIVALENT</span>`;
+    }
+
+    // Hero chip stating the SUBJECT column's own verdict — the change under review. Only
+    // rendered when a change context is present (else absence = nothing to review).
+    function subjectSemanticChipHtml(data) {
+        if (data.subject_breaking === undefined || data.subject_breaking === null) return '';
+        if (data.subject_breaking) {
+            const indeterminate = data.subject_semantic === 'indeterminate';
+            const label = indeterminate ? 'Breaking — unproven' : 'Breaking change';
+            const detail = indeterminate
+                ? 'Could not prove equivalence, so this is treated as breaking (fail-safe).'
+                : 'The expression’s meaning changed — downstream values may differ.';
+            return `
+                <div class="impact-breaking-chip impact-breaking">
+                    <span class="semantic-dot"></span>
+                    <span class="impact-breaking-chip-label">${label}</span>
+                    <span class="impact-breaking-chip-detail">${escapeHtml(detail)}</span>
+                </div>`;
+        }
+        return `
+            <div class="impact-breaking-chip impact-equivalent">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span class="impact-breaking-chip-label">Proven equivalent</span>
+                <span class="impact-breaking-chip-detail">Cosmetic-only change — downstream values are unaffected.</span>
+            </div>`;
+    }
+
+    // A neutral note for a column that is NOT part of the reviewed change.
+    // Exploring such a column produces no verdict — the change-wide policy decision does not
+    // describe it. Only shown when a change context is loaded (subject_in_changeset === false);
+    // in pure-explore mode the flag is absent and nothing renders.
+    function notInChangesetNoteHtml(data) {
+        if (data.subject_in_changeset !== false) return '';
+        return `
+            <div class="impact-not-in-change" role="note">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span>Not part of the reviewed change — exploring this column produces no verdict.</span>
+            </div>`;
+    }
+
+    // A Metabase dashboard reached PAST the dbt edge reads as a distinct card variant:
+    // an "outside dbt" eyebrow, honest table-level vs column-precise caption, via-card count.
+    function metabaseExposureCardHtml(exposure) {
+        const name = escapeHtml(exposure.name || 'Unknown');
+        const meta = exposure.meta || {};
+        const tier = meta.tier ? `<span class="mb-tier">${escapeHtml(String(meta.tier))}</span>` : '';
+        const precision = exposure.precision === 'table'
+            ? '<span class="mb-precision mb-precision-table" title="Reached only via a table-grain card — the specific column could not be resolved">table-level</span>'
+            : '<span class="mb-precision mb-precision-column" title="Reached via a column-precise card">column-precise</span>';
+        const viaCards = Array.isArray(exposure.via_cards) && exposure.via_cards.length
+            ? `<span class="mb-via-cards">via card${exposure.via_cards.length !== 1 ? 's' : ''} ${exposure.via_cards.map(c => '#' + escapeHtml(String(c))).join(', ')}</span>`
+            : '';
+        // F4: name the exact field(s) of the dashboard this change hits, so the reviewer goes
+        // straight to it. Distinct model.column (a column may be read by several cards), role
+        // shown when known. Absent on a table-grain reach — "table-level" already explains why.
+        const viaColumns = (function () {
+            if (!Array.isArray(exposure.via_columns) || !exposure.via_columns.length) return '';
+            const seen = new Map();
+            exposure.via_columns.forEach(v => {
+                if (!v || !v.model || !v.column) return;
+                const key = v.model + '.' + v.column;
+                if (!seen.has(key)) seen.set(key, v.role || '');
+            });
+            if (!seen.size) return '';
+            const chips = Array.from(seen.entries()).map(([col, role]) =>
+                `<span class="mb-field"><code>${escapeHtml(col)}</code>${role ? `<span class="mb-field-role">${escapeHtml(role)}</span>` : ''}</span>`
+            ).join('');
+            return `<div class="mb-fields-line"><span class="mb-fields-label">Affects</span>${chips}</div>`;
+        })();
+        return `
+            <div class="exposure-card exposure-card-metabase">
+                <div class="exposure-boundary-eyebrow">${typeof metabaseLogoSvg === 'function' ? metabaseLogoSvg(12) : ''}<span>BI · METABASE</span></div>
+                <div class="exposure-card-header">
+                    <div class="exposure-card-title-group">
+                        <span class="exposure-card-name">${name}</span>
+                        <span class="exposure-card-type">dashboard</span>
+                    </div>
+                    ${tier}
+                </div>
+                <div class="exposure-card-body">
+                    <div class="mb-reach-line">${precision}${viaCards}</div>
+                    ${viaColumns}
+                </div>
+                <div class="exposure-card-footer">
+                    ${exposure.url ? `
+                        <a href="${exposure.url}" target="_blank" class="exposure-link">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                            View dashboard
+                        </a>
+                    ` : ''}
+                </div>
             </div>`;
     }
 
@@ -177,11 +302,29 @@ const ImpactModule = (function() {
                 + `${coverage.parse_failed || 0} parse-failed, ${coverage.skipped_no_sql || 0} no compiled SQL). `
                 + `Impact counts are a lower bound.`;
         }
+        // Cross-boundary honesty: when a Metabase artifact was joined, add a second
+        // muted line about BI reach (column-precise vs table-only, staleness). Absent → skip.
+        let metabaseLine = '';
+        const mb = coverage.metabase;
+        if (mb && mb.level && mb.level !== 'absent') {
+            const precise = mb.cards_column_precise || 0;
+            const tableOnly = mb.cards_table_only || 0;
+            const reached = mb.dashboards_reached || 0;
+            const staleTxt = mb.stale ? ', snapshot stale' : '';
+            const mbText = `Metabase: ${reached} dashboard${reached !== 1 ? 's' : ''} reached `
+                + `(${precise} column-precise, ${tableOnly} table-only${staleTxt}).`;
+            metabaseLine = `
+                <div class="coverage-line coverage-line-metabase ${mb.level === 'partial' || mb.stale ? 'coverage-line-partial' : ''}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    <span>${escapeHtml(mbText)}</span>
+                </div>`;
+        }
         return `
             <div class="coverage-line ${coverage.complete ? '' : 'coverage-line-partial'}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                 <span>${escapeHtml(text)}</span>
             </div>
+            ${metabaseLine}
         `;
     }
 
@@ -195,11 +338,26 @@ const ImpactModule = (function() {
         const criticalColumns = affectedColumns.filter(col => col.severity === 'critical');
         const lowImpactColumns = affectedColumns.filter(col => col.severity === 'low_impact');
 
+        // Whole-change policy verdict pins ABOVE everything (decision first). Owned by the
+        // Policy module so the encoding lives in one place; absent → nothing rendered.
+        // The backend attaches policy_verdict ONLY for a column that is part of the reviewed
+        // change, so this banner never speaks for an arbitrary explored column;
+        // an out-of-change column gets a neutral "not part of this change" note instead.
+        const policyBanner = (window.PolicyModule && data.policy_verdict)
+            ? window.PolicyModule.bannerHtml(data.policy_verdict)
+            : notInChangesetNoteHtml(data);
+        // A block/warn verdict owns the primary spark, so the confidence badge steps down to
+        // a muted treatment — avoids two amber blocks stacking.
+        const verdictDecision = data.policy_verdict && data.policy_verdict.decision;
+        const confidenceMuted = verdictDecision === 'block' || verdictDecision === 'warn';
+
         let html = `
             <div class="impact-hero">
+                ${policyBanner}
                 <h2 class="impact-question">What breaks if you change <code>${escapeHtml(columnName)}</code>?</h2>
                 <p class="impact-question-sub">in <code>${escapeHtml(modelName)}</code></p>
-                ${confidenceBadgeHtml(data.confidence, modelName)}
+                ${subjectSemanticChipHtml(data)}
+                <div class="${confidenceMuted ? 'confidence-muted' : ''}">${confidenceBadgeHtml(data.confidence, modelName)}</div>
                 <div class="impact-hero-metrics">
                     <div class="hero-metric ${criticalColumns.length > 0 ? 'hero-metric-critical' : ''}">
                         <div class="hero-metric-icon">
@@ -321,6 +479,7 @@ const ImpactModule = (function() {
                             <div class="column-card-header">
                                 <div class="column-card-title">
                                     <span class="column-name-bold">${colColumnName}</span>
+                                    ${semanticBadgeHtml(col)}
                                 </div>
                                 <span class="transformation-badge critical-transformation">${transformationType}</span>
                             </div>
@@ -376,6 +535,11 @@ const ImpactModule = (function() {
             `;
 
             affectedExposures.forEach(exposure => {
+                // Cross-boundary Metabase dashboards render as a distinct "outside dbt" card.
+                if (exposure.source === 'metabase') {
+                    html += metabaseExposureCardHtml(exposure);
+                    return;
+                }
                 const exposureName = exposure.name || 'Unknown';
                 const exposureType = exposure.type || 'unknown';
                 const dependsOnModels = exposure.depends_on_models || [];
@@ -508,6 +672,7 @@ const ImpactModule = (function() {
                                 <span class="column-model">${colModelName}</span>
                                 <span class="column-separator">.</span>
                                 <span class="column-name-bold">${colColumnName}</span>
+                                ${semanticBadgeHtml(col)}
                             </div>
                             <span class="transformation-badge low-impact-transformation">${transformationType}</span>
                         </div>
@@ -523,6 +688,11 @@ const ImpactModule = (function() {
         }
 
         impactContent.innerHTML = html;
+
+        // Let the Policy module wire its banner (open the full Policy panel on click).
+        if (window.PolicyModule && data.policy_verdict) {
+            window.PolicyModule.bindBanner(impactContent, data.policy_verdict);
+        }
 
         // Coverage is artifact-wide; append it once the (memoized) fetch resolves so it
         // never blocks rendering the impact analysis itself.
@@ -589,6 +759,16 @@ const ImpactModule = (function() {
         const passThrough = summary.low_impact_count || 0;
         const relatedExposures = summary.affected_exposures || 0;
         const relatedModels = summary.affected_models || 0;
+        // Compact confidence pip beside the Related-Exposures tile: full analysis reads
+        // neutral + an indigo check; a partial (lower-bound) analysis reads as an amber dot
+        // (it shares the ONE caution slot — an incomplete analysis IS a caution, not an error).
+        const confidenceLevel = summary.confidence && summary.confidence.level;
+        let exposurePip = '';
+        if (confidenceLevel === 'full') {
+            exposurePip = `<span class="summary-confidence-pip pip-full" title="Complete impact — every downstream model could be analyzed"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>`;
+        } else if (confidenceLevel === 'partial') {
+            exposurePip = `<span class="summary-confidence-pip pip-partial" title="Lower bound — some downstream models couldn’t be analyzed, so real reach may be larger"></span>`;
+        }
 
         container.innerHTML = `
             <div class="summary-metric ${transformations > 0 ? 'summary-metric-critical' : ''}">
@@ -636,7 +816,7 @@ const ImpactModule = (function() {
                     </svg>
                 </div>
                 <div class="summary-metric-content">
-                    <div class="summary-metric-value">${relatedExposures}</div>
+                    <div class="summary-metric-value">${relatedExposures}${exposurePip}</div>
                     <div class="summary-metric-label">Related Exposures</div>
                 </div>
             </div>

@@ -564,7 +564,7 @@ function drawModels(g, state, config, dragBehavior) {
         .attr('viewBox', '0 0 24 24');
 
     toggleIcon.append('path')
-        .attr('d', 'M6 9l6 6 6-6')
+.attr('d', ' 9l6 6 6-6')
         .attr('stroke', '#64748b')
         .attr('fill', 'none')
         .attr('stroke-width', 2)
@@ -742,6 +742,50 @@ function drawColumns(nodes, state, config, onColumnClick) {
                 .attr('fill', col.isKey ? '#3b82f6' : '#94a3b8')
                 .attr('opacity', 0.7);
 
+            // --- subject-node ring — the policy verdict on the column being explored.
+            //     block = red (--error), warn = amber (--accent), allow/absent = no ring.
+            //     A ring (not a fill) so the product stays the hero; at most one color per node.
+            if (col.id === state.subjectNodeId &&
+                (state.policyDecision === 'block' || state.policyDecision === 'warn')) {
+                const rowH = config.box.columnHeight - config.box.columnPadding;
+                columnGroup.append('rect')
+                    .attr('class', 'column-subject-ring policy-' + state.policyDecision)
+                    .attr('x', 0.75)
+                    .attr('y', 1.5)
+                    .attr('width', config.box.width - (config.box.padding * 2) - 1.5)
+                    .attr('height', rowH - 3)
+                    .attr('rx', 5)
+                    .attr('fill', 'none')
+                    .style('pointer-events', 'none');
+            }
+
+            // --- breaking mark — a small amber dot on a changed column whose meaning
+            //     may have shifted (fail-safe: indeterminate/unknown also renders breaking).
+            //     Equivalent/unchanged columns get nothing (absence = safe; color is rationed).
+            if (col.breaking) {
+                const dotCy = (config.box.columnHeight - config.box.columnPadding) / 2;
+                const dotGroup = columnGroup.append('g')
+                    .attr('class', 'column-breaking-mark')
+                    .style('cursor', 'help');
+                dotGroup.append('circle')
+                    .attr('class', 'column-breaking-dot')
+                    .attr('cx', 8)
+                    .attr('cy', dotCy)
+                    .attr('r', 2.75);
+                const semanticLabel = col.semantic === 'meaning_changed'
+                    ? 'Meaning changed — value may differ downstream'
+                    : 'Breaking (unproven) — treated as a change (fail-safe)';
+                dotGroup
+                    .on('mouseenter', function(event) { showTooltip(event, semanticLabel); })
+                    .on('mousemove', function(event) {
+                        const tt = createTooltip();
+                        const x = (event.pageX !== undefined ? event.pageX : event.clientX + window.scrollX);
+                        const y = (event.pageY !== undefined ? event.pageY : event.clientY + window.scrollY);
+                        tt.style('left', (x + 10) + 'px').style('top', (y - 10) + 'px');
+                    })
+                    .on('mouseleave', function() { hideTooltip(); });
+            }
+
             // --- Data Type Tag geometry (computed before the name so the name
             //     can be pixel-truncated to the space actually left of the tag) ---
             const nameX = 12;
@@ -894,7 +938,7 @@ function drawColumns(nodes, state, config, onColumnClick) {
                     .attr('stroke-linecap', 'round')
                     .attr('stroke-linejoin', 'round')
                     .attr('transform', `translate(${iconX}, ${iconTop})`)
-                    .attr('d', 'M4.5 0 L9 1.6 V4.6 C9 7.4 7 9.3 4.5 10 C2 9.3 0 7.4 0 4.6 V1.6 Z M2.4 4.8 L4 6.4 L6.8 3.2');
+.attr('d', '.5 0 L9 1.6 V4.6 C9 7.4 7 9.3 4.5 10 C2 9.3 0 7.4 0 4.6 V1.6 Z.4 4.8 L4 6.4 L6.8 3.2');
 
                 badgeGroup.append('text')
                     .attr('class', 'column-test-badge-count')
@@ -999,37 +1043,123 @@ function drawExposures(g, state, config, dragBehavior) {
         d && d.exposureData && d.exposureData.rowset && d.exposureData.note
             ? `Row-set dependency — used only in:\n${d.exposureData.note}`
             : null;
+    // F6: a reached Metabase dashboard gets a STRUCTURED hover card, not the plain single-line
+    // tooltip (which rendered the multi-line reach detail as one unreadable nowrap run-on). The
+    // card mirrors the Impact panel's Metabase card: identity + tier, column/table precision,
+    // the via-card(s), the affected field(s) (the column-precise chain, when present), and a
+    // link. A short hide-delay + the card's own hover keeps it reachable so the link is clickable.
+    const escHc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const biHovercardHtml = (d) => {
+        const ex = (d && d.exposureData) || {};
+        const tier = ex.tier ? `<span class="bi-hc-tier">${escHc(ex.tier)}</span>` : '';
+        const precision = ex.precision === 'table'
+            ? '<span class="bi-hc-precision bi-hc-precision-table">table-level</span>'
+            : (ex.precision === 'column'
+                ? '<span class="bi-hc-precision bi-hc-precision-column">column-precise</span>'
+                : '');
+        const cards = (Array.isArray(ex.via_cards) && ex.via_cards.length)
+            ? `<div class="bi-hc-cards">via card${ex.via_cards.length !== 1 ? 's' : ''} `
+              + `${ex.via_cards.map((c) => '#' + escHc(c)).join(', ')}</div>`
+            : '';
+        let fields = '';
+        if (Array.isArray(ex.via_columns) && ex.via_columns.length) {
+            const seen = new Map();
+            ex.via_columns.forEach((v) => {
+                if (v && v.model && v.column) {
+                    const k = v.model + '.' + v.column;
+                    if (!seen.has(k)) seen.set(k, v.role || '');
+                }
+            });
+            if (seen.size) {
+                const chips = Array.from(seen.entries()).map(([col, role]) =>
+                    `<span class="bi-hc-field"><code>${escHc(col)}</code>`
+                    + `${role ? `<span class="bi-hc-role">${escHc(role)}</span>` : ''}</span>`).join('');
+                fields = `<div class="bi-hc-fields"><span class="bi-hc-fields-label">Affects</span>${chips}</div>`;
+            }
+        }
+        const link = ex.url
+            ? `<a class="bi-hc-link" href="${escHc(ex.url)}" target="_blank" rel="noopener">View dashboard →</a>`
+            : '';
+        const logo = (typeof metabaseLogoSvg === 'function') ? metabaseLogoSvg(12) : '';
+        return `<div class="bi-hc-eyebrow">${logo}<span>BI · METABASE — past the dbt edge</span></div>`
+            + `<div class="bi-hc-title">${escHc((d && d.name) || 'dashboard')}${tier}</div>`
+            + (precision ? `<div class="bi-hc-meta">${precision}</div>` : '')
+            + cards + fields + link;
+    };
+    let biHideTimer = null;
+    const ensureBiHovercard = () => {
+        let c = document.getElementById('biHovercard');
+        if (!c) {
+            c = document.createElement('div');
+            c.id = 'biHovercard';
+            c.className = 'bi-hovercard';
+            document.body.appendChild(c);
+            c.addEventListener('mouseenter', () => {
+                if (biHideTimer) { clearTimeout(biHideTimer); biHideTimer = null; }
+            });
+            c.addEventListener('mouseleave', () => hideBiHovercard());
+        }
+        return c;
+    };
+    const showBiHovercard = (event, d) => {
+        const c = ensureBiHovercard();
+        if (biHideTimer) { clearTimeout(biHideTimer); biHideTimer = null; }
+        c.innerHTML = biHovercardHtml(d);
+        c.style.left = (event.pageX + 14) + 'px';
+        c.style.top = (event.pageY - 10) + 'px';
+        c.classList.add('is-visible');
+    };
+    const hideBiHovercard = () => {
+        if (biHideTimer) { clearTimeout(biHideTimer); biHideTimer = null; }
+        biHideTimer = setTimeout(() => {
+            const c = document.getElementById('biHovercard');
+            if (c) c.classList.remove('is-visible');
+        }, 160);
+    };
+
     exposureGroups
-        .on('mouseover.rowset', function (event, d) {
+        .on('mouseover.biexp', function (event, d) {
+            if (d && d.boundary === 'metabase') { showBiHovercard(event, d); return; }
             const text = rowsetTip(event, d);
             if (text) showTooltip(event, text);
         })
-        .on('mousemove.rowset', function (event, d) {
+        .on('mousemove.biexp', function (event, d) {
+            // Metabase card holds a fixed position (set on show) so the user can travel to it;
+            // only the plain rowset tooltip tracks the cursor.
+            if (d && d.boundary === 'metabase') return;
             if (!rowsetTip(event, d)) return;
             const t = createTooltip();
             t.style('left', event.pageX + 12 + 'px').style('top', event.pageY - 10 + 'px');
         })
-        .on('mouseout.rowset', function (event, d) {
-            if (!(d && d.exposureData && d.exposureData.rowset)) return;
+        .on('mouseout.biexp', function (event, d) {
             if (event.relatedTarget && this.contains(event.relatedTarget)) return;
-            hideTooltip();
+            if (d && d.boundary === 'metabase') { hideBiHovercard(); return; }
+            if (d && d.exposureData && d.exposureData.rowset) hideTooltip();
         });
 
     const backgroundGroup = exposureGroups.append('g')
         .attr('class', 'exposure-background');
 
     backgroundGroup.append('rect')
-        .attr('class', 'exposure-container')
+        .attr('class', d => 'exposure-container' + (d.boundary === 'metabase' ? ' bi-node' : ''))
         .attr('width', config.box.width)
         .attr('height', d => d.height)
         .attr('rx', 8)
         .attr('ry', 8)
         .style('fill', 'var(--surface)')
-        .style('stroke', d => (d.exposureData && d.exposureData.rowset) ? 'var(--info)' : 'var(--violet)')
+        // a reached Metabase dashboard is NOT a dbt model — a dashed INDIGO-family
+        // border (no new hue) + monitor glyph read it as "outside the dbt boundary".
+        .style('stroke', d => (d.exposureData && d.exposureData.rowset)
+            ? 'var(--info)'
+            : (d.boundary === 'metabase' ? 'var(--primary)' : 'var(--violet)'))
         .style('stroke-width', 2)
         // Row-set dependents use the column only in a predicate (not projected): a dashed
-        // blue border signals "indirect / row-set" vs a solid violet exposure box.
-        .style('stroke-dasharray', d => (d.exposureData && d.exposureData.rowset) ? '5 4' : 'none');
+        // blue border signals "indirect / row-set" vs a solid violet exposure box. Metabase
+        // BI dashboards also dash (indigo) to signal "external artifact, past the dbt edge".
+        .style('stroke-dasharray', d => (d.exposureData && d.exposureData.rowset)
+            ? '5 4'
+            : (d.boundary === 'metabase' ? '6 4' : 'none'));
 
     const foregroundGroup = exposureGroups.append('g')
         .attr('class', 'exposure-foreground');
@@ -1043,7 +1173,9 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('rx', 7)
         .style('fill', d => (d.exposureData && d.exposureData.rowset)
             ? 'color-mix(in srgb, var(--info) 14%, var(--surface))'
-            : 'color-mix(in srgb, var(--violet) 12%, var(--surface))')
+            : (d.boundary === 'metabase'
+                ? 'color-mix(in srgb, var(--primary) 12%, var(--surface))'
+                : 'color-mix(in srgb, var(--violet) 12%, var(--surface))'))
         .style('stroke', 'none');
 
     foregroundGroup.append('svg')
@@ -1054,9 +1186,14 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('y', config.box.titleHeight / 2 - 12)
         .attr('viewBox', '0 0 24 24')
         .append('path')
-        .attr('d', getModelIcon('exposure'))
-        .attr('fill', 'none')
-        .attr('stroke', d => (d.exposureData && d.exposureData.rowset) ? 'var(--info)' : 'var(--violet)')
+        // Metabase dashboards carry the real Metabase logomark (a FILL path) — monochrome, in
+        // the indigo accent, so the mark itself (not a new colour) says "this is Metabase". Other
+        // exposures / row-set nodes keep the stroked line glyph.
+        .attr('d', d => d.boundary === 'metabase' ? METABASE_LOGO_PATH : getModelIcon('exposure'))
+        .attr('fill', d => d.boundary === 'metabase' ? 'var(--primary)' : 'none')
+        .attr('stroke', d => d.boundary === 'metabase'
+            ? 'none'
+            : ((d.exposureData && d.exposureData.rowset) ? 'var(--info)' : 'var(--violet)'))
         .attr('stroke-width', '2')
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
@@ -1067,13 +1204,17 @@ function drawExposures(g, state, config, dragBehavior) {
         .attr('y', config.box.titleHeight / 2 - 6)
         .style('fill', d => (d.exposureData && d.exposureData.rowset)
             ? 'var(--info)'
-            : 'color-mix(in srgb, var(--violet) 60%, var(--text-muted))')
-        .style('font-family', 'var(--font-sans)')
+            : (d.boundary === 'metabase'
+                ? 'color-mix(in srgb, var(--primary) 72%, var(--text-muted))'
+                : 'color-mix(in srgb, var(--violet) 60%, var(--text-muted))'))
+        .style('font-family', 'var(--font-mono)')
         .style('font-size', '8.5px')
         .style('font-weight', '600')
-        .style('letter-spacing', '0.09em')
+        .style('letter-spacing', '0.12em')
         .style('pointer-events', 'none')
-        .text(d => (d.exposureData && d.exposureData.rowset) ? 'ROW-SET' : 'EXPOSURE');
+        .text(d => (d.exposureData && d.exposureData.rowset)
+            ? 'ROW-SET'
+            : (d.boundary === 'metabase' ? 'BI · METABASE' : 'EXPOSURE'));
 
     const exposureTitleText = foregroundGroup.append('text')
         .attr('class', 'exposure-title')
@@ -1366,6 +1507,86 @@ function drawExposures(g, state, config, dragBehavior) {
     });
 }
 
+// the dbt → BI boundary. A thin vertical dashed rule read poorly, so the
+// reached Metabase dashboards now sit inside a soft indigo-family LANE with a horizontal header
+// — "past here, we've left dbt" reads as a distinct ZONE, not a hairline. A no-op when no
+// dashboard was reached (no --metabase context) → the graph renders exactly as today.
+function drawBoundaryBand(g, state, config) {
+    const biNodes = (state.exposures || []).filter(
+        e => e && e.boundary === 'metabase' && typeof e.x === 'number' && !isNaN(e.x)
+    );
+    if (biNodes.length === 0) return;
+
+    // Horizontal extent: enclose every reached dashboard (exposure d.x is the box's left edge,
+    // width is the shared box width), with a little breathing room on each side.
+    const boxW = config.box.width;
+    const padX = 22;
+    const laneLeft = Math.min(...biNodes.map(e => e.x)) - padX;
+    const laneRight = Math.max(...biNodes.map(e => e.x + boxW)) + padX;
+
+    // Vertical extent: cover the full laid-out content so the lane reads as a column, with room
+    // above the top node for the header so it never overlaps a dashboard.
+    const ys = [];
+    (state.models || []).forEach(m => {
+        if (typeof m.y === 'number' && !isNaN(m.y)) {
+            ys.push(m.y - (m.height || 0) / 2, m.y + (m.height || 0) / 2);
+        }
+    });
+    (state.exposures || []).forEach(e => {
+        if (typeof e.y === 'number' && !isNaN(e.y)) {
+            ys.push(e.y - (e.height || 0) / 2, e.y + (e.height || 0) / 2);
+        }
+    });
+    const padY = 50;
+    const headerH = 30;
+    const laneTop = (ys.length ? Math.min(...ys) : 0) - padY - headerH;
+    const laneBottom = (ys.length ? Math.max(...ys) : config.height) + padY;
+
+    let band = g.select('.bi-boundary-band');
+    if (band.empty()) {
+        band = g.append('g').attr('class', 'bi-boundary-band');
+    }
+    band.selectAll('*').remove();
+    band.style('pointer-events', 'none');
+
+    // A horizontal header at the lane's top-left — legible at a glance, unlike the old rotated
+    // hairline label. The lane encloses the whole consumption layer past the models (dbt
+    // exposures AND Metabase dashboards), so the header stays generic; the Metabase-specific
+    // "BI · METABASE" identity lives on the individual dashboard node, not the zone.
+    // Drawn FIRST so we can measure it and size the lane to enclose it (F7).
+    const headerPad = 15;
+    const label = band.append('text')
+        .attr('class', 'bi-lane-label')
+        .attr('x', laneLeft + headerPad)
+        .attr('y', laneTop + headerPad)
+        .attr('dominant-baseline', 'hanging')
+        .text('PAST THE dbt EDGE · BI / CONSUMPTION LAYER');
+
+    // F7: the header is a fixed-length string but the lane width came only from the dashboards'
+    // geometry — on a narrow lane the text overran the box. Widen the lane so it always encloses
+    // its own header (never shrinks below the geometry-derived width).
+    let labelWidth = 0;
+    try {
+        labelWidth = label.node().getComputedTextLength();
+    } catch (e) {
+        labelWidth = 0;
+    }
+    const laneWidth = Math.max(laneRight - laneLeft, labelWidth + headerPad * 2);
+
+    // The lane surface — a tinted rounded rect (dashed indigo border, muted fill; no new hue).
+    // Inserted BEFORE the label so it paints underneath it.
+    band.insert('rect', '.bi-lane-label')
+        .attr('class', 'bi-lane')
+        .attr('x', laneLeft)
+        .attr('y', laneTop)
+        .attr('width', Math.max(0, laneWidth))
+        .attr('height', Math.max(0, laneBottom - laneTop))
+        .attr('rx', 14);
+
+    // Keep the lane behind the nodes.
+    band.lower();
+}
+
 // Draw the synthetic "+N more" progressive-disclosure nodes. These are neutral,
 // clearly-not-a-model affordances: a dashed muted box carrying an honest count
 // and a "click to expand" hint. Styling lives in graph.css (.more-node) so both
@@ -1462,16 +1683,24 @@ function drawEdges(g, data, state, config) {
         edgesGroup = g.append('g').attr('class', 'edges-group');
     }
 
+    // when a breaking path exists, the off-path context recedes so the single amber
+    // blast thread reads clearly. No breaking context => hasBreakingPath is false => today's look.
+    const hasBreaking = state.hasBreakingPath === true;
+
     // Draw all lineage edges, but hide those between non-visible models
     const lineageEdges = edgesGroup.selectAll('.edge.lineage')
         .data(data.edges.filter(e => e.type === 'lineage'))
         .join('path')
-        .attr('class', 'edge lineage')
+        // tag the blast-path edges (edges leaving a breaking column) so interactions
+        // can keep the amber thread lifted through select/reset cycles.
+        .attr('class', d => 'edge lineage' + (d.breaking ? ' breaking' : ''))
         .attr('marker-end', 'url(#arrowhead)')
         .attr('data-source', d => d.source)
         .attr('data-target', d => d.target)
-        .style('stroke', config.colors.edge)
-        .style('stroke-width', 1.5)
+        // Breaking edges are the ONE warm accent (amber); everything else stays neutral slate.
+        .style('stroke', d => d.breaking ? 'var(--accent)' : config.colors.edge)
+        .style('stroke-width', d => d.breaking ? 1.75 : 1.5)
+        .style('stroke-opacity', d => d.breaking ? 1 : (hasBreaking ? 0.4 : 1))
         .style('fill', 'none')
         .style('display', d => {
             const sourceNode = state.nodeIndex.get(d.source);

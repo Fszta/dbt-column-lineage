@@ -79,7 +79,11 @@ function processData(data, state) {
                 id: node.id,
                 dataType: node.data_type,
                 isKey: node.is_key || false,
-                tests: node.tests || []
+                tests: node.tests || [],
+                // change-context marks (present only with a --base-manifest/--policy
+                // context; absent => undefined/false => no mark, today's graph unchanged).
+                breaking: node.breaking === true,
+                semantic: node.semantic || null
             });
         } else if (node.type === 'exposure') {
             if (!exposureGroups[node.model]) {
@@ -88,7 +92,10 @@ function processData(data, state) {
                     columns: [],
                     isMain: false,
                     type: 'exposure',
-                    exposureData: node.exposure_data || {}
+                    exposureData: node.exposure_data || {},
+                    // "metabase" on reached BI dashboards → drawn past the dbt/BI
+                    // boundary. null on plain dbt exposures (backward compatible).
+                    boundary: node.boundary || null
                 };
             }
         }
@@ -96,6 +103,13 @@ function processData(data, state) {
 
     state.models = Object.values(modelGroups);
     state.exposures = Object.values(exposureGroups);
+
+    // change-context signals the renderer reads for the subject ring and the
+    // "lift the breaking path, dim off-path" treatment. All null/false in pure-explore
+    // mode (no diff/policy context) → no marks, graph renders exactly as today.
+    state.subjectNodeId = data.main_node || null;
+    state.policyDecision = (data.impact_summary && data.impact_summary.policy_decision) || null;
+    state.hasBreakingPath = Array.isArray(data.edges) && data.edges.some(e => e && e.breaking);
 
     buildLineageMaps(data, state);
     buildModelDownstreamMap(data, state);

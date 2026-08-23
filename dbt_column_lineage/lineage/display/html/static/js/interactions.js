@@ -365,6 +365,16 @@ function highlightLineage(columnId, state, config) {
     .style('stroke-width', 2.5)
     .style('stroke-opacity', 1)
     .attr('marker-end', 'url(#arrowhead-highlighted)');
+
+    // keep the amber blast path lifted on breaking edges that are NOT part of the
+    // currently-traced (indigo) selection — the selection wins where it overlaps, but the
+    // "what breaks" thread stays visible everywhere else.
+    d3.selectAll('.edge.lineage.breaking')
+        .filter(d => !(relatedColumns.has(d.source) && relatedColumns.has(d.target)))
+        .transition().duration(200)
+        .style('stroke', 'var(--accent)')
+        .style('stroke-width', 1.75)
+        .style('stroke-opacity', 0.95);
 }
 
 function resetHighlights(state, config) {
@@ -382,11 +392,21 @@ function resetHighlights(state, config) {
     });
 
     // Reset lineage edge highlighting
+    const hasBreaking = state && state.hasBreakingPath === true;
     d3.selectAll('.edge.lineage').transition().duration(200)
         .style('stroke', config.colors.edge)
         .style('stroke-width', 1.5)
-        .style('stroke-opacity', 1)
+        // when a breaking path is present, off-path edges rest dimmed so the amber
+        // blast thread stays the read; no breaking context => full opacity (today's look).
+        .style('stroke-opacity', hasBreaking ? 0.4 : 1)
         .attr('marker-end', 'url(#arrowhead)');
+
+    // the amber blast path is a property of the change, not the selection — restore it
+    // whenever highlights clear so the "what breaks" thread persists at rest.
+    d3.selectAll('.edge.lineage.breaking').transition().duration(200)
+        .style('stroke', 'var(--accent)')
+        .style('stroke-width', 1.75)
+        .style('stroke-opacity', 1);
 
     // Restore exposure edge color
     d3.selectAll('.edge.exposure').transition().duration(200)
