@@ -195,6 +195,16 @@ and the tool behaves exactly as before.
   dbt-col-lineage impact --base-manifest base/manifest.json --base-catalog base/catalog.json \
       --policy policy.yml --fail-on policy
   ```
+- **Scaffold a starter policy, don't start from a blank file** — `dbt-col-lineage policy init`
+  reads your manifest + catalog and writes a heavily-commented, safe-by-construction
+  `dbt-col-lineage.policy.yml` keyed only to signals the scan confirmed exist: it enables the
+  provable-break block when column-targeted tests are found and an exposure guard when exposures
+  are found, and offers every dbt-`meta` key you actually use as a commented template prefixed with
+  its real coverage. The result runs green on day one — no rage-block.
+
+  ```bash
+  dbt-col-lineage policy init --manifest target/manifest.json --catalog target/catalog.json
+  ```
 - **Backtest a policy before you arm it** — `dbt-col-lineage policy test` replays a candidate
   policy over your recent git history (`--last 30`) or a saved changeset corpus and reports, per
   rule, what the gate *would* have ruled — including how many firings were driven by a fail-safe

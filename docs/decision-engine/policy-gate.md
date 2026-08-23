@@ -18,7 +18,14 @@ how it clears and lifts itself on the next push, so the gate is an exit path, no
 
 ## Quick start
 
-Author a `policy.yml`, then gate on it:
+!!! tip "Scaffold the policy — don't start from a blank file"
+    `dbt-col-lineage policy init` reads your manifest + catalog and writes a heavily-commented,
+    safe-by-construction `./dbt-col-lineage.policy.yml` keyed only to signals it confirmed exist,
+    so it runs green on day one. Start there rather than authoring from scratch — see
+    [`policy init`](#scaffold-a-starter-policy-policy-init) below and the
+    [Policy recipes](policy-recipes.md) page for the blessed copy-paste rules it emits.
+
+Author (or scaffold) a `policy.yml`, then gate on it:
 
 ```bash
 dbt-col-lineage impact \
@@ -358,6 +365,66 @@ dashboards, not dbt-native exposures — combine `on_missing_meta: fail_open` wi
 in the reach `where`. Under `fail_closed`, dbt-native exposures (which lack the guard meta) would
 be treated as risk and block regardless; `fail_open` lets the guard do its job. See the
 [cross-boundary guide](metabase.md#isolating-metabase-only-rules) for the worked example.
+
+## Scaffold a starter policy — `policy init`
+
+Authoring three-valued fail-safe YAML from a blank file is the adoption cliff, and a naive starter
+makes it worse (a value-comparison block rule on a `meta` key most of your models lack
+[rage-blocks every PR](#fail-safe-defaults) under `fail_closed`). `policy init` removes the blank
+page: it introspects your manifest + catalog and writes a heavily-commented,
+**safe-by-construction** starter policy keyed *only* to signals the scan confirmed exist.
+
+```bash
+dbt-col-lineage policy init \
+  --manifest target/manifest.json --catalog target/catalog.json
+# → wrote ./dbt-col-lineage.policy.yml
+```
+
+The default output path is `./dbt-col-lineage.policy.yml` — exactly the path
+[`impact` and `policy test` auto-resolve](#quick-start), so the generated file is picked up with no
+`--policy` flag. **The file is yours** — it is code scaffolded into your repo, not a tool-managed
+preset that can change under you. Edit it freely.
+
+### What it emits
+
+| Section | Behaviour |
+|---|---|
+| Header | Ownership note, a pointer to run [`policy test`](#backtest-a-policy-before-you-arm-it-policy-test) before arming anything, and the two footguns (presence vs. value operators; the fail-safe glossary) stated plainly. |
+| `defaults` | `on_missing_meta: fail_closed`, `on_error: fail_closed` — the safe closed posture, emitted with the explanatory comment. |
+| `provable-break-block` | Emitted **enabled** *iff* the scan found column-targeted dbt tests. This is a pure structural fact (never `UNKNOWN`), so it is safe to block on day one — it can only fire on a real breakage. Emitted commented, with the reason, when no tests are found. |
+| `exposure-guard` | Emitted **enabled** (`warn`) *iff* the scan found exposures. Emitted commented otherwise. |
+| Meta templates | For every dbt-`meta` key the scan actually found, a **commented** `warn` template using the presence operator `is_true`, prefixed with the key's **real coverage** (`present on N/total models (P%)`). Never enabled, never a block, never a value comparison — so uncommenting one can never rage-block. |
+| Footer | Next steps: run `policy test`, uncomment a template once its coverage is useful, and promote `warn` → `block` only after the backtest proves it fires on real matches. |
+
+The enabled rules are **tool-owned structural signals only** — facts the pipeline computes that can
+never silently no-op. Meta-keyed rules always ship commented, because the tool never guesses your
+governance intent. If the manifest has neither tests nor exposures, `policy init` emits a valid file
+with `rules: []` and an honest note that nothing could be safely auto-enabled — an honest empty
+policy, never a fake guard.
+
+!!! danger "The scaffold never emits a fail-open default"
+    `policy init` only ever writes the safe `fail_closed` posture — a gate that opens whenever it is
+    unsure is not a gate. The permissive fail-safe mode is described in the header glossary but is
+    deliberately never written as a copy-pasteable value.
+
+### Options
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--manifest <path>` | `target/manifest.json` | the dbt manifest to scan (run dbt first). |
+| `--catalog <path>` | `target/catalog.json` | the dbt catalog to scan. |
+| `--adapter <dialect>` | auto-detected | override the sqlglot dialect (e.g. `tsql`, `snowflake`, `bigquery`). |
+| `-o`, `--output <path>` | `./dbt-col-lineage.policy.yml` | where to write the generated policy (the path `load_policy` auto-resolves). |
+| `--force` | off | overwrite an existing file at `--output` instead of refusing. |
+| `--stdout` | off | print the generated policy to stdout instead of writing a file (never touches disk). |
+
+`policy init` **refuses to overwrite** an existing policy without `--force`, so a hand-edited file is
+never silently clobbered; `--stdout` prints without touching the filesystem at all.
+
+The generated file arrives **green** — the enabled rules are safe-by-construction — but the meta
+templates are yours to arm. Once you have it, replay it with
+[`policy test`](#backtest-a-policy-before-you-arm-it-policy-test) and reach for the blessed
+[Policy recipes](policy-recipes.md) when you want to graft in a rule the scan couldn't auto-enable.
 
 ## Backtest a policy before you arm it — `policy test`
 

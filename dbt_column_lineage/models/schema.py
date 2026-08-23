@@ -779,3 +779,68 @@ class BacktestReport(BaseModel):
     fidelity_note: str = ""
     warnings: List[str] = Field(default_factory=list)
     baseline_delta: Optional[Dict[str, Any]] = None
+
+
+# ===========================================================================
+# POLICY INIT SCAN — the `policy init` manifest introspection.
+#
+# Append-only block. ``policy init`` reads the manifest + catalog once and
+# computes which tool-owned signals actually exist (column-targeted tests,
+# exposures) and a meta-key coverage histogram — the manifest scan. These types are
+# internal to the scaffold flow (NOT part of any ``--format json`` surface), but
+# they are typed rather than loose dicts per the house rule so mypy stays honest,
+# mirroring the ``BacktestReport`` precedent. The emitter (lineage/policy_init.py)
+# consumes a ``PolicyInitScan`` to decide which rules to enable vs comment and to
+# print REAL coverage numbers in the inline notes.
+# ===========================================================================
+
+
+class MetaKeyCoverage(BaseModel):
+    """One row of the meta-key coverage histogram: how many models/columns carry a key.
+
+    ``key`` is the dotted meta path (``critical`` or ``governance.tier``) so it matches the
+    engine's ``_dotted_get`` lookup verbatim. ``n_present`` is the count carrying it;
+    ``total`` is the denominator (``total_models`` for the model histogram, ``total_columns``
+    for the column histogram). ``pct`` is the rendered percentage used verbatim in the emitted
+    coverage comment (e.g. "present on 95/1163 models (8%)").
+    """
+
+    key: str
+    n_present: int
+    total: int
+
+    @property
+    def pct(self) -> int:
+        """Whole-percent coverage, guarded so a zero denominator yields 0 (never divides)."""
+        if self.total == 0:
+            return 0
+        return round(100 * self.n_present / self.total)
+
+
+class PolicyInitScan(BaseModel):
+    """The read-only manifest/catalog scan that drives ``policy init`` (the manifest scan).
+
+    Everything here is derived from the registry accessors — never guessed. The two
+    ``*_present`` properties gate whether the corresponding tool-owned rule is emitted ENABLED
+    (a signal that actually fires) versus commented-out with an honest "not detected" note.
+    """
+
+    total_models: int = 0
+    total_columns: int = 0
+    # Sum of ``get_column_tests`` over every (model, column) pair — column-targeted generic tests.
+    column_test_count: int = 0
+    models_with_column_tests: int = 0
+    exposure_count: int = 0
+    # Sorted by n_present desc, then key (stable, most-covered-first).
+    model_meta_keys: List[MetaKeyCoverage] = Field(default_factory=list)
+    column_meta_keys: List[MetaKeyCoverage] = Field(default_factory=list)
+
+    @property
+    def tests_present(self) -> bool:
+        """True when the scan found at least one column-targeted generic test."""
+        return self.column_test_count > 0
+
+    @property
+    def exposures_present(self) -> bool:
+        """True when the scan found at least one exposure."""
+        return self.exposure_count > 0
