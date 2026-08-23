@@ -12,31 +12,31 @@
         <meta name="author" content="Fszta">
       
       
-        <link rel="canonical" href="https://fszta.github.io/dbt-column-lineage/decision-engine/concepts/gotchas/">
+        <link rel="canonical" href="https://fszta.github.io/dbt-column-lineage/decision-engine/policy-recipes/">
       
       
-        <link rel="prev" href="../guardrails/">
+        <link rel="prev" href="../policy-gate/">
       
       
-        <link rel="next" href="../../semantic-categorization/">
+        <link rel="next" href="../metabase/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/favicon.svg">
+      <link rel="icon" href="../../assets/favicon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Things to know - DBT Column Lineage</title>
+        <title>Policy Recipes - DBT Column Lineage</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../stylesheets/custom.css">
+      <link rel="stylesheet" href="../../stylesheets/custom.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#things-to-know" class="md-skip">
+        <a href="#policy-recipes" class="md-skip">
           Skip to content
         </a>
       
@@ -90,9 +90,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="DBT Column Lineage" class="md-header__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
+    <a href="../.." title="DBT Column Lineage" class="md-header__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
       
-  <img src="../../../assets/logo.svg" alt="logo">
+  <img src="../../assets/logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Things to know
+              Policy Recipes
             
           </span>
         </div>
@@ -222,7 +222,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -243,7 +243,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -263,7 +263,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../features/impact-analysis/" class="md-tabs__link">
+        <a href="../../features/impact-analysis/" class="md-tabs__link">
           
   
   
@@ -285,7 +285,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../overview/" class="md-tabs__link">
+        <a href="../overview/" class="md-tabs__link">
           
   
   
@@ -305,7 +305,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../reference/json-output/" class="md-tabs__link">
+        <a href="../../reference/json-output/" class="md-tabs__link">
           
   
   
@@ -323,7 +323,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../changelog/" class="md-tabs__link">
+      <a href="../../changelog/" class="md-tabs__link">
         
   
   
@@ -360,9 +360,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="DBT Column Lineage" class="md-nav__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
+    <a href="../.." title="DBT Column Lineage" class="md-nav__button md-logo" aria-label="DBT Column Lineage" data-md-component="logo">
       
-  <img src="../../../assets/logo.svg" alt="logo">
+  <img src="../../assets/logo.svg" alt="logo">
 
     </a>
     DBT Column Lineage
@@ -389,7 +389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -470,7 +470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -498,7 +498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -587,7 +587,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../features/impact-analysis/" class="md-nav__link">
+      <a href="../../features/impact-analysis/" class="md-nav__link">
         
   
   
@@ -679,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../overview/" class="md-nav__link">
+      <a href="../overview/" class="md-nav__link">
         
   
   
@@ -695,6 +695,155 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/how-it-works/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/guardrails/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guardrails & non-goals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/gotchas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Things to know
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -725,17 +874,17 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
     
   
-    Concepts
+    Guides
   
 
     
@@ -746,12 +895,12 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_3">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Concepts
+    Guides
   
 
           </label>
@@ -764,14 +913,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../how-it-works/" class="md-nav__link">
+      <a href="../semantic-categorization/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    How it works
+    Semantic Categorization
   
 
     
@@ -792,14 +941,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../guardrails/" class="md-nav__link">
+      <a href="../policy-gate/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Guardrails & non-goals
+    Policy Gate
   
 
     
@@ -836,7 +985,7 @@
   <span class="md-ellipsis">
     
   
-    Things to know
+    Policy Recipes
   
 
     
@@ -854,7 +1003,7 @@
   <span class="md-ellipsis">
     
   
-    Things to know
+    Policy Recipes
   
 
     
@@ -880,10 +1029,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-gate-on-changebreaking-not-an-equality-match-on-semantic" class="md-nav__link">
+  <a href="#the-footgun-in-one-paragraph" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Gate on change.breaking, not an equality match on semantic
+        The footgun, in one paragraph
       
     </span>
   </a>
@@ -891,10 +1040,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-equivalent-means-provably-unchanged-output-not-unchanged-text" class="md-nav__link">
+  <a href="#1-block-provable-test-breaks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. equivalent means provably-unchanged output, not unchanged text
+        1. Block provable test breaks
       
     </span>
   </a>
@@ -902,10 +1051,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-absent-boolean-meta-reads-as-false-by-design" class="md-nav__link">
+  <a href="#2-warn-and-notify-when-a-change-reaches-an-exposure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Absent boolean meta reads as False — by design
+        2. Warn (and notify) when a change reaches an exposure
       
     </span>
   </a>
@@ -913,10 +1062,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-fail-closed-vs-fail-open-how-undecidable-inputs-resolve" class="md-nav__link">
+  <a href="#3-critical-mart-review" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Fail-closed vs fail-open: how undecidable inputs resolve
+        3. Critical-mart review
       
     </span>
   </a>
@@ -924,10 +1073,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-cross-boundary-reach-is-only-as-good-as-its-snapshot-and-says-so" class="md-nav__link">
+  <a href="#4-pii-guard-the-correctly-written-one" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Cross-boundary reach is only as good as its snapshot — and says so
+        4. PII guard (the correctly-written one)
       
     </span>
   </a>
@@ -935,21 +1084,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-a-block-is-a-block-until-it-clears-itself" class="md-nav__link">
+  <a href="#promoting-warn-block" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. A block is a block-until — it clears itself
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-blockwarn-the-action-vs-blockwarn-the-decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. block/warn the action vs block/warn the decision
+        Promoting warn → block
       
     </span>
   </a>
@@ -965,71 +1103,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-          
-          
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Guides
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_3">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Guides
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -1037,91 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../semantic-categorization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Semantic Categorization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../policy-gate/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Policy Gate
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../policy-recipes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Policy Recipes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../metabase/" class="md-nav__link">
+      <a href="../metabase/" class="md-nav__link">
         
   
   
@@ -1149,7 +1138,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explorer/" class="md-nav__link">
+      <a href="../explorer/" class="md-nav__link">
         
   
   
@@ -1185,7 +1174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../glossary/" class="md-nav__link">
+      <a href="../glossary/" class="md-nav__link">
         
   
   
@@ -1274,7 +1263,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../reference/json-output/" class="md-nav__link">
+      <a href="../../reference/json-output/" class="md-nav__link">
         
   
   
@@ -1309,7 +1298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../changelog/" class="md-nav__link">
+      <a href="../../changelog/" class="md-nav__link">
         
   
   
@@ -1349,83 +1338,112 @@
   
 
 
-<h1 id="things-to-know">Things to know</h1>
-<p>A short list of subtleties that are easy to get wrong. Each one is intentional; internalizing them
-is the difference between trusting the engine and fighting it. If you read only one page beyond
-<a href="../how-it-works/">How it works</a>, read this one.</p>
-<h2 id="1-gate-on-changebreaking-not-an-equality-match-on-semantic">1. Gate on <code>change.breaking</code>, not an equality match on <code>semantic</code></h2>
-<p>This is the single most important rule. The <code>semantic</code> field is always a <em>present</em> value, so a
-policy condition matching <code>semantic eq meaning_changed</code> resolves to a plain <strong>False</strong> for an
-<code>indeterminate</code> (or absent) semantic — it silently lets the unprovable case through.</p>
-<p><code>change.breaking</code> is the fail-safe roll-up: it is <strong>true for everything that isn't a proven
-<code>equivalent</code></strong> (so it folds in <code>meaning_changed</code>, <code>indeterminate</code>, <em>and</em> absent). To catch
-everything possibly-breaking, always gate on:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> field</span><span class="p">:</span><span class="w"> </span><span class="nv">breaking</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<h1 id="policy-recipes">Policy recipes</h1>
+<p>Blessed, copy-paste starter policies for the <a href="../policy-gate/">policy gate</a>. Each is
+<strong>safe-by-construction</strong>: it uses a presence operator (<code>is_true</code> / <code>exists</code>), so it never
+rage-blocks on a <code>meta</code> key your models don't carry.</p>
+<div class="admonition tip">
+<p class="admonition-title">Start with <code>policy init</code>, not a blank file</p>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dbt-col-lineage<span class="w"> </span>policy<span class="w"> </span>init<span class="w"> </span>--manifest<span class="w"> </span>target/manifest.json<span class="w"> </span>--catalog<span class="w"> </span>target/catalog.json
 </code></pre></div>
-<h2 id="2-equivalent-means-provably-unchanged-output-not-unchanged-text">2. <code>equivalent</code> means provably-unchanged <em>output</em>, not unchanged <em>text</em></h2>
-<p>Semantic categorization is an <strong>output gate, not a source-text gate</strong>. It canonicalizes each
-expression before comparing, so a set of edits are correctly reported <code>equivalent</code> even though a
-human sees the text change — boolean reordering (<code>a AND b</code> ↔ <code>b AND a</code>), de Morgan / idempotence,
-constant folding to the same value, <code>BETWEEN</code> ↔ an equivalent range, type aliases (<code>int</code> ↔
-<code>integer</code>), comments/whitespace. This is <strong>intended and safe</strong>: the value is provably unchanged, so
-there is nothing to rebuild. Don't mistake an <code>equivalent</code> verdict for a missed change.</p>
-<p>Conversely, a few edits look harmless but can't be proven equivalent <em>type-safely</em>, so the engine
-errs to breaking — e.g. arithmetic reordering (<code>a + b</code> vs <code>b + a</code>, since floats/overflow don't
-commute) and quoted-vs-unquoted identifiers on case-sensitive warehouses. That is the fail-safe
-stance, not a bug.</p>
-<h2 id="3-absent-boolean-meta-reads-as-false-by-design">3. Absent boolean meta reads as <em>False</em> — by design</h2>
-<p><code>is_true</code> / <code>exists</code> on a <strong>missing</strong> key resolves to <code>False</code>. So a model that simply <em>forgot</em>
-<code>critical: true</code> is <strong>not</strong> blocked by a rule keyed on <code>meta.critical is_true</code>. A metadata gate
-can't police metadata it was never given; that "miss = blind" risk is one the consumer accepts.</p>
-<p>If you want the opposite — <em>fail-closed on a missing key</em> — key the rule on a <strong>value operator over
-a reached object</strong> instead. For example, "PII reaches a mart whose <code>readable_by</code> is <strong>not a subset
-of</strong> the allowlist" blocks even when <code>readable_by</code> is absent, because a missing value resolves to
-<em>unknown → risk → block</em>. Same engine, opposite behaviour, purely by operator choice.</p>
-<h2 id="4-fail-closed-vs-fail-open-how-undecidable-inputs-resolve">4. Fail-closed vs fail-open: how undecidable inputs resolve</h2>
-<p>When a rule can't be decided (missing key, unresolved reach, operator/type mismatch), the outcome
-is governed by <code>on_missing_meta</code> / <code>on_error</code>:</p>
-<ul>
-<li><strong><code>fail_closed</code></strong> (default): for a <em>blocking</em> rule, an undecidable leaf biases toward
-  "unknown = risk = fire". The gate over-blocks rather than passing a risky change.</li>
-<li><strong><code>fail_open</code></strong>: an undecidable leaf resolves <code>False</code> — the rule only fires on explicitly-tagged
-  nodes. (This is the pattern for "act <strong>only</strong> on Metabase dashboards", combined with a
-  <code>source == metabase</code> guard.)</li>
-<li><strong><code>skip</code></strong>: the rule is skipped for that subject and counted, for honesty.</li>
-</ul>
-<p>The asymmetry is deliberate: <strong>blocking rules bias toward firing; non-blocking rules bias toward
-staying quiet</strong> — the safety mechanism over-blocks but never manufactures spurious warnings.</p>
-<h2 id="5-cross-boundary-reach-is-only-as-good-as-its-snapshot-and-says-so">5. Cross-boundary reach is only as good as its snapshot — and says so</h2>
-<p>Metabase reach comes from a point-in-time <code>metabase-extract</code> snapshot, so the engine is honest
-about two things instead of fabricating certainty:</p>
-<ul>
-<li><strong>Precision</strong> — a dashboard reached through a query-builder card is <strong>column-precise</strong> (the exact
-  field is known); one reached through a <code>select *</code> native card is <strong>table-grain</strong> (reached, but the
-  specific column is unproven). Both are real reach; only the second is imprecise, and it's labelled.</li>
-<li><strong>Staleness</strong> — a snapshot older than the freshness threshold is flagged <strong>stale</strong> and reported
-  as degraded, but it is <strong>still used in full</strong>: the reach is gated on, not discarded, so a block
-  driven by an old snapshot is <em>explainable</em> rather than silently trusted-as-fresh. (Only an
-  <em>absent</em> snapshot means dbt-only reach.) Dashboard reach is never fabricated.</li>
-</ul>
-<p>So a fail-closed block driven by a stale or coarse snapshot reads <em>as such</em> — you can see why it
-fired.</p>
-<h2 id="6-a-block-is-a-block-until-it-clears-itself">6. A block is a <code>block-until</code> — it clears itself</h2>
-<p>A <code>block</code> is an exit path, not a wall. The gate is stateless and re-runs on <strong>every push</strong>, so a
-block lifts the moment the change stops tripping the rule — revert it, make it a proven-<code>equivalent</code>
-refactor, evolve the downstream/schema to absorb it, or stop it reaching the flagged object. No
-ticket or re-approval, and no external input. The verdict states how to clear it. Inside the engine
-there is deliberately <strong>no</strong> priority/suppression between rules — a <code>warn</code> action can never cancel a
-<code>block</code> action. The one audited way to <em>acknowledge</em> a fired verdict without changing the code is an
-in-code <a href="../../policy-gate/#overriding-a-verdict-the-in-code-escape-hatch">override pragma</a>, which
-lives in the PR's SQL and only ever lowers severity.</p>
-<h2 id="7-blockwarn-the-action-vs-blockwarn-the-decision">7. <code>block</code>/<code>warn</code> the <em>action</em> vs <code>block</code>/<code>warn</code> the <em>decision</em></h2>
-<p>The same words appear on two levels. A rule emits <strong>actions</strong> (<code>block</code>, <code>warn</code>, <code>add-to-build-set</code>,
-…); the engine combines all fired actions <strong>most-severe-wins</strong> into one <strong>decision</strong>
-(<code>block</code> &gt; <code>warn</code> &gt; <code>allow</code>). An action named <code>block</code> is what <em>drives</em> a <code>block</code> decision — but the
-decision is the single ruling, and it's what <code>--fail-on policy</code> gates on. The
-<a href="../../glossary/#4-policy-actions-what-a-fired-rule-contributes">Glossary</a> pins both.</p>
+<code>policy init</code> reads your manifest + catalog and writes a heavily-commented
+<code>./dbt-col-lineage.policy.yml</code> keyed only to signals it confirmed exist — the structural
+rules below arrive enabled, and every dbt-<code>meta</code> key you actually use arrives as a commented
+template prefixed with its real coverage. This page is the reference for the recipes it emits
+and a few more you can graft in. The generated file is <strong>yours</strong> — edit it freely.</p>
+</div>
+<div class="admonition danger">
+<p class="admonition-title">Run <code>policy test</code> before you arm a <code>block</code></p>
+<p>Before you flip any rule from <code>warn</code> to <code>block</code> — or uncomment a <code>meta</code>-keyed template —
+replay it over your recent history:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>dbt-col-lineage<span class="w"> </span>policy<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--last<span class="w"> </span><span class="m">20</span><span class="w"> </span>--policy<span class="w"> </span>dbt-col-lineage.policy.yml
+</code></pre></div>
+This shows what each rule <strong>would</strong> have done and, the headline column, how many firings were
+driven by a fail-safe <code>UNKNOWN</code> rather than a proven match. A rule that blocks mostly via
+fail-safe defaults is the <a href="../policy-gate/">rage-block footgun</a> — catch it here, not in CI.</p>
+</div>
+<h2 id="the-footgun-in-one-paragraph">The footgun, in one paragraph</h2>
+<p>Under the default <code>on_missing_meta: fail_closed</code>, a <strong>value comparison</strong> (<code>eq</code>, <code>in</code>, <code>gt</code>,
+<code>matches</code>, …) on a key a model <em>doesn't declare</em> resolves <code>UNKNOWN</code>, and a blocking rule then
+fires on <strong>everything</strong> that lacks the key. A <strong>presence operator</strong> (<code>is_true</code>, <code>is_false</code>,
+<code>exists</code>, <code>absent</code>) is <em>total</em>: it resolves <code>FALSE</code> on a missing key, so the rule simply doesn't
+match. <strong>Every recipe here uses a presence operator.</strong> Reach for a value comparison only after
+<code>policy test</code> proves your key coverage.</p>
 <hr />
-<p>Once these are second nature, the how-to guides (<a href="../../policy-gate/">Policy gate</a>,
-<a href="../../semantic-categorization/">Semantic</a>, <a href="../../metabase/">Cross-boundary</a>) are just mechanics.</p>
+<h2 id="1-block-provable-test-breaks">1. Block provable test breaks</h2>
+<p>The day-1 governance win, and the only tier objective enough to block on sight: a change that
+removes or renames a column a dbt test targets <strong>will fail the next <code>dbt build</code></strong>. This is a
+proven structural fact (never <code>UNKNOWN</code>), so blocking on it can only ever fire on a real breakage.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">defaults</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">on_missing_meta</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fail_closed</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fail_closed</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">rules</span><span class="p">:</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provable-break-block</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aggregate</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> structural</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> fact</span><span class="p">:</span><span class="w"> </span><span class="nv">provable_test_break</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">block</span><span class="w"> </span><span class="p p-Indicator">}]</span>
+</code></pre></div>
+<h2 id="2-warn-and-notify-when-a-change-reaches-an-exposure">2. Warn (and notify) when a change reaches an exposure</h2>
+<p>Flag any change that reaches a dbt exposure (a dashboard / downstream consumer) for human review —
+without gating the merge. <code>warn</code>, not <code>block</code>: <code>touches_exposure</code> can be <code>UNKNOWN</code> on unresolved
+reach, and a non-blocking rule never fires on <code>UNKNOWN</code>, so this never manufactures a spurious
+warning.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exposure-guard</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> structural</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> fact</span><span class="p">:</span><span class="w"> </span><span class="nv">touches_exposure</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">warn</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">        </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"#analytics-eng"</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"{change.model}.{change.column}</span><span class="nv"> </span><span class="s">reaches</span><span class="nv"> </span><span class="s">{reach.count}</span><span class="nv"> </span><span class="s">exposure(s)</span><span class="nv"> </span><span class="s">—</span><span class="nv"> </span><span class="s">please</span><span class="nv"> </span><span class="s">review."</span>
+</code></pre></div>
+<h2 id="3-critical-mart-review">3. Critical-mart review</h2>
+<p>Warn when a change reaches a model your team flagged <code>critical</code>. This assumes a <strong>boolean flag</strong>
+<code>meta: { critical: true }</code> on the model, so it uses <code>is_true</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical-mart-guard</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">      </span><span class="nt">reach</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">        </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="nt">where</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">critical</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">warn</span><span class="w"> </span><span class="p p-Indicator">}]</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title"><code>is_true</code> vs <code>exists</code></p>
+<p><code>is_true</code> matches only a model where <code>critical</code> is <strong>present AND truthy</strong>. A model without the
+key — <em>or</em> one that set <code>critical: false</code> — does <strong>not</strong> match. That is what you want for a
+flag: <code>exists</code> would also match <code>critical: false</code>, wrongly reporting the change as reaching a
+critical model. Use <code>exists</code> only for a key whose mere presence is the signal.</p>
+</div>
+<h2 id="4-pii-guard-the-correctly-written-one">4. PII guard (the correctly-written one)</h2>
+<p>The rule most likely to be mis-written into a rage-block. A change to a column your team tagged
+<code>pii</code> should get extra scrutiny. Tag PII columns with <code>meta: { pii: true }</code> and gate with the
+<strong>presence</strong> operator <code>is_true</code> — <strong>never</strong> <code>eq true</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pii-change-guard</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">warn</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">        </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">        </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"#data-governance"</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"PII</span><span class="nv"> </span><span class="s">column</span><span class="nv"> </span><span class="s">{change.model}.{change.column}</span><span class="nv"> </span><span class="s">changed</span><span class="nv"> </span><span class="s">—</span><span class="nv"> </span><span class="s">governance</span><span class="nv"> </span><span class="s">review</span><span class="nv"> </span><span class="s">required."</span>
+</code></pre></div>
+<div class="admonition danger">
+<p class="admonition-title">Why <code>is_true</code>, and why <code>policy test</code> first</p>
+<p><code>meta: { key: pii, op: eq, value: true }</code> looks equivalent but is <strong>not</strong>: on the ~92% of
+columns that never declared <code>pii</code> (see above), <code>eq</code> resolves <code>UNKNOWN</code>, and under
+<code>fail_closed</code> a <code>block</code> action then fires on <strong>every</strong> untagged column — it rage-blocks every
+PR. <code>is_true</code> resolves <code>FALSE</code> on those columns, so the rule targets <em>only</em> real PII. Even so,
+run <code>policy test --last 20</code> before promoting this to <code>block</code>, to confirm it fires only on the
+columns you expect.</p>
+</div>
+<hr />
+<h2 id="promoting-warn-block">Promoting <code>warn</code> → <code>block</code></h2>
+<p>Every meta-keyed recipe here ships as <code>warn</code>. Promote it to <code>block</code> only once
+<code>policy test</code> shows, over your real history, that it fires <strong>exclusively on proven matches</strong> and
+never via a fail-safe <code>UNKNOWN</code>. That evidence — not intuition — is the bar for arming a gate.
+See the <a href="../policy-gate/">policy gate guide</a> and the <a href="../glossary/">glossary</a> for the full
+operator / fail-safe reference.</p>
 
 
 
@@ -1505,10 +1523,10 @@ decision is the single ruling, and it's what <code>--fail-on policy</code> gates
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.integrate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.integrate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

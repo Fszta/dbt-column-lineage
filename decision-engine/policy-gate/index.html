@@ -18,7 +18,7 @@
         <link rel="prev" href="../semantic-categorization/">
       
       
-        <link rel="next" href="../metabase/">
+        <link rel="next" href="../policy-recipes/">
       
       
         
@@ -1024,6 +1024,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#semantic-severity-defaults-no-rules-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantic-severity defaults (no rules needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#predicates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1201,6 +1212,95 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scaffold-a-starter-policy-policy-init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scaffold a starter policy — policy init
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scaffold a starter policy — policy init">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-emits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it emits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backtest-a-policy-before-you-arm-it-policy-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backtest a policy before you arm it — policy test
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backtest a policy before you arm it — policy test">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-what-to-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing what to replay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-report-the-trust-instrument" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The report — the trust instrument
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gating-a-policy-change-pr-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gating a policy-change PR in CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-the-verdict" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1262,6 +1362,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#overriding-a-verdict-the-in-code-escape-hatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overriding a verdict — the in-code escape hatch
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Overriding a verdict — the in-code escape hatch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scope-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#it-moves-fail-on-tests-the-whole-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        It moves --fail-on tests (the whole point)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-honored-override-is-logged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every honored override is logged
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auditing-override-reliance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auditing override reliance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#in-ci-github-action" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1276,6 +1437,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policy-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1535,7 +1724,15 @@ consumer configs</strong>, not built-ins. The worked examples below are exactly 
 shipped example policies you copy and adapt to your own <code>meta</code> conventions.</p>
 </div>
 <h2 id="quick-start">Quick start</h2>
-<p>Author a <code>policy.yml</code>, then gate on it:</p>
+<div class="admonition tip">
+<p class="admonition-title">Scaffold the policy — don't start from a blank file</p>
+<p><code>dbt-col-lineage policy init</code> reads your manifest + catalog and writes a heavily-commented,
+safe-by-construction <code>./dbt-col-lineage.policy.yml</code> keyed only to signals it confirmed exist,
+so it runs green on day one. Start there rather than authoring from scratch — see
+<a href="#scaffold-a-starter-policy-policy-init"><code>policy init</code></a> below and the
+<a href="../policy-recipes/">Policy recipes</a> page for the blessed copy-paste rules it emits.</p>
+</div>
+<p>Author (or scaffold) a <code>policy.yml</code>, then gate on it:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dbt-col-lineage<span class="w"> </span>impact<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--manifest<span class="w"> </span>target/manifest.json<span class="w"> </span>--catalog<span class="w"> </span>target/catalog.json<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--base-manifest<span class="w"> </span>base/manifest.json<span class="w"> </span>--base-catalog<span class="w"> </span>base/catalog.json<span class="w"> </span><span class="se">\</span>
@@ -1562,31 +1759,79 @@ disappear because someone fat-fingered the YAML.</p>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">defaults</span><span class="p">:</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">on_missing_meta</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fail_closed</span><span class="w">   </span><span class="c1"># fail_closed | fail_open | skip  (default fail_closed)</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fail_closed</span><span class="w">          </span><span class="c1"># how operator/type mismatches resolve</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">rules</span><span class="p">:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-rule</span><span class="w">                  </span><span class="c1"># required, unique — appears in the verdict</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">What this rule protects.</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span><span class="w">                </span><span class="c1"># change (per changed column) | aggregate (once for the PR)</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;predicate-tree&gt;</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;action-or-list&gt;</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">on_missing_meta</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fail_open</span><span class="w">   </span><span class="c1"># optional per-rule override of the default</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">on_meaning_changed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span><span class="w">      </span><span class="c1"># block | warn | allow — gate a proven meaning change (optional)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">on_indeterminate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span><span class="w">         </span><span class="c1"># block | warn | allow — gate an unprovable change  (optional)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">rules</span><span class="p">:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-rule</span><span class="w">                  </span><span class="c1"># required, unique — appears in the verdict</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">What this rule protects.</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span><span class="w">                </span><span class="c1"># change (per changed column) | aggregate (once for the PR)</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;predicate-tree&gt;</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;action-or-list&gt;</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">on_missing_meta</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fail_open</span><span class="w">   </span><span class="c1"># optional per-rule override of the default</span>
 </code></pre></div>
 <p>Each rule is evaluated against <strong>every changed column</strong> (<code>scope: change</code>, the default), or once
 against the whole changeset (<code>scope: aggregate</code>, for project-wide rules). The changed column a
 rule fired on is recorded in the verdict, so the report can say <em>which</em> change tripped it.</p>
+<h3 id="semantic-severity-defaults-no-rules-needed">Semantic-severity defaults (no rules needed)</h3>
+<p><code>on_meaning_changed</code> and <code>on_indeterminate</code> are built-in knobs that gate the <strong>semantic axis</strong>
+directly — no hand-written rule required. Each maps a column's classification straight to a gate
+contribution:</p>
+<table>
+<thead>
+<tr>
+<th>Knob</th>
+<th>Fires on</th>
+<th>Values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on_meaning_changed</code></td>
+<td>a column the AST diff proved <em>changed meaning</em> (<code>semantic: meaning_changed</code>)</td>
+<td><code>block</code> · <code>warn</code> · <code>allow</code></td>
+</tr>
+<tr>
+<td><code>on_indeterminate</code></td>
+<td>a column that <em>could not be proven safe</em> (<code>semantic: indeterminate</code>)</td>
+<td><code>block</code> · <code>warn</code> · <code>allow</code></td>
+</tr>
+</tbody>
+</table>
+<p>They exist to be tuned <strong>independently</strong>: a proven-breaking change need not carry the same weight
+as could-not-prove-safe. The common shape is <em>block the proven one, warn the unprovable one</em>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">defaults</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">on_meaning_changed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">on_indeterminate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># no rules: — the gate is driven entirely by the two knobs</span>
+</code></pre></div>
+<p>Both default to unset, so a policy that omits them behaves exactly as before. <code>allow</code> (or leaving
+a knob unset) contributes nothing. Structural add/remove/type changes carry no semantic and are
+untouched by these knobs — they're governed by provable breaks and your rules. A knob contribution
+folds into the same <a href="#how-multiple-rules-combine-into-one-verdict">most-severe-wins</a> combination as
+every rule (appearing in the verdict as <code>builtin:on_meaning_changed</code> / <code>builtin:on_indeterminate</code>),
+so a rule can only ever raise the decision, never lower one.</p>
+<div class="admonition note">
+<p class="admonition-title">Why not block <code>meaning_changed</code> by default?</p>
+<p>The no-policy gate deliberately keeps <code>block</code> reserved for <em>provable</em> test breaks, because the
+conservative canonicalizer can over-classify a redundant-paren or commutative-reorder rewrite as
+<code>meaning_changed</code>. These knobs are the opt-in for teams that have decided a meaning change should
+hard-block in their project.</p>
+</div>
 <h3 id="predicates">Predicates</h3>
 <p>A predicate is a tree of <strong>leaf conditions</strong> combined with <code>all</code> (AND), <code>any</code> (OR), and <code>not</code>.
 <code>all</code>/<code>any</code> take a list; <code>not</code> takes a single node. A bare leaf is itself a valid predicate.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">predicate</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">all</span><span class="p">:</span><span class="w">                                 </span><span class="c1"># AND — every child must hold</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">reach</span><span class="p">:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">        </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">        </span><span class="nt">where</span><span class="p">:</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">          </span><span class="nt">any</span><span class="p">:</span><span class="w">                         </span><span class="c1"># OR — inside the reach's inner predicate</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">audience</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">eq</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="nv">public</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">readable_by</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">not_subset_of</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">COMPLIANCE</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">PAYMENT_OPS</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">not</span><span class="p">:</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">        </span><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> field</span><span class="p">:</span><span class="w"> </span><span class="nv">kind</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">eq</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="nv">added</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">predicate</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">all</span><span class="p">:</span><span class="w">                                 </span><span class="c1"># AND — every child must hold</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">reach</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">        </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">        </span><span class="nt">where</span><span class="p">:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">          </span><span class="nt">any</span><span class="p">:</span><span class="w">                         </span><span class="c1"># OR — inside the reach's inner predicate</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">audience</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">eq</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="nv">public</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">readable_by</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">not_subset_of</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">COMPLIANCE</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">PAYMENT_OPS</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">not</span><span class="p">:</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">        </span><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> field</span><span class="p">:</span><span class="w"> </span><span class="nv">kind</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">eq</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="nv">added</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p>A leaf condition matches on exactly one of <strong>four axes</strong>:</p>
 <h4 id="change-facts-about-the-changed-column-itself"><code>change</code> — facts about the changed column itself</h4>
@@ -1616,22 +1861,22 @@ rule fired on is recorded in the verdict, so the report can say <em>which</em> c
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> field</span><span class="p">:</span><span class="w"> </span><span class="nv">breaking</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> field</span><span class="p">:</span><span class="w"> </span><span class="nv">breaking</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <h4 id="meta-a-dbt-meta-key-on-the-changed-model-or-column"><code>meta</code> — a dbt <code>meta</code> key on the changed model or column</h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">governance.tier</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">eq</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="nv">gold</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># dotted path into nested meta</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">governance.tier</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">eq</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="nv">gold</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># dotted path into nested meta</span>
 </code></pre></div>
 <p>Keys are dotted paths resolved against the node's merged meta (dbt's <code>config.meta</code> over
 top-level <code>meta</code>). Missing-key handling is governed by <a href="#fail-safe-defaults"><code>on_missing_meta</code></a>.</p>
 <h4 id="reach-conditions"><code>reach</code> — a <em>quantified</em> condition over the change's downstream reach</h4>
 <p>"Does this change reach a downstream object whose own meta satisfies an inner predicate?"</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">reach</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span><span class="w">                  </span><span class="c1"># model | column | exposure — what to scan</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">mechanism</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">derived_recompute</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">rowset_filter</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># optional: restrict by how it propagates</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">where</span><span class="p">:</span><span class="w">                       </span><span class="c1"># inner predicate, evaluated against each reached object's meta</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">critical</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">min_count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">                 </span><span class="c1"># require at least N matches (default 1)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">reach</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span><span class="w">                  </span><span class="c1"># model | column | exposure — what to scan</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">mechanism</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">derived_recompute</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">rowset_filter</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># optional: restrict by how it propagates</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">where</span><span class="p">:</span><span class="w">                       </span><span class="c1"># inner predicate, evaluated against each reached object's meta</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">critical</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">min_count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">                 </span><span class="c1"># require at least N matches (default 1)</span>
 </code></pre></div>
 <ul>
 <li><code>reach.kind</code> picks the downstream object type. <strong>BI dashboards surface as <code>kind: exposure</code></strong>
@@ -1644,7 +1889,7 @@ top-level <code>meta</code>). Missing-key handling is governed by <a href="#fail
   <code>owner</code> / <code>name</code>).</li>
 </ul>
 <h4 id="structural-booleans-the-pipeline-already-computes"><code>structural</code> — booleans the pipeline already computes</h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">structural</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> fact</span><span class="p">:</span><span class="w"> </span><span class="nv">provable_test_break</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># the change orphans a dbt test</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">structural</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> fact</span><span class="p">:</span><span class="w"> </span><span class="nv">provable_test_break</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># the change orphans a dbt test</span>
 </code></pre></div>
 <table>
 <thead>
@@ -1745,14 +1990,14 @@ top-level <code>meta</code>). Missing-key handling is governed by <a href="#fail
 </tbody>
 </table>
 <p>Actions can carry parameters:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">action</span><span class="p">:</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">add-to-build-set</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reached</span><span class="w">                 </span><span class="c1"># reached | subject | both</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">mechanism</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">derived_recompute</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># optional: only nodes reached this way</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"#data-governance"</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"PII</span><span class="nv"> </span><span class="s">{change.model}.{change.column}</span><span class="nv"> </span><span class="s">reaches</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">non-allowlisted</span><span class="nv"> </span><span class="s">reader"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">action</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">add-to-build-set</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reached</span><span class="w">                 </span><span class="c1"># reached | subject | both</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">mechanism</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">derived_recompute</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># optional: only nodes reached this way</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"#data-governance"</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"PII</span><span class="nv"> </span><span class="s">{change.model}.{change.column}</span><span class="nv"> </span><span class="s">reaches</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">non-allowlisted</span><span class="nv"> </span><span class="s">reader"</span>
 </code></pre></div>
 <p><code>message</code> supports a small, safe interpolation vocabulary — <code>{change.model}</code>, <code>{change.column}</code>,
 <code>{reach.count}</code>, <code>{rule.id}</code> — no arbitrary code.</p>
@@ -1771,29 +2016,29 @@ top-level <code>meta</code>). Missing-key handling is governed by <a href="#fail
 <p>The offline analogue of a a PII-exposure gate gate, expressed as pure config: a change to a
 PII-tagged column that reaches a downstream model whose declared readers are <strong>not</strong> a subset of
 the allowlist blocks the PR and notifies governance.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">rules</span><span class="p">:</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pii-outside-allowlist</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="no">A change to a PII-tagged column that reaches a consumer readable by a role</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="no">outside the compliance allowlist must block (offline PII-exposure check).</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">      </span><span class="nt">all</span><span class="p">:</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">          </span><span class="c1"># subject column is PII</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">reach</span><span class="p">:</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">            </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span><span class="w">                             </span><span class="c1"># scan reached downstream models</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">            </span><span class="nt">where</span><span class="p">:</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">              </span><span class="nt">meta</span><span class="p">:</span>
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">                </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">readable_by</span><span class="w">                    </span><span class="c1"># roles the mart exposes to</span>
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">                </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">not_subset_of</span>
-<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">                </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">COMPLIANCE</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">PAYMENT_OPS</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
-<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
-<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify</span>
-<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="w">        </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
-<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a><span class="w">        </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"#data-governance"</span>
-<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a><span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"PII</span><span class="nv"> </span><span class="s">{change.model}.{change.column}</span><span class="nv"> </span><span class="s">reaches</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">non-allowlisted</span><span class="nv"> </span><span class="s">reader"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">rules</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pii-outside-allowlist</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">      </span><span class="no">A change to a PII-tagged column that reaches a consumer readable by a role</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="no">outside the compliance allowlist must block (offline PII-exposure check).</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">      </span><span class="nt">all</span><span class="p">:</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">          </span><span class="c1"># subject column is PII</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">reach</span><span class="p">:</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">            </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span><span class="w">                             </span><span class="c1"># scan reached downstream models</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">            </span><span class="nt">where</span><span class="p">:</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">              </span><span class="nt">meta</span><span class="p">:</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">                </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">readable_by</span><span class="w">                    </span><span class="c1"># roles the mart exposes to</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">                </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">not_subset_of</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">                </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">COMPLIANCE</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">PAYMENT_OPS</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">        </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">        </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"#data-governance"</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"PII</span><span class="nv"> </span><span class="s">{change.model}.{change.column}</span><span class="nv"> </span><span class="s">reaches</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">non-allowlisted</span><span class="nv"> </span><span class="s">reader"</span>
 </code></pre></div>
 <p>Note the fail-safe subtlety: because the reach uses a <strong>value</strong> operator (<code>not_subset_of</code>) on
 <code>readable_by</code>, a mart that <em>forgot</em> to declare its readers resolves to <em>unknown → risk present</em>
@@ -1803,36 +2048,36 @@ exposes to everyone. (See <a href="#fail-safe-defaults">fail-safe defaults</a>.)
 <p>Expresses <code>critical:true</code> gating — and it is <strong>breaking-aware</strong>: a proven-equivalent refactor
 that reaches a critical mart does <em>not</em> block. When it does block, it also schedules a selective
 rebuild of only the descendants that actually recompute.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">rules</span><span class="p">:</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">breaking-reaches-critical</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A breaking change that reaches a critical mart must block.</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">      </span><span class="nt">all</span><span class="p">:</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> field</span><span class="p">:</span><span class="w"> </span><span class="nv">breaking</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># semantic != equivalent (fail-safe)</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">reach</span><span class="p">:</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">            </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">            </span><span class="nt">where</span><span class="p">:</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">              </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">critical</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">add-to-build-set</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reached</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">        </span><span class="nt">mechanism</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">derived_recompute</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">rowset_filter</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># rebuild only what recomputes</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">rules</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">breaking-reaches-critical</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A breaking change that reaches a critical mart must block.</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">      </span><span class="nt">all</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> field</span><span class="p">:</span><span class="w"> </span><span class="nv">breaking</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># semantic != equivalent (fail-safe)</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">reach</span><span class="p">:</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">            </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">            </span><span class="nt">where</span><span class="p">:</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">              </span><span class="nt">meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">critical</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">add-to-build-set</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reached</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">        </span><span class="nt">mechanism</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">derived_recompute</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">rowset_filter</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># rebuild only what recomputes</span>
 </code></pre></div>
 <h3 id="3-reproduce-the-legacy-fail-on-tests-gate">3. Reproduce the legacy <code>--fail-on tests</code> gate</h3>
 <p>The provable-break signal is a built-in <strong>structural</strong> fact, not a hardcoded verdict. The old
 <code>--fail-on tests</code> behaviour is one rule:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">rules</span><span class="p">:</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provable-break-blocks</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A change that provably breaks a dbt test must block (legacy --fail-on tests).</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">      </span><span class="nt">structural</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> fact</span><span class="p">:</span><span class="w"> </span><span class="nv">provable_test_break</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">rules</span><span class="p">:</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">provable-break-blocks</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A change that provably breaks a dbt test must block (legacy --fail-on tests).</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">      </span><span class="nt">structural</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> fact</span><span class="p">:</span><span class="w"> </span><span class="nv">provable_test_break</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
 </code></pre></div>
 <h2 id="fail-safe-defaults">Fail-safe defaults</h2>
 <p>The engine is <strong>fail-closed by default</strong>: an undecidable input biases toward <em>blocking</em> so a
@@ -1869,6 +2114,15 @@ governance gate never silently passes a risky change.</p>
 </table>
 <p>The asymmetry is deliberate: <strong>blocking rules bias toward firing; non-blocking rules bias toward
 staying silent</strong> — the safety mechanism over-blocks but never manufactures spurious warnings.</p>
+<div class="admonition tip">
+<p class="admonition-title">See what fail-safe would <em>actually</em> do before you arm it — <code>policy test</code></p>
+<p>Fail-safe semantics are impossible to verify by reading the YAML: the same naive
+<code>meta.pii is_true</code> guard can block every changed column under <code>fail_closed</code> and silently
+allow everything under <code>skip</code>. <strong><a href="#backtest-a-policy-before-you-arm-it-policy-test"><code>policy test</code></a></strong>
+replays a candidate policy over your git history and reports, per rule, how many firings were
+driven by a fail-safe UNKNOWN rather than a proven match — so you never arm a rage-blocking or
+silently-dead rule across a large repo.</p>
+</div>
 <div class="admonition warning">
 <p class="admonition-title">Gate on <code>change.breaking</code>, not <code>change.semantic == …</code></p>
 <p><code>change.semantic</code> is always a <em>present</em> value, so <code>change.semantic eq meaning_changed</code>
@@ -1892,6 +2146,319 @@ dashboards, not dbt-native exposures — combine <code>on_missing_meta: fail_ope
 in the reach <code>where</code>. Under <code>fail_closed</code>, dbt-native exposures (which lack the guard meta) would
 be treated as risk and block regardless; <code>fail_open</code> lets the guard do its job. See the
 <a href="../metabase/#isolating-metabase-only-rules">cross-boundary guide</a> for the worked example.</p>
+<h2 id="scaffold-a-starter-policy-policy-init">Scaffold a starter policy — <code>policy init</code></h2>
+<p>Authoring three-valued fail-safe YAML from a blank file is the adoption cliff, and a naive starter
+makes it worse (a value-comparison block rule on a <code>meta</code> key most of your models lack
+<a href="#fail-safe-defaults">rage-blocks every PR</a> under <code>fail_closed</code>). <code>policy init</code> removes the blank
+page: it introspects your manifest + catalog and writes a heavily-commented,
+<strong>safe-by-construction</strong> starter policy keyed <em>only</em> to signals the scan confirmed exist.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>dbt-col-lineage<span class="w"> </span>policy<span class="w"> </span>init<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span>--manifest<span class="w"> </span>target/manifest.json<span class="w"> </span>--catalog<span class="w"> </span>target/catalog.json
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># → wrote ./dbt-col-lineage.policy.yml</span>
+</code></pre></div>
+<p>The default output path is <code>./dbt-col-lineage.policy.yml</code> — exactly the path
+<a href="#quick-start"><code>impact</code> and <code>policy test</code> auto-resolve</a>, so the generated file is picked up with no
+<code>--policy</code> flag. <strong>The file is yours</strong> — it is code scaffolded into your repo, not a tool-managed
+preset that can change under you. Edit it freely.</p>
+<h3 id="what-it-emits">What it emits</h3>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Header</td>
+<td>Ownership note, a pointer to run <a href="#backtest-a-policy-before-you-arm-it-policy-test"><code>policy test</code></a> before arming anything, and the two footguns (presence vs. value operators; the fail-safe glossary) stated plainly.</td>
+</tr>
+<tr>
+<td><code>defaults</code></td>
+<td><code>on_missing_meta: fail_closed</code>, <code>on_error: fail_closed</code> — the safe closed posture, emitted with the explanatory comment.</td>
+</tr>
+<tr>
+<td><code>provable-break-block</code></td>
+<td>Emitted <strong>enabled</strong> <em>iff</em> the scan found column-targeted dbt tests. This is a pure structural fact (never <code>UNKNOWN</code>), so it is safe to block on day one — it can only fire on a real breakage. Emitted commented, with the reason, when no tests are found.</td>
+</tr>
+<tr>
+<td><code>exposure-guard</code></td>
+<td>Emitted <strong>enabled</strong> (<code>warn</code>) <em>iff</em> the scan found exposures. Emitted commented otherwise.</td>
+</tr>
+<tr>
+<td>Meta templates</td>
+<td>For every dbt-<code>meta</code> key the scan actually found, a <strong>commented</strong> <code>warn</code> template using the presence operator <code>is_true</code>, prefixed with the key's <strong>real coverage</strong> (<code>present on N/total models (P%)</code>). Never enabled, never a block, never a value comparison — so uncommenting one can never rage-block.</td>
+</tr>
+<tr>
+<td>Footer</td>
+<td>Next steps: run <code>policy test</code>, uncomment a template once its coverage is useful, and promote <code>warn</code> → <code>block</code> only after the backtest proves it fires on real matches.</td>
+</tr>
+</tbody>
+</table>
+<p>The enabled rules are <strong>tool-owned structural signals only</strong> — facts the pipeline computes that can
+never silently no-op. Meta-keyed rules always ship commented, because the tool never guesses your
+governance intent. If the manifest has neither tests nor exposures, <code>policy init</code> emits a valid file
+with <code>rules: []</code> and an honest note that nothing could be safely auto-enabled — an honest empty
+policy, never a fake guard.</p>
+<div class="admonition danger">
+<p class="admonition-title">The scaffold never emits a fail-open default</p>
+<p><code>policy init</code> only ever writes the safe <code>fail_closed</code> posture — a gate that opens whenever it is
+unsure is not a gate. The permissive fail-safe mode is described in the header glossary but is
+deliberately never written as a copy-pasteable value.</p>
+</div>
+<h3 id="options">Options</h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--manifest &lt;path&gt;</code></td>
+<td><code>target/manifest.json</code></td>
+<td>the dbt manifest to scan (run dbt first).</td>
+</tr>
+<tr>
+<td><code>--catalog &lt;path&gt;</code></td>
+<td><code>target/catalog.json</code></td>
+<td>the dbt catalog to scan.</td>
+</tr>
+<tr>
+<td><code>--adapter &lt;dialect&gt;</code></td>
+<td>auto-detected</td>
+<td>override the sqlglot dialect (e.g. <code>tsql</code>, <code>snowflake</code>, <code>bigquery</code>).</td>
+</tr>
+<tr>
+<td><code>-o</code>, <code>--output &lt;path&gt;</code></td>
+<td><code>./dbt-col-lineage.policy.yml</code></td>
+<td>where to write the generated policy (the path <code>load_policy</code> auto-resolves).</td>
+</tr>
+<tr>
+<td><code>--force</code></td>
+<td>off</td>
+<td>overwrite an existing file at <code>--output</code> instead of refusing.</td>
+</tr>
+<tr>
+<td><code>--stdout</code></td>
+<td>off</td>
+<td>print the generated policy to stdout instead of writing a file (never touches disk).</td>
+</tr>
+</tbody>
+</table>
+<p><code>policy init</code> <strong>refuses to overwrite</strong> an existing policy without <code>--force</code>, so a hand-edited file is
+never silently clobbered; <code>--stdout</code> prints without touching the filesystem at all.</p>
+<p>The generated file arrives <strong>green</strong> — the enabled rules are safe-by-construction — but the meta
+templates are yours to arm. Once you have it, replay it with
+<a href="#backtest-a-policy-before-you-arm-it-policy-test"><code>policy test</code></a> and reach for the blessed
+<a href="../policy-recipes/">Policy recipes</a> when you want to graft in a rule the scan couldn't auto-enable.</p>
+<h2 id="backtest-a-policy-before-you-arm-it-policy-test">Backtest a policy before you arm it — <code>policy test</code></h2>
+<p>A policy's fail-safe behaviour is unverifiable by inspection (see the <a href="#fail-safe-defaults">tip above</a>),
+and a rule that never fires is a silent no-op. <code>policy test</code> makes both visible <strong>offline</strong>: it
+replays a candidate policy over your recent history and reports, per rule, what the gate <em>would</em>
+have ruled — before you make it a required check.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>dbt-col-lineage<span class="w"> </span>policy<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>--manifest<span class="w"> </span>target/manifest.json<span class="w"> </span>--catalog<span class="w"> </span>target/catalog.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>--policy<span class="w"> </span>policy.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span>--last<span class="w"> </span><span class="m">30</span><span class="w">                                    </span><span class="c1"># replay the last 30 commits</span>
+</code></pre></div>
+<p>It is deterministic, offline, and <strong>sequential</strong> — no dbt run, no warehouse, no credentials. The
+head registry is built <strong>once</strong> (the one meaningful cost) and reused for every point, so replaying
+30–50 commits is cheap; per-point progress (<code>replaying i/N &lt;ref&gt;</code>) streams to stderr so a long run
+is observably alive.</p>
+<div class="admonition note">
+<p class="admonition-title"><code>policy test</code> is a subcommand, not a flag</p>
+<p><code>dbt-col-lineage policy test …</code> is dispatched on the leading <code>policy</code> word. It is entirely
+separate from the <strong><code>--policy</code></strong> <em>option</em> on <code>dbt-col-lineage impact</code> (which gates a single
+live PR) — the two never shadow each other.</p>
+</div>
+<h3 id="choosing-what-to-replay">Choosing what to replay</h3>
+<p>Supply <strong>exactly one</strong> change source:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--git-range &lt;base&gt;..&lt;head&gt;</code></td>
+<td>replay each commit in the range as one changeset (default head = <code>HEAD</code>). On squash-merge repos one commit ≈ one PR.</td>
+</tr>
+<tr>
+<td><code>--last &lt;N&gt;</code></td>
+<td>sugar for <code>--git-range HEAD~N..HEAD</code> — the last <code>N</code> commits.</td>
+</tr>
+<tr>
+<td><code>--changesets &lt;dir&gt;</code></td>
+<td>replay a directory of saved changeset JSONs (fixtures / a CI corpus).</td>
+</tr>
+</tbody>
+</table>
+<p>Other options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--policy &lt;path&gt;</code></td>
+<td><em>(required)</em></td>
+<td>the candidate policy to backtest. A present-but-invalid file <strong>fails loudly</strong> — never treated as "no policy".</td>
+</tr>
+<tr>
+<td><code>--manifest</code> / <code>--catalog</code></td>
+<td><code>target/manifest.json</code> / <code>target/catalog.json</code></td>
+<td>the <strong>head</strong> artifacts — the registry replayed against every point.</td>
+</tr>
+<tr>
+<td><code>--repo-dir &lt;dir&gt;</code></td>
+<td>current directory</td>
+<td>the git repo for <code>--git-range</code> / <code>--last</code>. Independent of the manifest/catalog paths (which may live under <code>target/</code>).</td>
+</tr>
+<tr>
+<td><code>--adapter &lt;dialect&gt;</code></td>
+<td>auto-detected</td>
+<td>override the sqlglot dialect.</td>
+</tr>
+<tr>
+<td><code>--format table\|json\|markdown</code></td>
+<td><code>table</code></td>
+<td><code>table</code> for terminals; <code>json</code> / <code>markdown</code> for a CI artifact or an agent over MCP.</td>
+</tr>
+<tr>
+<td><code>--fail-on none\|any-block\|regression</code></td>
+<td><code>none</code></td>
+<td>exit-code gate — see <a href="#gating-a-policy-change-pr-in-ci">below</a>.</td>
+</tr>
+<tr>
+<td><code>--baseline &lt;path&gt;</code></td>
+<td>—</td>
+<td>a saved prior backtest JSON to diff against (required by <code>--fail-on regression</code>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-report-the-trust-instrument">The report — the trust instrument</h3>
+<p>The per-rule aggregate is the artifact you arm the gate on. Every <code>table</code> / <code>markdown</code> run leads
+with a coverage-honest totals line — <code>N PR(s) replayed (E evaluated, K skipped) — B would BLOCK,
+W would WARN; avg blast radius …</code> — so a low-coverage run is never mistaken for a clean pass, then
+one row per rule:</p>
+<table>
+<thead>
+<tr>
+<th>rule_id</th>
+<th>would-BLOCK PRs</th>
+<th>would-WARN PRs</th>
+<th>fired-total</th>
+<th>fail-safe UNKNOWN</th>
+<th>flag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>provable-break-block</td>
+<td>2</td>
+<td>–</td>
+<td>2</td>
+<td>0</td>
+<td></td>
+</tr>
+<tr>
+<td>exposure-guard</td>
+<td>–</td>
+<td>14</td>
+<td>1315</td>
+<td>0</td>
+<td></td>
+</tr>
+<tr>
+<td>pii-guard (naive)</td>
+<td><strong>18</strong></td>
+<td>–</td>
+<td>3169</td>
+<td><strong>3169</strong></td>
+<td><strong>FAIL-SAFE ONLY (never a proven match)</strong></td>
+</tr>
+<tr>
+<td>tier-guard</td>
+<td>–</td>
+<td>–</td>
+<td>0</td>
+<td>0</td>
+<td><strong>DEAD (never fired)</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Two columns carry the whole point:</p>
+<ul>
+<li><strong>fail-safe UNKNOWN</strong> — firings that resolved via a fail-safe <code>UNKNOWN</code> (a blocking rule under
+  <code>fail_closed</code> firing on an undecidable predicate) rather than a proven <code>TRUE</code> match. A rule that
+  blocks <em>mostly</em> via fail-safe defaults is the <strong>rage-block footgun</strong>: it looks armed but is
+  really just blocking everything it can't decide. The <strong>flag</strong> column calls it out — <code>FAIL-SAFE
+  ONLY (never a proven match)</code> when every firing was fail-safe, or <code>partly fail-safe</code> when some
+  were.</li>
+<li><strong>DEAD (never fired)</strong> — a guard that never fired across the whole range is a silent no-op. This
+  is usually the honest signal that the <code>meta</code> key it inspects <strong>isn't populated</strong> on your models
+  ("your <code>pii-guard</code> matched 0 subjects across your last 50 PRs" → go tag your columns).</li>
+</ul>
+<p><code>--format json</code> emits the full typed <code>BacktestReport</code>: the totals, the <code>rule_stats</code> above, and a
+per-point drill-down (<code>points[]</code>) carrying each commit's decision, blast radius, the rules it
+fired, a <code>sample_reach</code>, plus <code>unmapped_changes</code> and any per-point <code>parse_failures</code> — coverage
+honesty, never hidden.</p>
+<div class="admonition danger">
+<p class="admonition-title">What a git-diff backtest does <em>not</em> prove (the fidelity note)</p>
+<p>Every run prints a <strong>fidelity note</strong>, and it is deliberately blunt. In the default git-diff
+mode the tool diffs whole <code>.sql</code> files, so <strong>every change is classified <code>indeterminate</code> by
+construction</strong> and the head registry is HEAD's replayed against older diffs (models added or
+renamed since a commit surface as <code>unmapped_changes</code>). Rules keyed on reach / <code>meta</code> /
+<code>change.kind</code> / <code>on_indeterminate</code> fire normally and <strong>can block</strong>. What this version does
+<strong>not</strong> exercise: the <strong>provable-break</strong> block tier and the <strong>semantic meaning-change</strong> block
+tier — both need a per-commit before-state. The note says so plainly; per-commit base-manifest
+validation of those tiers ships in a later release. In <code>--changesets</code> mode the note is
+branched too: the provable-break tier is still unexercised, and a <code>meaning_changed</code> block fires
+only if a saved changeset already carried that classification.</p>
+</div>
+<h3 id="gating-a-policy-change-pr-in-ci">Gating a policy-change PR in CI</h3>
+<p>Because the backtest itself has an exit code, <code>policy test</code> can gate the PR that <em>changes the
+policy</em> — a policy that would newly block N historical PRs is a regression worth a human look.</p>
+<table>
+<thead>
+<tr>
+<th><code>--fail-on</code></th>
+<th>Exit 1 when…</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code> (default)</td>
+<td>never — report only.</td>
+</tr>
+<tr>
+<td><code>any-block</code></td>
+<td>any replayed PR would block under the candidate policy.</td>
+</tr>
+<tr>
+<td><code>regression</code></td>
+<td>any rule's would-BLOCK count <strong>rose</strong> versus <code>--baseline</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><code>--fail-on regression</code> <strong>requires</strong> <code>--baseline</code>; running it without one exits 1 with a clear
+message rather than silently passing (a regression gate with no baseline validates nothing), and a
+malformed <code>--baseline</code> file is rejected loudly. Capture a baseline by saving a <code>--format json</code> run,
+then compare later runs against it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>dbt-col-lineage<span class="w"> </span>policy<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--policy<span class="w"> </span>policy.yml<span class="w"> </span>--last<span class="w"> </span><span class="m">50</span><span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>&gt;<span class="w"> </span>baseline.json
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="c1"># … on the policy-change PR:</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>dbt-col-lineage<span class="w"> </span>policy<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--policy<span class="w"> </span>policy.yml<span class="w"> </span>--last<span class="w"> </span><span class="m">50</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>--fail-on<span class="w"> </span>regression<span class="w"> </span>--baseline<span class="w"> </span>baseline.json
+</code></pre></div>
 <h2 id="reading-the-verdict">Reading the verdict</h2>
 <h3 id="a-block-is-a-block-until-not-a-dead-end">A block is a <code>block-until</code>, not a dead end</h3>
 <p>The point of the gate is <em>action-driven awareness</em>, so a <code>block</code> answers not just "you may not
@@ -1928,15 +2495,18 @@ exactly this, so the person hitting it sees the exit path.</p>
 <p>All three are <strong>self-clearing</strong> — they need no new tool feature, because the predicate simply
 evaluates to false on the next run. That is the whole release model today.</p>
 <div class="admonition note">
-<p class="admonition-title">Manual-override release paths are deliberately not built (yet)</p>
-<p>Two <em>other</em> exit paths are conceivable — <strong>block-until-acknowledged</strong> (an owner signs off via
-a PR label the gate honors) and <strong>block-until-proven</strong> (a <code>/data-diff</code> result proves the
-values are unchanged). Both require the gate to consume a <strong>new external input</strong>, which would
-cut against the offline / zero-credential guarantee and add an override concept the engine
-deliberately omits in v1 (a <code>warn</code> can never cancel a <code>block</code>; see
-<a href="#how-multiple-rules-combine-into-one-verdict">how rules combine</a>). They are noted here as
-possible future work, <strong>not</strong> currently available — the self-clearing paths above are the
-supported way to release a block.</p>
+<p class="admonition-title">The audited release path: an in-code override</p>
+<p>Beyond self-clearing, there is one supported way to <em>acknowledge</em> a fired verdict without
+changing the code that tripped it: an <strong><a href="#overriding-a-verdict-the-in-code-escape-hatch">override pragma</a></strong>
+(<code>-- lineage:allow-change</code> / <code>-- lineage:allow-break</code>). It lives in the PR's own SQL, so it
+stays offline / zero-credential and is diffed and reviewed like any code — and it only ever
+<em>lowers</em> severity (it is a post-evaluation cap, not a rule; a <code>warn</code> action still can never
+cancel a <code>block</code> action inside the engine — see
+<a href="#how-multiple-rules-combine-into-one-verdict">how rules combine</a>).</p>
+<p>Two <em>external-input</em> release paths remain deliberately unbuilt: <strong>block-until-acknowledged</strong>
+(an owner signs off via a PR label the gate honors) and <strong>block-until-proven</strong> (a <code>/data-diff</code>
+result). Both would require the gate to consume a new external input, cutting against the
+offline / zero-credential guarantee — noted as possible future work, <strong>not</strong> available today.</p>
 </div>
 <h3 id="exit-code">Exit code</h3>
 <table>
@@ -1965,23 +2535,23 @@ supported way to release a block.</p>
 <h3 id="json-format-json">JSON (<code>--format json</code>)</h3>
 <p>When a policy resolved, the report gains a <code>policy_verdict</code> block — the flagship machine-facing
 surface:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">"policy_verdict"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">"decision"</span><span class="p">:</span><span class="w"> </span><span class="s2">"block"</span><span class="p">,</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">"hits"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"rule_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"pii-outside-allowlist"</span><span class="p">,</span><span class="w"> </span><span class="nt">"decision"</span><span class="p">:</span><span class="w"> </span><span class="s2">"block"</span><span class="p">,</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">        </span><span class="nt">"change_model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"dim_account_holders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"change_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">,</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">        </span><span class="nt">"matched_reach"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"account_holders"</span><span class="p">],</span><span class="w"> </span><span class="nt">"actions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"block"</span><span class="p">,</span><span class="w"> </span><span class="s2">"notify"</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="p">],</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span><span class="nt">"build_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"dim_accounts"</span><span class="p">],</span>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">    </span><span class="nt">"test_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"fact_revenue"</span><span class="p">],</span>
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">    </span><span class="nt">"notifications"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"slack"</span><span class="p">,</span><span class="w"> </span><span class="nt">"target"</span><span class="p">:</span><span class="w"> </span><span class="s2">"#data-governance"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PII …"</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="p">],</span>
-<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nt">"evaluated_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
-<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nt">"fired_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
-<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">"policy_verdict"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="nt">"decision"</span><span class="p">:</span><span class="w"> </span><span class="s2">"block"</span><span class="p">,</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="nt">"hits"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"rule_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"pii-outside-allowlist"</span><span class="p">,</span><span class="w"> </span><span class="nt">"decision"</span><span class="p">:</span><span class="w"> </span><span class="s2">"block"</span><span class="p">,</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">        </span><span class="nt">"change_model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"dim_account_holders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"change_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">,</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">        </span><span class="nt">"matched_reach"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"account_holders"</span><span class="p">],</span><span class="w"> </span><span class="nt">"actions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"block"</span><span class="p">,</span><span class="w"> </span><span class="s2">"notify"</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="nt">"build_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"dim_accounts"</span><span class="p">],</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="nt">"test_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"fact_revenue"</span><span class="p">],</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="nt">"notifications"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"slack"</span><span class="p">,</span><span class="w"> </span><span class="nt">"target"</span><span class="p">:</span><span class="w"> </span><span class="s2">"#data-governance"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PII …"</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="w">    </span><span class="nt">"evaluated_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="w">    </span><span class="nt">"fired_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
+<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="markdown-pr-comment">Markdown / PR comment</h3>
 <p>When a policy is present, the report adds a <strong>Policy verdict</strong> section — fired rules grouped by
@@ -1991,19 +2561,147 @@ decision (block first), each naming the subject change and the reach it matched,
 that). A <code>block</code> verdict leads with a one-line <strong>"blocked until…"</strong> note stating how the block
 clears (see <a href="#a-block-is-a-block-until-not-a-dead-end">above</a>), so the PR comment carries the
 release path, not just the obstacle.</p>
+<h2 id="overriding-a-verdict-the-in-code-escape-hatch">Overriding a verdict — the in-code escape hatch</h2>
+<p>A gate with no escape hatch gets turned off, not tuned. The moment the verdict flags a change the
+author knows is fine ("yes, this recomputes downstream — it's intended, and downstream was updated
+in the same PR"), the tempting move is to disarm the whole gate (<code>--fail-on none</code>). An <strong>override
+pragma</strong> is the alternative: an inline SQL comment in the head model that acknowledges <em>one specific
+change</em>, with a mandatory reason. It is <strong>explicit, in the diff, reviewed like any other code, and
+logged</strong> — never a silent global off-switch.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">select</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="c1">-- lineage:allow-change reason="renamed from amount_cents; all downstream refs updated in this PR"</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="n">amount</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">amount_eur</span><span class="p">,</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="p">...</span>
+</code></pre></div>
+<p>Two verbs, deliberately distinct so a soft acknowledgement can <strong>never</strong> silence a hard break:</p>
+<table>
+<thead>
+<tr>
+<th>Pragma</th>
+<th>What it downgrades</th>
+<th>Can it touch a provable break?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-- lineage:allow-change [column=&lt;col&gt;] reason="…"</code></td>
+<td>a REVIEW / WARN contribution for that column to <em>allow</em> (the common case).</td>
+<td><strong>No</strong> — never.</td>
+</tr>
+<tr>
+<td><code>-- lineage:allow-break [column=&lt;col&gt;] reason="…"</code></td>
+<td>a provable BLOCK — the only verb that can — down to REVIEW (no-policy gate) or WARN (policy gate).</td>
+<td>Yes, and only that far — <strong>never to safe</strong>. A provably-broken test always leaves a visible mark + audit record.</td>
+</tr>
+</tbody>
+</table>
+<p><code>reason=</code> is <strong>mandatory</strong>: an override with no non-empty reason is dropped and warned (an override
+that isn't justified has no audit value).</p>
+<h3 id="scope-resolution">Scope resolution</h3>
+<p>Which changed column a pragma excuses, in priority order:</p>
+<ol>
+<li>an explicit <code>column=&lt;name&gt;</code> argument, else</li>
+<li>the column whose SELECT expression the comment is attached to / immediately precedes, else</li>
+<li><strong>model scope</strong> — a pragma placed above the model's first statement with no <code>column=</code> arg excuses
+   every changed column in that model (logged as a model-level override, so the broader reach is
+   visible).</li>
+</ol>
+<p>Pragmas are <strong>head-only</strong> by design: the override lives in the PR's own SQL, so it is diffable and
+reviewed like any code. Source lines in the report are relative to the <strong>compiled</strong> SQL.</p>
+<div class="admonition danger">
+<p class="admonition-title">Fail-safe invariants (non-negotiable — this is a gate)</p>
+<ul>
+<li>An override only ever <strong>lowers</strong> severity, never raises it.</li>
+<li><code>allow-change</code> <strong>cannot</strong> touch a provable BLOCK — only <code>allow-break</code> can, and only
+  BLOCK→REVIEW/WARN, never →safe.</li>
+<li>On the same column, <code>allow-break</code> <strong>wins</strong> over <code>allow-change</code> (hard beats soft).</li>
+<li>A malformed / reasonless / unknown-verb pragma is <strong>dropped with a loud warning</strong> and never
+  changes the ruling silently.</li>
+<li>On a rename, adjacency resolves to the <em>new</em> column name, so a break stays armed unless you
+  name the old column explicitly (<code>column=&lt;old_name&gt;</code>) or use model scope. Overriding the wrong
+  side is a no-op, not an accidental unblock.</li>
+</ul>
+</div>
+<h3 id="it-moves-fail-on-tests-the-whole-point">It moves <code>--fail-on tests</code> (the whole point)</h3>
+<p>An <code>allow-break</code> that acknowledges a provable break <strong>excuses that break</strong> from the gate: the
+excused break drops out of <code>provable_breaks</code> / <code>provable_break_count</code>, so <code>--fail-on tests</code> (and
+<code>--fail-on policy</code> on a provable-break rule) clears — exit 0 — while the acknowledgement stays
+visible in the report. <code>allow-change</code> never excuses a break. Run with
+<a href="#auditing-override-reliance"><code>--no-overrides</code></a> to see the raw gate the override cleared.</p>
+<h3 id="every-honored-override-is-logged">Every honored override is logged</h3>
+<p>Nothing is ever silently suppressed. A honored override is surfaced on every surface:</p>
+<ul>
+<li>
+<p><strong>JSON</strong> — the impact report gains four blocks:</p>
+<table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>overrides</code></td>
+<td>honored overrides: <code>{model, column, verb, reason, downgraded_from, downgraded_to, source_line, scope}</code></td>
+</tr>
+<tr>
+<td><code>ineffective_overrides</code></td>
+<td>pragmas that landed on a <em>real</em> changed column but changed nothing, with a fix <code>hint</code> (e.g. <code>allow-break</code> on an added column)</td>
+</tr>
+<tr>
+<td><code>stale_overrides</code></td>
+<td>pragmas with <strong>no matching change</strong> at all — dead excuses to prune</td>
+</tr>
+<tr>
+<td><code>override_warnings</code></td>
+<td>dropped malformed / reasonless / unknown-verb pragmas (strings)</td>
+</tr>
+</tbody>
+</table>
+<p>Under the policy engine, a capped <code>RuleHit</code> also carries <code>overridden: true</code>,
+<code>original_decision</code>, and <code>override_reason</code>, so the verdict says exactly which rule the override
+suppressed.</p>
+</li>
+<li>
+<p><strong>Markdown / PR comment</strong> — an override section renders, in order: <strong>⚠️ Override pragmas IGNORED</strong>
+  first and unfolded (a dropped pragma must be noticed), then <strong>⚠️ Overrides applied</strong> (each with
+  its <code>from → to</code> delta and reason), <strong>⚠️ Overrides with no effect</strong> (ineffective, with the hint),
+  and a folded <strong>Stale overrides</strong> list to prune. A capped policy hit reads
+  <em>"override suppressed WARN (reason: …)"</em> inline.</p>
+</li>
+<li>
+<p><strong>Action</strong> — the composite action emits an <code>overrides_applied</code> output (count of honored
+  overrides). See <a href="#in-ci-github-action">In CI</a>.</p>
+</li>
+</ul>
+<h3 id="auditing-override-reliance">Auditing override reliance</h3>
+<p><code>impact --no-overrides</code> evaluates the changeset <strong>as if no pragma were present</strong> — the raw gate.
+Use it to answer "what would the gate say without the excuses?" and to measure override reliance
+over history (a rising <code>allow-break</code> volume is a signal the gate is mis-tuned, not merely escaped).
+With no pragma present, the output is byte-identical to the default run.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>dbt-col-lineage<span class="w"> </span>impact<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>--manifest<span class="w"> </span>target/manifest.json<span class="w"> </span>--catalog<span class="w"> </span>target/catalog.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>--base-manifest<span class="w"> </span>base/manifest.json<span class="w"> </span>--base-catalog<span class="w"> </span>base/catalog.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>--fail-on<span class="w"> </span>tests<span class="w"> </span>--no-overrides<span class="w">        </span><span class="c1"># ignore every -- lineage:allow-* pragma</span>
+</code></pre></div>
 <h2 id="in-ci-github-action">In CI (GitHub Action)</h2>
 <p>The composite action exposes a <code>policy</code> input and policy outputs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Fszta/dbt-column-lineage@v0</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">with</span><span class="p">:</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/manifest.json</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="nt">catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/catalog.json</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="nt">base-manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/manifest.json</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="nt">base-catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/catalog.json</span>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy.yml</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="nt">fail-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy</span><span class="w">         </span><span class="c1"># block the PR when the verdict is block</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Fszta/dbt-column-lineage@v0</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="nt">manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/manifest.json</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="nt">catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/catalog.json</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">    </span><span class="nt">base-manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/manifest.json</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">    </span><span class="nt">base-catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/catalog.json</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">    </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy.yml</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">    </span><span class="nt">fail-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy</span><span class="w">         </span><span class="c1"># block the PR when the verdict is block</span>
 </code></pre></div>
 <p>Outputs for downstream steps: <code>policy_decision</code> (<code>block</code>/<code>warn</code>/<code>allow</code>), <code>build_set_size</code>,
-<code>test_set_size</code> — for example, feed the build set into a selective <code>dbt build</code>.</p>
+<code>test_set_size</code> — for example, feed the build set into a selective <code>dbt build</code>. The action also
+emits <code>overrides_applied</code>: the number of honored override pragmas that lowered the ruling on this
+run (always present; <code>0</code> when none fired).</p>
+<p>To evaluate the <strong>raw gate</strong> in CI — ignoring every <code>-- lineage:allow-*</code> pragma, e.g. to backtest
+override reliance — set the <code>no-overrides</code> input to <code>true</code> (threads through to <code>--no-overrides</code>).</p>
 
 
 

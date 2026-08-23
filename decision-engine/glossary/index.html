@@ -969,6 +969,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../policy-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../metabase/" class="md-nav__link">
         
   
@@ -1230,6 +1258,17 @@
     <span class="md-ellipsis">
       
         8. Confidence &amp; coverage — can I trust the answer is complete?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-override-pragmas-the-audited-escape-hatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Override pragmas — the audited escape hatch
       
     </span>
   </a>
@@ -1807,11 +1846,54 @@ by unknowns reads as such rather than as fabricated certainty.</p>
 </tbody>
 </table>
 <hr />
+<h2 id="9-override-pragmas-the-audited-escape-hatch">9. Override pragmas — the audited escape hatch</h2>
+<p><strong>Code:</strong> <code>OverrideDirective</code> / <code>OverrideVerb</code> (<code>models/schema.py</code>), <code>ColumnChange.override</code> ·
+<strong>JSON:</strong> the report's <code>overrides</code> / <code>ineffective_overrides</code> / <code>stale_overrides</code> /
+<code>override_warnings</code> blocks · <strong>UI/CI:</strong> the Markdown override section and the action's
+<code>overrides_applied</code> output.</p>
+<p>An in-code SQL comment in the head model that acknowledges one changed column, with a mandatory
+reason — the supported way to lower a verdict without disarming the gate. Full behaviour:
+<a href="../policy-gate/#overriding-a-verdict-the-in-code-escape-hatch">policy guide → overriding a verdict</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-- lineage:allow-change</code></td>
+<td>Downgrades a REVIEW / WARN contribution for its column to <em>allow</em>. <strong>Cannot</strong> touch a provable break.</td>
+</tr>
+<tr>
+<td><code>-- lineage:allow-break</code></td>
+<td>The only verb that can downgrade a provable BLOCK — to REVIEW (no-policy gate) or WARN (policy gate), never to <em>safe</em>.</td>
+</tr>
+<tr>
+<td>Honored override</td>
+<td>A pragma that matched a real change and lowered its severity — listed in <code>overrides</code> and counted by <code>overrides_applied</code>.</td>
+</tr>
+<tr>
+<td>Ineffective override</td>
+<td>Matched a real changed column but changed nothing (e.g. <code>allow-break</code> on an <code>added</code> column) — surfaced with a fix hint.</td>
+</tr>
+<tr>
+<td>Stale override</td>
+<td>Named / resolved to a column that isn't in the changeset at all — a dead excuse to prune.</td>
+</tr>
+<tr>
+<td>Dropped pragma</td>
+<td>Malformed / reasonless / unknown-verb — ignored with a loud warning, ruling unchanged.</td>
+</tr>
+</tbody>
+</table>
+<hr />
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="../overview/">Overview</a> — how the layers fit together.</li>
 <li><a href="../semantic-categorization/">Semantic categorization</a> — the AST-diff engine (§1–2).</li>
-<li><a href="../policy-gate/">Policy gate</a> — rules, actions, decisions, fail-safe (§3–7).</li>
+<li><a href="../policy-gate/">Policy gate</a> — rules, actions, decisions, fail-safe, override pragmas (§3–9).</li>
 <li><a href="../metabase/">Cross-boundary (Metabase)</a> — reach kinds and precision (§3).</li>
 </ul>
 

@@ -1082,6 +1082,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../decision-engine/policy-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../decision-engine/metabase/" class="md-nav__link">
         
   
@@ -1389,6 +1417,10 @@ to wire it up.</p>
 <tr>
 <td><code>tripped_level</code></td>
 <td>Highest severity band reached — <code>none</code>, <code>any</code>, <code>critical</code>, <code>exposures</code>, or <code>tests</code>.</td>
+</tr>
+<tr>
+<td><code>overrides_applied</code></td>
+<td>Number of honored <code>-- lineage:allow-*</code> override pragmas that lowered the ruling on this run (<code>0</code> when none).</td>
 </tr>
 </tbody>
 </table>
