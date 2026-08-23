@@ -1,5 +1,5 @@
 /**
- * DBT Column Lineage Graph Visualization
+ * Parrant Graph Visualization
  * Main entry point that initializes the graph
  */
 function initGraph(data) {
