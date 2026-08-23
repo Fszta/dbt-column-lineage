@@ -629,7 +629,7 @@ def changes_from_dicts(entries: List[Dict[str, Any]]) -> List[ColumnChange]:
 
     Accepts the dicts produced by :meth:`ColumnChange.to_dict` (model/column/kind + optional
     detail/semantic/explain). The ``override`` field is intentionally NOT restored — the backtest
-    backtest runs ``honor_overrides=False`` (it measures the RAW gate), and base/head
+    runs ``honor_overrides=False`` (it measures the RAW gate), and base/head
     expressions/reason are not needed for policy evaluation. Unknown/malformed entries raise a
     ``ValueError`` (via the enum constructors) so a corrupt corpus fails loudly.
     """
