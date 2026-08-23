@@ -2,8 +2,13 @@ import re
 import logging
 from dataclasses import dataclass, field
 from sqlglot import parse_one, exp
-from typing import Dict, List, Set, Optional, Any, Callable, Literal, cast
-from dbt_column_lineage.models.schema import ColumnLineage, SQLParseResult
+from typing import Dict, List, Set, Optional, Any, Callable, Literal, Tuple, cast
+from dbt_column_lineage.models.schema import (
+    ColumnLineage,
+    OverrideDirective,
+    OverrideVerb,
+    SQLParseResult,
+)
 from dbt_column_lineage.parser.sql_parser_utils import (
     get_table_aliases,
     get_table_context,
@@ -14,6 +19,132 @@ from dbt_column_lineage.parser.sql_parser_utils import (
 )
 
 logging.getLogger("sqlglot").setLevel(logging.ERROR)
+
+
+# ---------------------------------------------------------------------------
+# override pragma parsing (`-- lineage:allow-change` / `-- lineage:allow-break`).
+#
+# sqlglot comment<->node association is unreliable, so we scan the RAW SQL TEXT line by
+# line rather than the AST. The pragma lives in the HEAD model's own SQL (diffable,
+# reviewed like any code). A malformed / reasonless / unknown-verb pragma is DROPPED and
+# reported as a loud warning — it must never alter the ruling silently (audit invariant).
+# ---------------------------------------------------------------------------
+
+_OVERRIDE_LINE_RE = re.compile(
+    r"--\s*lineage:allow-(?P<verb>[a-z0-9-]+)\b(?P<args>.*)$", re.IGNORECASE
+)
+# reason="..." or reason='...' — the quoted value is extracted FIRST so a ``column=`` that
+# happens to sit inside the reason text is not mis-read as the target column arg.
+_REASON_RE = re.compile(r"""reason\s*=\s*(?P<q>["'])(?P<val>.*?)(?P=q)""", re.IGNORECASE)
+_COLUMN_ARG_RE = re.compile(r"""column\s*=\s*"?(?P<val>[A-Za-z_][\w]*)"?""", re.IGNORECASE)
+_SELECT_WORD_RE = re.compile(r"\bselect\b", re.IGNORECASE)
+# ` as <alias>` in a SELECT-list line (the projected output name).
+_ALIAS_AS_RE = re.compile(r"\bas\s+\"?(?P<a>[A-Za-z_]\w*)\"?", re.IGNORECASE)
+# last bare identifier before an optional trailing comma (fallback alias extraction).
+_TRAILING_IDENT_RE = re.compile(r'(?:"(?P<q>[^"]+)"|(?P<b>[A-Za-z_]\w*))\s*$')
+
+
+def _extract_select_alias(line: str) -> Optional[str]:
+    """Best-effort pull of the projected column name from a SELECT-list line.
+
+    Prefers the token after a case-insensitive `` as `` (the explicit alias); else the last
+    bare identifier before an optional trailing comma, stripping quotes. Lowercased. Returns
+    ``None`` when nothing looks like a column (the caller then treats the pragma as an
+    unresolved => stale override rather than silently excusing the wrong column).
+    """
+    # Drop any trailing line comment so `x as y  -- note` doesn't confuse extraction.
+    code = line.split("--", 1)[0].strip().rstrip(",").strip()
+    if not code:
+        return None
+    m = _ALIAS_AS_RE.search(code)
+    if m:
+        return m.group("a").lower()
+    m2 = _TRAILING_IDENT_RE.search(code)
+    if m2:
+        token = m2.group("q") or m2.group("b")
+        if token:
+            return token.lower()
+    return None
+
+
+def _adjacent_column(lines: List[str], pragma_idx: int) -> Optional[str]:
+    """Scan forward from the pragma line to the next non-blank, non-comment line and extract
+    its projected column via :func:`_extract_select_alias`. Best-effort (``None`` => stale)."""
+    for j in range(pragma_idx + 1, len(lines)):
+        stripped = lines[j].strip()
+        if not stripped or stripped.startswith("--"):
+            continue
+        return _extract_select_alias(lines[j])
+    return None
+
+
+def parse_override_directives(sql: str) -> Tuple[List[OverrideDirective], List[str]]:
+    """Parse ``-- lineage:allow-(change|break) ...`` pragmas from raw head SQL.
+
+    Returns ``(directives, warnings)``. A pragma is DROPPED (contributing a human warning
+    string, never a directive) when its verb is unknown or its ``reason=`` is missing/empty —
+    so a malformed override can never silently change the ruling. Scope resolution:
+      * explicit ``column=<ident>`` => ``column`` scope;
+      * else if the pragma line is BEFORE the first line containing a ``select`` keyword =>
+        ``model`` scope (``column=None``, excuses every changed column of the model);
+      * else line-adjacency: the projected column of the next code line => ``column`` scope
+        (``column`` may be ``None`` when adjacency can't resolve => the caller marks it stale).
+    """
+    lines = sql.splitlines()
+    first_select_idx: Optional[int] = None
+    for i, line in enumerate(lines):
+        if _SELECT_WORD_RE.search(line):
+            first_select_idx = i
+            break
+
+    directives: List[OverrideDirective] = []
+    warnings: List[str] = []
+    for i, line in enumerate(lines):
+        m = _OVERRIDE_LINE_RE.search(line)
+        if not m:
+            continue
+        line_no = i + 1
+        verb_suffix = m.group("verb").lower()
+        args = m.group("args")
+        try:
+            verb = OverrideVerb("allow-" + verb_suffix)
+        except ValueError:
+            warnings.append(
+                f"line {line_no}: unknown override verb 'allow-{verb_suffix}' — pragma ignored"
+            )
+            continue
+        reason_match = _REASON_RE.search(args)
+        if reason_match is None or not reason_match.group("val").strip():
+            warnings.append(
+                f"line {line_no}: 'allow-{verb_suffix}' pragma has no non-empty reason= "
+                "— pragma ignored (an override must always be justified)"
+            )
+            continue
+        reason = reason_match.group("val").strip()
+        # Look for column= OUTSIDE the quoted reason span (so reason="see column=x" is safe).
+        args_wo_reason = args[: reason_match.start()] + args[reason_match.end() :]
+        column_match = _COLUMN_ARG_RE.search(args_wo_reason)
+        column: Optional[str]
+        scope: Literal["column", "model"]
+        if column_match:
+            column = column_match.group("val").lower()
+            scope = "column"
+        elif first_select_idx is not None and i < first_select_idx:
+            column = None
+            scope = "model"
+        else:
+            column = _adjacent_column(lines, i)
+            scope = "column"
+        directives.append(
+            OverrideDirective(
+                verb=verb,
+                column=column,
+                reason=reason,
+                scope=scope,
+                source_line=line_no,
+            )
+        )
+    return directives, warnings
 
 
 @dataclass
