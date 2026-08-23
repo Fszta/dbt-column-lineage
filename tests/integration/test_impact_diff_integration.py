@@ -258,7 +258,9 @@ def test_scope_git_filters_to_changed_models(dbt_artifacts, base_artifacts, monk
     from dbt_column_lineage.lineage import changeset
 
     monkeypatch.setattr(
-        changeset, "_git_changed_sql_files", lambda ref, repo_dir=None: ["macros/only.sql"]
+        changeset,
+        "_git_changed_sql_files",
+        lambda ref, repo_dir=None, git_head="HEAD": ["macros/only.sql"],
     )
     result = _run_impact(
         [

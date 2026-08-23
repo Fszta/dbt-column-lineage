@@ -1,0 +1,22 @@
+{
+  "changeset": {
+    "source": "fixture",
+    "total_changes": 2,
+    "changes": [
+      {
+        "model": "stg_accounts",
+        "column": "account_id",
+        "kind": "logic_changed",
+        "detail": null,
+        "semantic": "indeterminate"
+      },
+      {
+        "model": "accounts_tiering",
+        "column": "account_tier",
+        "kind": "removed",
+        "detail": null,
+        "semantic": null
+      }
+    ]
+  }
+}
