@@ -1,3 +1,5 @@
+## [0.16.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.15.0-12-g17e2632087040ec4fb4a86d6a2c1133b626388fe...v0.16.0) (2026-08-23)
+
 ## [0.14.0](https://github.com/Fszta/dbt-column-lineage/compare/v0.13.0...v0.14.0) (2026-08-20)
 
 ### ⚠ BREAKING CHANGES
