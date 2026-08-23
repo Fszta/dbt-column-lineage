@@ -312,7 +312,7 @@ def _build_explore_change_context(
     report["provable_breaks"] = [b.model_dump() for b in breaks]
     summary_obj = report.get("summary", {})
     summary: Dict[str, Any] = summary_obj if isinstance(summary_obj, dict) else {}
-    report["verdict"] = decide_verdict(breaks, summary)
+    report["verdict"] = decide_verdict(breaks, summary, changes)
 
     if policy is not None:
         verdict = evaluate_policy(
@@ -581,7 +581,7 @@ def impact(
         report["provable_breaks"] = [b.model_dump() for b in breaks]
         summary_obj = report.get("summary", {})
         summary: Dict[str, Any] = summary_obj if isinstance(summary_obj, dict) else {}
-        report["verdict"] = decide_verdict(breaks, summary)
+        report["verdict"] = decide_verdict(breaks, summary, changes)
         # Expose the count in the summary so the CI gate (--fail-on tests) can read it.
         summary["provable_break_count"] = len(breaks)
         # Honesty: break detection only sees catalog-backed models and tests it could
