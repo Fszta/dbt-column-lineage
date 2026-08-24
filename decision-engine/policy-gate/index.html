@@ -2541,26 +2541,52 @@ surface:</p>
 <a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="nt">"hits"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"rule_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"pii-outside-allowlist"</span><span class="p">,</span><span class="w"> </span><span class="nt">"decision"</span><span class="p">:</span><span class="w"> </span><span class="s2">"block"</span><span class="p">,</span>
 <a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">        </span><span class="nt">"change_model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"dim_account_holders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"change_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">,</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">        </span><span class="nt">"matched_reach"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"account_holders"</span><span class="p">],</span><span class="w"> </span><span class="nt">"actions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"block"</span><span class="p">,</span><span class="w"> </span><span class="s2">"notify"</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="p">],</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="nt">"build_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"dim_accounts"</span><span class="p">],</span>
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="nt">"test_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"fact_revenue"</span><span class="p">],</span>
-<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="nt">"notifications"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"slack"</span><span class="p">,</span><span class="w"> </span><span class="nt">"target"</span><span class="p">:</span><span class="w"> </span><span class="s2">"#data-governance"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PII …"</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">    </span><span class="p">],</span>
-<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="w">    </span><span class="nt">"evaluated_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
-<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="w">    </span><span class="nt">"fired_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
-<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a><span class="p">}</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">        </span><span class="nt">"matched_reach"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"account_holders"</span><span class="p">],</span><span class="w"> </span><span class="nt">"actions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"block"</span><span class="p">,</span><span class="w"> </span><span class="s2">"notify"</span><span class="p">],</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">        </span><span class="nt">"fired_on_unknown"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"unknown_cause"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="nt">"build_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"dim_accounts"</span><span class="p">],</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="nt">"test_set"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"fact_revenue"</span><span class="p">],</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">    </span><span class="nt">"notifications"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"slack"</span><span class="p">,</span><span class="w"> </span><span class="nt">"target"</span><span class="p">:</span><span class="w"> </span><span class="s2">"#data-governance"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PII …"</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="w">    </span><span class="nt">"evaluated_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="w">    </span><span class="nt">"fired_rules"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a><span class="w">    </span><span class="nt">"unresolved_reach_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a><span class="w">    </span><span class="nt">"skipped_missing_meta"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a><span class="p">}</span>
 </code></pre></div>
+<p>Each hit carries <code>fired_on_unknown</code> (with <code>unknown_cause</code> — <code>missing</code> / <code>error</code>): <code>true</code> means the
+rule fired because a <a href="#fail-safe-defaults">fail-safe knob</a> resolved an <strong>UNKNOWN</strong>, not because it
+proved a match. The verdict-level <code>unresolved_reach_count</code> / <code>skipped_missing_meta</code> count what the
+policy left <strong>undecided</strong>. Both are surfaced in the PR comment (below) so a fail-safe block never
+reads as a proven one.</p>
 <h3 id="markdown-pr-comment">Markdown / PR comment</h3>
-<p>When a policy is present, the report adds a <strong>Policy verdict</strong> section — fired rules grouped by
-decision (block first), each naming the subject change and the reach it matched, followed by the
-<strong>selective build set / test set</strong> and the notify intents. It deliberately references node
-<em>names</em> only; it never re-lists the downstream blast radius (the impact section above it owns
-that). A <code>block</code> verdict leads with a one-line <strong>"blocked until…"</strong> note stating how the block
-clears (see <a href="#a-block-is-a-block-until-not-a-dead-end">above</a>), so the PR comment carries the
-release path, not just the obstacle.</p>
+<p>When a policy is present, the report adds a <strong>Policy verdict</strong> section — a <strong>"Why this verdict"</strong>
+breakdown of the rules that fired, grouped by decision (block first). Each row names the subject
+change, a capped sample of the reach it matched, and — the load-bearing bit — an <strong>honesty
+marker</strong>:</p>
+<ul>
+<li><code>✓ proven match</code> — the rule proved its predicate against real data.</li>
+<li><code>⚠️ **fired on a fail-safe default** (meta missing / evaluation error)</code> — the rule fired only
+  because a <a href="#fail-safe-defaults">fail-safe knob</a> resolved an <strong>UNKNOWN</strong>. A fail-safe block reads
+  very differently from a proven one, on purpose: a confident-looking ruling that was actually
+  <em>undecided</em> is exactly the trust this gate is sold on.</li>
+</ul>
+<p>When an <a href="#overriding-a-verdict--the-in-code-escape-hatch">override</a> capped a hit, the row shows the
+<code>original → effective (overridden: reason)</code> delta so the audit trail is visible. Below the rules
+come the <strong>selective build set / test set</strong> and the notify intents.</p>
+<p>Whenever the policy left anything <strong>undecided</strong>, a LOUD <strong>Coverage</strong> footer states it plainly —
+<code>Coverage: N columns undecided (missing meta), M reaches unresolved — these did NOT count as
+safe.</code> — so a fail-closed block driven by unknowns is never folded into a clean pass.</p>
+<p>The section deliberately references node <em>names</em> only; it never re-lists the downstream blast radius
+(the impact section above it owns that). A <code>block</code> verdict leads with a one-line <strong>"blocked until…"</strong>
+note stating how the block clears (see <a href="#a-block-is-a-block-until-not-a-dead-end">above</a>), so the PR
+comment carries the release path, not just the obstacle.</p>
+<p>The <strong>default gate</strong> (no policy) explains itself too: each flagged column carries the compact
+semantic reason it was flagged, alongside the provable-break diagnostics. <code>impact --explain</code>
+<em>expands</em> the human comment with the <code>base → head</code> expression trace; the JSON always carries the
+full explanation regardless of the flag.</p>
 <h2 id="overriding-a-verdict-the-in-code-escape-hatch">Overriding a verdict — the in-code escape hatch</h2>
 <p>A gate with no escape hatch gets turned off, not tuned. The moment the verdict flags a change the
 author knows is fine ("yes, this recomputes downstream — it's intended, and downstream was updated
