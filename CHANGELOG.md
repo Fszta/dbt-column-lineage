@@ -1,3 +1,15 @@
+## [0.17.2](https://github.com/Fszta/parrant/compare/v0.17.1...v0.17.2) (2026-08-24)
+
+### Features
+
+* **comment:** explain the verdict in the sticky PR comment ([7b85255](https://github.com/Fszta/parrant/commit/7b852556991044d228f50b44b13e32ebda230318))
+
+### Bug Fixes
+
+* **explorer:** restore SVG icons broken by stripped path moveto commands ([cbb0522](https://github.com/Fszta/parrant/commit/cbb05220be7d54753eace215b2f55ab1ff9856eb))
+* **docs:** white header logo for contrast on the dark header ([b4d9f61](https://github.com/Fszta/parrant/commit/b4d9f61c549d82c98b4821d061cc3fef57c1ed27))
+* **docs:** use the self-contained tile mark for the header logo ([917cac0](https://github.com/Fszta/parrant/commit/917cac044ddbe1184874f0764af596699a1673a7))
+
 ## [0.17.1](https://github.com/Fszta/parrant/compare/v0.17.0...v0.17.1) (2026-08-23)
 
 ### Features
