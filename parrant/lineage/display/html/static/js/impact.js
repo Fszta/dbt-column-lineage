@@ -23,7 +23,7 @@ const ImpactModule = (function() {
         return `
             <div class="column-test-guardrails">
                 <span class="test-guardrails-label">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d=" 0.5 L10.5 2.1 V5.1 C10.5 7.9 8.5 9.8 6 10.5 C3.5 9.8 1.5 7.9 1.5 5.1 V2.1 Z"></path><path d=".9 5.3 L5.5 6.9 L8.3 3.7"></path></svg>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 0.5 L10.5 2.1 V5.1 C10.5 7.9 8.5 9.8 6 10.5 C3.5 9.8 1.5 7.9 1.5 5.1 V2.1 Z"></path><path d="M3.9 5.3 L5.5 6.9 L8.3 3.7"></path></svg>
                     Tests
                 </span>
                 <span class="test-pill-group">${pills}</span>
