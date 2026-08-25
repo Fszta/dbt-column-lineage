@@ -1,3 +1,15 @@
+## [0.18.0](https://github.com/Fszta/parrant/compare/v0.17.2...v0.18.0) (2026-08-25)
+
+### Features
+
+* **policy:** scaffold config-axis template and document config/inferred_meta axes ([0b81f56](https://github.com/Fszta/parrant/commit/0b81f5684dfdeb5402283d2fc4956362d5bd0a03))
+* **policy:** add generic config predicate axis (config.grants.select etc.) ([47247d5](https://github.com/Fszta/parrant/commit/47247d57857adf0f009bd0b3479f5988941a7b19))
+* **policy:** resolve meta by folding upstream lineage via effective.* predicates ([f9b1800](https://github.com/Fszta/parrant/commit/f9b1800608dc58a560d443c9ba9505a56ecd1876))
+
+### Bug Fixes
+
+* **policy:** treat null config set value as empty set ([311abcc](https://github.com/Fszta/parrant/commit/311abccd2cb129b9aad480b6043aaa94681fba0e))
+
 ## [0.17.2](https://github.com/Fszta/parrant/compare/v0.17.1...v0.17.2) (2026-08-24)
 
 ### Features
