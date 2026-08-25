@@ -189,3 +189,58 @@ def test_registry_internal_flags_untouched_by_meta(tmp_path):
     assert model.metadata["dbt_meta"] == {"team": "finance", "critical": True}
     # amount was recovered from compiled SQL, so its column meta still attaches.
     assert registry.get_column_dbt_meta("orders", "amount")["pii"] is True
+
+
+# --- config axis: node.config round-trip ----------------------------------
+
+
+def _granted_manifest_node():
+    return {
+        "name": "orders",
+        "unique_id": "model.p.orders",
+        "resource_type": "model",
+        "language": "sql",
+        "schema": "s",
+        "database": "d",
+        "compiled_code": "select 1 as id, 2 as amount",
+        "meta": {"team": "finance"},
+        "config": {
+            "materialized": "incremental",
+            "tags": ["nightly", "finance"],
+            "grants": {"select": ["pii_reader", "analyst"]},
+            "meta": {"critical": True},
+        },
+    }
+
+
+def test_manifest_get_model_config_returns_node_config(tmp_path):
+    reader = _write_manifest(tmp_path, {"model.p.orders": _granted_manifest_node()})
+    reader.load()
+    config = reader.get_model_config("orders")
+    assert config["materialized"] == "incremental"
+    assert config["grants"] == {"select": ["pii_reader", "analyst"]}
+    assert config["tags"] == ["nightly", "finance"]
+    # absent / unknown -> empty dict, never guessed
+    reader2 = _write_manifest(tmp_path, {"model.p.bare": {"name": "bare", "resource_type": "model"}})
+    reader2.load()
+    assert reader2.get_model_config("bare") == {}
+    assert reader2.get_model_config("nope") == {}
+
+
+def test_registry_model_config_round_trips_and_namespaced(tmp_path):
+    registry = _load_registry(
+        tmp_path,
+        {"model.p.orders": _catalog_node("orders", ["id", "amount"])},
+        {"model.p.orders": _granted_manifest_node()},
+    )
+    config = registry.get_model_config("ORDERS")  # case-insensitive
+    assert config["grants"] == {"select": ["pii_reader", "analyst"]}
+    assert config["materialized"] == "incremental"
+
+    # Namespaced under a reserved sub-key, disjoint from dbt_meta and the internal flags.
+    model = registry.get_model("orders")
+    assert model.metadata["dbt_config"]["materialized"] == "incremental"
+    assert model.metadata["dbt_meta"] == {"team": "finance", "critical": True}
+
+    # Unknown model -> empty dict.
+    assert registry.get_model_config("nope") == {}

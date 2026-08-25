@@ -392,11 +392,16 @@ class MatchAxis(str, Enum):
     ``INFERRED_META`` mirrors ``META`` but resolves a key's value by folding UPSTREAM lineage
     (a column's classification inherited from where its data comes from) rather than reading
     only the node's own declared meta — see ``inferred_meta`` in ``lineage/policy.py``.
+
+    ``CONFIG`` mirrors ``META`` but resolves a DOTTED key against the model's resolved dbt
+    ``node.config`` (``grants.select``, ``materialized``, ``tags``, ``enabled`` …) rather than
+    user ``meta`` — see ``config`` in ``lineage/policy.py``. Model-grained only.
     """
 
     CHANGE = "change"
     META = "meta"
     INFERRED_META = "inferred_meta"
+    CONFIG = "config"
     REACH = "reach"
     STRUCTURAL = "structural"
 
@@ -522,8 +527,8 @@ class Predicate(BaseModel):
     """Exactly one field is set: a boolean combinator OR a leaf condition.
 
     Combinators: ``all_`` (AND, alias ``all``), ``any_`` (OR, alias ``any``),
-    ``not_`` (negation, alias ``not``). Leaves: ``change`` / ``meta`` / ``reach`` /
-    ``structural``. The one-of invariant is enforced by a model validator.
+    ``not_`` (negation, alias ``not``). Leaves: ``change`` / ``meta`` / ``inferred_meta`` /
+    ``config`` / ``reach`` / ``structural``. The one-of invariant is enforced by a model validator.
     """
 
     all_: Optional[List["Predicate"]] = Field(default=None, alias="all")
@@ -535,6 +540,12 @@ class Predicate(BaseModel):
     # value by folding UPSTREAM lineage rather than reading only the node's own declared meta —
     # see ``inferred_meta`` in ``lineage/policy.py``. An unresolvable value is UNKNOWN (fail-safe).
     inferred_meta: Optional[MetaCondition] = None
+    # ``config`` shares ``MetaCondition``'s shape (key/op/value) but resolves the DOTTED key
+    # against the subject model's resolved dbt ``node.config`` (``grants.select``,
+    # ``materialized``, ``tags`` …) rather than user ``meta``. Model-grained. A missing dotted
+    # path resolves to the EMPTY SET for set operators (present, not unknown) and to
+    # UNKNOWN_MISSING for scalar operators — see ``config`` in ``lineage/policy.py``.
+    config: Optional[MetaCondition] = None
     reach: Optional[ReachCondition] = None
     structural: Optional[StructuralCondition] = None
 
@@ -551,6 +562,7 @@ class Predicate(BaseModel):
                 "change",
                 "meta",
                 "inferred_meta",
+                "config",
                 "reach",
                 "structural",
             )
@@ -559,7 +571,7 @@ class Predicate(BaseModel):
         if len(set_fields) != 1:
             raise ValueError(
                 "a predicate must set exactly one of "
-                "all/any/not/change/meta/inferred_meta/reach/structural, got: "
+                "all/any/not/change/meta/inferred_meta/config/reach/structural, got: "
                 f"{sorted(set_fields) or 'none'}"
             )
         return self

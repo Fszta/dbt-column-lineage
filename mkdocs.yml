@@ -102,4 +102,5 @@ nav:
     - Glossary: decision-engine/glossary.md
   - Reference:
     - JSON Output: reference/json-output.md
+  - Roadmap: ROADMAP.md
   - Changelog: changelog.md
