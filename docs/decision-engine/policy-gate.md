@@ -126,7 +126,7 @@ predicate:
         change: { field: kind, op: eq, value: added }
 ```
 
-A leaf condition matches on exactly one of **four axes**:
+A leaf condition matches on exactly one of **five axes**:
 
 #### `change` — facts about the changed column itself
 
@@ -150,6 +150,44 @@ meta: { key: governance.tier, op: eq, value: gold }   # dotted path into nested 
 
 Keys are dotted paths resolved against the node's merged meta (dbt's `config.meta` over
 top-level `meta`). Missing-key handling is governed by [`on_missing_meta`](#fail-safe-defaults).
+
+#### `effective` — a meta key resolved by folding UPSTREAM lineage { #effective-conditions }
+
+Same shape as `meta` (`key` / `op` / `value`), but the value is resolved from the column's
+**lineage**, not only its own declared meta — so a classification declared **once** (e.g. `pii:
+true` on a staging column) is inherited by every downstream column that derives from it, without
+re-tagging each one.
+
+```yaml
+effective: { key: pii, op: is_true }        # true if PII anywhere upstream (unless declassified)
+effective: { key: secret, op: is_true }
+```
+
+Resolution, per column:
+
+1. **Own meta wins.** If the column declares its own value for the key, that value is used
+   verbatim — this is the seed, the override, and the **declassification** point (a downstream
+   `pii: false` on a hashed/masked column stops propagation).
+2. **Otherwise fold the upstream source columns**, combining **most-restrictively** per a
+   key-specific strategy:
+    - `pii` — ordered `true > unknown > false`: any upstream `true` ⇒ `true`; else any
+      unresolved upstream ⇒ `unknown`; else `false`.
+    - `secret` — boolean **OR** over upstream (any upstream `true` ⇒ `true`); an own `false`
+      still wins by rule 1.
+    - Any **other** key falls back to the most-restrictive (`pii`-style) fold.
+3. **Otherwise** — no own meta *and* no resolvable upstream (a root/source column, or a chain
+   that never reaches a declared value) — the value is **UNKNOWN**.
+
+An **UNKNOWN** effective value is treated exactly like a missing plain `meta` key: it is routed
+to [`on_missing_meta`](#fail-safe-defaults), so under the default `fail_closed` a **blocking**
+rule fires. Note this differs from `meta.*`, where `is_true` / `is_false` on an absent key read
+as `False`: for `effective.*`, an unprovable classification is UNKNOWN for **every** operator
+(including `is_true`), so "we could not prove this column is *not* PII" fails closed rather than
+silently passing. `effective` is evaluated at **column** grain, so in a `reach.where` only a
+`reach.kind: column` object resolves; a reached model/exposure is UNKNOWN.
+
+`effective.*` is purely additive — `meta.*` is unchanged and still reads only the node's own
+declared meta.
 
 #### `reach` — a *quantified* condition over the change's downstream reach { #reach-conditions }
 
