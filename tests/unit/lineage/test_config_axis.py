@@ -20,9 +20,12 @@ combined ``inferred_meta`` + ``config`` case).
 
 import os
 
+import pytest
+
 from parrant.lineage.changeset import ChangeKind, ColumnChange
 from parrant.lineage.policy import (
     MetaIndex,
+    PolicyConfigError,
     PolicyEngine,
     build_impact_view,
     load_policy,
@@ -72,7 +75,7 @@ def _impact(*entries):
     return {"by_change": list(entries)}
 
 
-def _resolved(model, column, kind="logic_changed", models=None):
+def _resolved(model, column, kind="logic_changed", models=None, exposures=None):
     return {
         "model": model,
         "column": column,
@@ -80,7 +83,7 @@ def _resolved(model, column, kind="logic_changed", models=None):
         "resolved": True,
         "reached_models": models or [],
         "reached_columns": [],
-        "reached_exposures": [],
+        "reached_exposures": exposures or [],
     }
 
 
@@ -391,3 +394,137 @@ def test_shipped_pii_grants_allowlist_fixture_blocks_over_grant():
     verdict = _engine(policy, registry).evaluate([_change()])
     assert verdict.blocks()
     assert verdict.notifications[0].target == "#data-governance"
+
+
+# --- hardening: confirmed-safe edge paths ----------------------------------
+
+
+def test_set_op_against_a_scalar_config_value_is_error_and_fails_closed():
+    """config.grants.select is a STRING (not a list) fed to a SET operator -> UNKNOWN_ERROR ->
+    on_error (fail_closed default) -> a blocking rule FIRES (fails safe, never a false pass).
+
+    A present-but-wrong-shaped value is a genuine evaluation error, NOT the empty-set/absent
+    default — that mapping is reserved for absent / null, never for a real scalar in the slot."""
+    registry = FakeRegistry(model_config={"customers": {"grants": {"select": "loader"}}})
+    policy = _config_policy("grants.select", "not_subset_of", ["loader", "transformer"])
+    verdict = _engine(policy, registry).evaluate([_change()])
+    assert verdict.blocks()
+    assert verdict.hits[0].fired_on_unknown is True
+    assert verdict.hits[0].unknown_cause == "error"
+
+
+def test_intermediate_missing_hop_is_empty_set_not_unknown():
+    """``grants`` present but ``select`` absent -> the dotted path is still missing at the last
+    hop -> set op resolves to the EMPTY SET -> not_subset_of == FALSE -> no fire."""
+    registry = FakeRegistry(model_config={"customers": {"grants": {"insert": ["loader"]}}})
+    policy = _config_policy("grants.select", "not_subset_of", ["loader", "transformer"])
+    verdict = _engine(policy, registry).evaluate([_change()])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.fired_rules == 0
+    assert verdict.skipped_missing_meta == 0
+
+
+def test_superset_of_positive_and_missing():
+    """``superset_of`` (in _SET_OPERATORS) sanity: a proven superset fires; a missing path is the
+    EMPTY SET, and [] is a superset of nothing but the empty set -> no fire."""
+    granted = FakeRegistry(
+        model_config={"customers": {"grants": {"select": ["loader", "transformer", "reporter"]}}}
+    )
+    # {loader, transformer, reporter} ⊇ [loader, reporter] -> TRUE
+    v_pos = _engine(
+        _config_policy("grants.select", "superset_of", ["loader", "reporter"]), granted
+    ).evaluate([_change()])
+    assert v_pos.blocks()
+    # missing path -> [] ⊇ [loader] is FALSE -> no fire
+    empty = FakeRegistry(model_config={"customers": {}})
+    v_missing = _engine(
+        _config_policy("grants.select", "superset_of", ["loader"]), empty
+    ).evaluate([_change()])
+    assert v_missing.decision is GateDecision.ALLOW
+
+
+def test_reach_where_config_on_reached_exposure_does_not_match():
+    """A ``reach.where`` with a ``config`` leaf against a reached EXPOSURE (a non-model with no
+    dbt config) resolves present=False -> the set-op empty-set default -> FALSE, so it never
+    spuriously matches. The rule stays ALLOW."""
+    registry = FakeRegistry()
+    policy = parse_policy(
+        {
+            "version": 1,
+            "rules": [
+                {
+                    "id": "reaches-over-granted-exposure",
+                    "predicate": {
+                        "reach": {
+                            "kind": "exposure",
+                            "where": {
+                                "config": {
+                                    "key": "grants.select",
+                                    "op": "intersects",
+                                    "value": ["reporter"],
+                                }
+                            },
+                        }
+                    },
+                    "action": [{"type": "block"}],
+                }
+            ],
+        }
+    )
+    impact = _impact(
+        _resolved(
+            "customers",
+            "email",
+            exposures=[{"name": "exec_dashboard"}],
+        )
+    )
+    verdict = _engine(policy, registry, impact).evaluate([_change()])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.fired_rules == 0
+
+
+def test_predicate_with_two_axes_is_rejected():
+    """The one-of validator rejects a leaf that sets ``config`` AND ``meta`` at the same level."""
+    with pytest.raises(PolicyConfigError):
+        parse_policy(
+            {
+                "version": 1,
+                "rules": [
+                    {
+                        "id": "two-axes",
+                        "predicate": {
+                            "config": {"key": "materialized", "op": "eq", "value": "table"},
+                            "meta": {"key": "pii", "op": "is_true"},
+                        },
+                        "action": [{"type": "block"}],
+                    }
+                ],
+            }
+        )
+
+
+# --- consistency: a present-but-null set value is the empty set ------------
+
+
+def test_null_config_set_value_is_empty_set_no_fire():
+    """``grants.select: null`` (explicitly nulled readers) -> set op treats None like absent ->
+    EMPTY SET -> not_subset_of == FALSE -> no fire. Null readers = no readers = not exposed."""
+    registry = FakeRegistry(model_config={"customers": {"grants": {"select": None}}})
+    policy = _config_policy("grants.select", "not_subset_of", ["loader", "transformer"])
+    verdict = _engine(policy, registry).evaluate([_change()])
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.fired_rules == 0
+    assert verdict.skipped_missing_meta == 0
+
+
+def test_null_config_scalar_value_is_unchanged():
+    """The null->empty-set mapping is SET-operator only: a scalar op sees a present ``None`` value
+    and evaluates it normally (None != 'incremental' -> FALSE), NOT as an empty set or UNKNOWN."""
+    registry = FakeRegistry(model_config={"customers": {"materialized": None}})
+    verdict = _engine(_config_policy("materialized", "eq", "incremental"), registry).evaluate(
+        [_change()]
+    )
+    assert verdict.decision is GateDecision.ALLOW
+    assert verdict.fired_rules == 0
+    # present value -> NOT routed through the missing-meta knob (it is a concrete FALSE)
+    assert verdict.skipped_missing_meta == 0
