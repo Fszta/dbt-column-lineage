@@ -350,6 +350,7 @@ class MetaIndex:
         self._registry = registry
         self._metabase_reach = metabase_reach
         self._model_cache: Dict[str, Dict[str, Any]] = {}
+        self._config_cache: Dict[str, Dict[str, Any]] = {}
         self._column_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
         self._exposures: Optional[Dict[str, Any]] = None
         # Memoize resolved inferred meta across the (immutable) column DAG, keyed by
@@ -362,6 +363,14 @@ class MetaIndex:
             getter = getattr(self._registry, "get_model_dbt_meta", None)
             cached = dict(getter(model)) if getter is not None else {}
             self._model_cache[model] = cached
+        return cached
+
+    def _config_dict(self, model: str) -> Dict[str, Any]:
+        cached = self._config_cache.get(model)
+        if cached is None:
+            getter = getattr(self._registry, "get_model_config", None)
+            cached = dict(getter(model)) if getter is not None else {}
+            self._config_cache[model] = cached
         return cached
 
     def _column_dict(self, model: str, column: str) -> Dict[str, Any]:
@@ -394,6 +403,20 @@ class MetaIndex:
         if col.present:
             return col
         return self.model_meta(model, key)
+
+    def model_config(self, model: str, key: str) -> MetaLookup:
+        """A DOTTED ``config`` key on a model's resolved dbt ``node.config``.
+
+        Model-grained (dbt config is a model-level notion): there is no column merge, unlike
+        :meth:`subject_meta`. A missing dotted path is ``present=False`` here; the SET-vs-scalar
+        missing-path semantics are applied by :func:`_eval_config`, not stored on the lookup.
+        """
+        return _dotted_get(self._config_dict(model), key)
+
+    def subject_config(self, model: str, key: str) -> MetaLookup:
+        """Subject config: the changed column's *model* config (config is model-grained, so
+        there is no column-level fallback — mirrors :meth:`subject_meta` for the call sites)."""
+        return self.model_config(model, key)
 
     def inferred_meta(self, model: str, column: str, key: str) -> MetaLookup:
         """The column's INFERRED meta for ``key``, folded over UPSTREAM lineage.
@@ -689,6 +712,49 @@ def _eval_operator(op: Operator, lookup: MetaLookup, expected: Any) -> Tri:
     return Tri.UNKNOWN_ERROR
 
 
+# The set-valued operators, whose left operand is a collection. For the ``config`` axis a
+# missing dotted path is a proven EMPTY SET for these (see :func:`_eval_config`).
+_SET_OPERATORS = frozenset(
+    {
+        Operator.INTERSECTS,
+        Operator.SUBSET_OF,
+        Operator.NOT_SUBSET_OF,
+        Operator.SUPERSET_OF,
+    }
+)
+
+
+def _eval_config(op: Operator, lookup: MetaLookup, expected: Any) -> Tri:
+    """Evaluate an operator against a dbt ``config`` (``node.config``) lookup.
+
+    The ``config`` axis mirrors :func:`_eval_operator` (``meta`` semantics) with ONE
+    deliberate difference in the *missing dotted path* case, split by operator class:
+
+      * **SET operators** (``subset_of`` / ``not_subset_of`` / ``intersects`` / ``superset_of``):
+        an absent path — OR a path present but resolving to ``None`` (e.g. ``grants.select: null``)
+        — resolves to the **EMPTY SET** ``[]`` — *present*, NOT unknown. This is the generic,
+        correct default: "no ``grants.select`` declared = the empty reader set". So
+        ``config.grants.select not_subset_of [allowlist]`` on a model with no grants is
+        ``[] ⊄ X == FALSE`` and does NOT fire — a model that grants to nobody cannot over-expose.
+        A ``null`` value (readers explicitly nulled out) is treated identically to absent, staying
+        consistent with the ``[]`` case rather than routing a genuine "no readers" to a
+        fail-closed block via ``UNKNOWN_ERROR``.
+
+      * **SCALAR operators** (``eq`` / ``ne`` / ``matches`` / numeric …): an absent path stays
+        ``UNKNOWN_MISSING`` and routes to ``on_missing_meta`` exactly like a missing ``meta`` key.
+        The presence/boolean operators (``exists`` / ``absent`` / ``is_true`` / ``is_false``) remain
+        *total*, again exactly like ``meta``. A present-``None`` scalar value is left UNCHANGED
+        (evaluated as ``None`` by the normal operator semantics) — the empty-set mapping is a
+        set-operator-only concern.
+
+    Values are surfaced RAW (as dbt resolved them); the engine never normalizes them.
+    """
+    if op in _SET_OPERATORS and (not lookup.present or lookup.value is None):
+        # Absent path OR an explicit ``null`` collapse to the proven empty set for set ops.
+        lookup = MetaLookup(present=True, value=[])
+    return _eval_operator(op, lookup, expected)
+
+
 def _eval_inferred(op: Operator, lookup: MetaLookup, expected: Any) -> Tri:
     """Evaluate an operator against an INFERRED-meta lookup.
 
@@ -898,6 +964,8 @@ class PolicyEngine:
             return self._eval_meta_subject(predicate.meta, subject)
         if predicate.inferred_meta is not None:
             return self._eval_inferred_subject(predicate.inferred_meta, subject)
+        if predicate.config is not None:
+            return self._eval_config_subject(predicate.config, subject)
         if predicate.reach is not None:
             return self._eval_reach(predicate.reach, subject, trace)
         if predicate.structural is not None:
@@ -935,6 +1003,14 @@ class PolicyEngine:
         is untouched."""
         lookup = self._meta.inferred_meta(subject.model, subject.column, cond.key)
         return _eval_inferred(cond.op, lookup, cond.value)
+
+    def _eval_config_subject(self, cond: MetaCondition, subject: ColumnChange) -> Tri:
+        """``config.<dotted.key>`` on the subject's model: resolve against the model's dbt
+        ``node.config`` (``grants.select``, ``materialized``, ``tags`` …). Model-grained.
+        A missing dotted path is the EMPTY SET for set operators and UNKNOWN for scalar ones —
+        see :func:`_eval_config`. Additive: ``meta.*`` / ``inferred_meta.*`` are untouched."""
+        lookup = self._meta.subject_config(subject.model, cond.key)
+        return _eval_config(cond.op, lookup, cond.value)
 
     def _eval_reach(self, cond: ReachCondition, subject: ColumnChange, trace: _Trace) -> Tri:
         if not self._impact.is_resolved(subject):
@@ -982,6 +1058,12 @@ class PolicyEngine:
                 self._reached_inferred(obj, predicate.inferred_meta.key),
                 predicate.inferred_meta.value,
             )
+        if predicate.config is not None:
+            return _eval_config(
+                predicate.config.op,
+                self._reached_config(obj, predicate.config.key),
+                predicate.config.value,
+            )
         # change / reach / structural are not meaningful against a reached object -> error cause.
         return Tri.UNKNOWN_ERROR
 
@@ -991,6 +1073,15 @@ class PolicyEngine:
         if obj.kind is ReachKind.COLUMN:
             return self._meta.column_meta(obj.name, obj.column or "", key)
         return self._meta.exposure_meta(obj.name, key)
+
+    def _reached_config(self, obj: ReachedObject, key: str) -> MetaLookup:
+        """``config.<key>`` on a reached object. Config is model-grained, so a reached MODEL or
+        COLUMN resolves it on that node's model (both carry the model in ``obj.name``); a reached
+        exposure has no dbt ``config`` and is ``present=False`` -> the set-op empty-set / scalar
+        UNKNOWN semantics of :func:`_eval_config` then apply."""
+        if obj.kind is ReachKind.MODEL or obj.kind is ReachKind.COLUMN:
+            return self._meta.model_config(obj.name, key)
+        return MetaLookup(present=False, value=None)
 
     def _reached_inferred(self, obj: ReachedObject, key: str) -> MetaLookup:
         """``inferred_meta.<key>`` on a reached object. Inferred meta is a COLUMN-level notion, so

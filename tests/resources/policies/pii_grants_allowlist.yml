@@ -1,0 +1,37 @@
+# Example — PII must not be GRANTED to a role outside the sensitive-data allowlist.
+#
+# The offline PII-not-over-granted rule, expressed as PURE CONSUMER CONFIG on the generic
+# `config` axis. It composes two axes:
+#   * inferred_meta.pii — the column is PII (declared once upstream, inherited via lineage);
+#   * config.grants.select — the roles the model grants SELECT to, read straight from the dbt
+#     `node.config` (no manifest-patch bridge).
+#
+# Sensitive data may only be granted to `pii_reader`. A model that grants `select` to a role
+# outside the allowlist (e.g. `reporter` / `analyst`) fires; one that grants only to `pii_reader`
+# passes. Because `not_subset_of` is a SET operator, a model with NO grants declared resolves to
+# the EMPTY SET -> `[] not_subset_of [...] == FALSE` -> it does NOT fire (a model that grants to
+# nobody cannot over-expose).
+#
+# NOTE: env-suffix normalization (e.g. pii_reader_prod -> pii_reader) is a CONSUMER concern — the
+# engine surfaces grant roles RAW, exactly as dbt resolved them. List the exact role names your
+# project grants (or every environment-suffixed variant) in the allowlist below.
+version: 1
+rules:
+  - id: pii-not-over-granted
+    description: >
+      A change to a PII column (inferred over lineage) on a model that grants SELECT to a role
+      outside the sensitive-data allowlist must block (offline PII-exposure check on dbt grants).
+    scope: change
+    predicate:
+      all:
+        - inferred_meta: { key: pii, op: is_true } # PII anywhere upstream, unless declassified
+        - config:
+            key: grants.select # roles the model grants SELECT to (dbt node.config)
+            op: not_subset_of
+            value: [pii_reader]
+    action:
+      - type: block
+      - type: notify
+        channel: slack
+        target: "#data-governance"
+        message: "PII {change.model}.{change.column} is granted to a non-allowlisted role"

@@ -262,6 +262,20 @@ class ManifestReader:
         config = node.get("config") or {}
         return self._merged_meta(node.get("meta"), config.get("meta"))
 
+    def get_model_config(self, model_name: str) -> Dict[str, Any]:
+        """The node's resolved dbt ``config`` dict for a model (``node.config``).
+
+        This is the generic dbt config surface — ``grants``, ``materialized``, ``tags``,
+        ``enabled``, ``schema`` … — captured verbatim, exactly as dbt resolved it. Values
+        are surfaced RAW (never normalized); no key is privileged. Returns an empty dict for
+        an unknown model or one with no config — config is *absent*, never guessed.
+        """
+        node = self._find_node(model_name)
+        if not node:
+            return {}
+        config = node.get("config") or {}
+        return dict(config) if isinstance(config, dict) else {}
+
     def get_column_meta(self, model_name: str) -> Dict[str, Dict[str, Any]]:
         """Per-column merged user meta for a model, keyed by lowercased column name.
 

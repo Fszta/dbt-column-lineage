@@ -126,7 +126,7 @@ predicate:
         change: { field: kind, op: eq, value: added }
 ```
 
-A leaf condition matches on exactly one of **five axes**:
+A leaf condition matches on exactly one of **six axes**:
 
 #### `change` — facts about the changed column itself
 
@@ -206,6 +206,48 @@ the fail-safe direction, but not a useful gate. So: seed your `pii` / `secret` s
 run the rule advisory (`skip`) to see where the signal lands, and only then promote it to
 blocking. UNKNOWN always resolves via the fail-safe knob — there is no separate "block
 everything" mode.
+
+#### `config` — a dbt `node.config` key on the changed model { #config-conditions }
+
+Same shape as `meta` (`key` / `op` / `value`), but the value is resolved against the model's
+**resolved dbt `config`** — `grants`, `materialized`, `tags`, `enabled`, `schema` … — rather than
+user `meta`. Keys are **dotted paths** into that config, and values are surfaced **raw** (exactly as
+dbt resolved them; the engine never normalizes). This makes any generic dbt config attribute
+referenceable — most importantly `config.grants.select`, the roles a model grants `SELECT` to.
+
+```yaml
+config: { key: grants.select, op: not_subset_of, value: [pii_reader] }
+config: { key: materialized, op: eq, value: incremental }   # scalar
+config: { key: tags, op: intersects, value: [finance] }     # list
+```
+
+`config` is a **model-grained** notion (dbt config is a model-level concept), so there is no
+column-level fallback like `meta` has — the key resolves against the changed column's *model*
+config. It is purely additive: `meta.*` and `inferred_meta.*` are unchanged.
+
+**Missing-path semantics — set vs scalar (the load-bearing rule):**
+
+| Operator class | A missing dotted path resolves to… | Why |
+|---|---|---|
+| **set** (`subset_of`, `not_subset_of`, `intersects`, `superset_of`) | the **empty set** `[]` — *present, not unknown* | "no `grants.select` declared = the empty reader set". So `config.grants.select not_subset_of [allowlist]` on a model with **no grants** is `[] ⊄ X == FALSE` and does **not** fire — a model that grants to nobody cannot over-expose. This is the generic, correct default. |
+| **scalar** (`eq`, `ne`, `matches`, numeric …) | `UNKNOWN` → [`on_missing_meta`](#fail-safe-defaults) | exactly like a missing plain `meta` key. The presence/boolean operators (`exists` / `absent` / `is_true` / `is_false`) stay *total*, also like `meta`. |
+
+A key present but explicitly **`null`** (e.g. `grants.select: null`) is treated **like absent for
+set operators** — it collapses to the empty set (null readers = no readers = not exposed), staying
+consistent with the `[]` case rather than fail-closed-blocking. For scalar operators a `null` value
+is left as-is (evaluated as `None` by the operator). A value present but of the **wrong shape** for
+the operator — a *scalar in a set slot*, e.g. `grants.select: "pii_reader"` (a bare string) fed to
+`not_subset_of` — is a genuine evaluation error (`UNKNOWN_ERROR`) routed to
+[`on_error`](#fail-safe-defaults), so under the default `fail_closed` a blocking rule **fires**
+(fails safe, never a silent pass).
+
+This differs deliberately from `meta.*`, where a set operator on a missing key resolves to
+`UNKNOWN`. For `config` a set-operator miss is a **proven empty set** — the right default for the
+"grants must not exceed an allowlist" gate, so the rule fires only on models that actually grant to
+a role outside it, never on models with no grants at all.
+
+`config` is usable in a `reach.where` too: it resolves against the reached model's config (a reached
+column resolves against its model; a reached exposure has no dbt config → `present=False`).
 
 #### `reach` — a *quantified* condition over the change's downstream reach { #reach-conditions }
 
@@ -376,6 +418,44 @@ rules:
     action:
       - type: block
 ```
+
+### 4. PII must not be *granted* to a role outside the allowlist
+
+The [`config` axis](#config-conditions) makes "sensitive data must not be granted to a role outside
+an allowlist" expressible **directly** — reading dbt's own `grants` config, with no manifest-patch
+bridge. It composes the [`inferred_meta`](#inferred-meta-conditions) axis (PII inherited over
+lineage) with `config.grants.select` (the roles the model grants `SELECT` to):
+
+```yaml
+version: 1
+rules:
+  - id: pii-not-over-granted
+    description: >
+      A change to a PII column (inferred over lineage) on a model that grants SELECT to a
+      role outside the compliance allowlist must block (offline PII-exposure check on grants).
+    scope: change
+    predicate:
+      all:
+        - inferred_meta: { key: pii, op: is_true }   # PII anywhere upstream, unless declassified
+        - config:
+            key: grants.select                        # roles the model grants SELECT to
+            op: not_subset_of
+            value: [pii_reader]
+    action:
+      - type: block
+      - type: notify
+        channel: slack
+        target: "#data-governance"
+        message: "PII {change.model}.{change.column} is granted to a non-allowlisted role"
+```
+
+Sensitive data may only be granted to `pii_reader`: a model that grants `select` to `reporter` /
+`analyst` trips `not_subset_of` and blocks; one that grants only to `pii_reader` passes. Because
+`not_subset_of` is a **set** operator, a PII model with **no grants declared** resolves to the
+[empty set → `FALSE`](#config-conditions) and does **not** fire — only a model that actually grants
+`SELECT` to a role outside the allowlist blocks. (Env-suffix normalization — e.g. `pii_reader_prod`
+→ `pii_reader` — is a **consumer** concern: the engine surfaces grant roles raw, so list the exact
+role names your project grants.) Ships as `tests/resources/policies/pii_grants_allowlist.yml`.
 
 ## Fail-safe defaults
 

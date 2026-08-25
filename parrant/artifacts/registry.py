@@ -246,6 +246,14 @@ class ModelRegistry:
                 model.metadata = model.metadata or {}
                 model.metadata["dbt_meta"] = model_meta
 
+            # The node's resolved dbt ``config`` (grants/materialized/tags/enabled/schema/…),
+            # namespaced under ``dbt_config`` so it stays disjoint from the tool-internal flags
+            # and from ``dbt_meta``. Model-grained only (dbt config is a model-level notion).
+            model_config = self._manifest_reader.get_model_config(model_name)
+            if model_config:
+                model.metadata = model.metadata or {}
+                model.metadata["dbt_config"] = model_config
+
             column_meta = self._manifest_reader.get_column_meta(model_name)
             if not column_meta:
                 continue
@@ -559,6 +567,20 @@ class ModelRegistry:
         if model_obj is None or not model_obj.metadata:
             return {}
         return dict(model_obj.metadata.get("dbt_meta") or {})
+
+    def get_model_config(self, model: str) -> Dict[str, Any]:
+        """The node's resolved dbt ``config`` dict for a model (case-insensitive).
+
+        Reads the config namespaced under ``Model.metadata["dbt_config"]`` by
+        :meth:`_apply_meta`, kept disjoint from ``dbt_meta`` and the tool-internal flags.
+        Returns an empty dict for an unknown model or one with no config — config is absent,
+        never guessed. Metadata-agnostic: every key (``grants``, ``materialized``, ``tags``, …)
+        is exposed generically, none privileged. Values are surfaced RAW (no normalization).
+        """
+        model_obj = self._state.models.get(model.lower())
+        if model_obj is None or not model_obj.metadata:
+            return {}
+        return dict(model_obj.metadata.get("dbt_config") or {})
 
     def get_column_dbt_meta(self, model: str, column: str) -> Dict[str, Any]:
         """Arbitrary user-authored dbt ``meta`` for a column (case-insensitive).
