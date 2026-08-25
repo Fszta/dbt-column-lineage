@@ -1,8 +1,10 @@
 # Policy recipes
 
 Blessed, copy-paste starter policies for the [policy gate](policy-gate.md). Each is
-**safe-by-construction**: it uses a presence operator (`is_true` / `exists`), so it never
-rage-blocks on a `meta` key your models don't carry.
+**safe-by-construction**: it either uses a presence operator (`is_true` / `exists`), so it never
+rage-blocks on a `meta` key your models don't carry, or — for the [`config` axis](policy-gate.md#config-conditions)
+recipe below — a **set operator** whose missing path resolves to the *empty set* (present, not
+`UNKNOWN`), so it fires only on models that actually declare the config it checks.
 
 !!! tip "Start with `policy init`, not a blank file"
     ```bash
@@ -115,6 +117,48 @@ The rule most likely to be mis-written into a rage-block. A change to a column y
     PR. `is_true` resolves `FALSE` on those columns, so the rule targets *only* real PII. Even so,
     run `policy test --last 20` before promoting this to `block`, to confirm it fires only on the
     columns you expect.
+
+## 5. PII over-grant guard (the `config` axis) { #config-grants-guard }
+
+The flagship offline governance rule: **sensitive data must not be granted `SELECT` to a role
+outside the allowlist** — checked straight against dbt's own `grants` config, with no
+manifest-patch bridge. It composes two axes: [`inferred_meta.pii`](policy-gate.md#inferred-meta-conditions)
+(PII declared once upstream and inherited down the lineage graph) and
+[`config.grants.select`](policy-gate.md#config-conditions) (the roles the model grants `SELECT` to):
+
+```yaml
+  - id: pii-over-grant-guard
+    scope: change
+    predicate:
+      all:
+        - inferred_meta: { key: pii, op: is_true }    # PII anywhere upstream, unless declassified
+        - config:
+            key: grants.select                        # roles the model grants SELECT to
+            op: not_subset_of
+            value: [pii_reader]                        # your sensitive-data allowlist
+    action:
+      - { type: warn }
+      - type: notify
+        channel: slack
+        target: "#data-governance"
+        message: "PII {change.model}.{change.column} is granted to a non-allowlisted role."
+```
+
+!!! note "Why this is still safe-by-construction"
+    `not_subset_of` is a **set** operator, and on the `config` axis a *missing* `grants.select`
+    path resolves to the **empty set** — present, not `UNKNOWN`. So `[] not_subset_of [pii_reader]`
+    is `FALSE`: a model that grants to nobody cannot over-expose and simply doesn't match. The rule
+    fires **only** on a model that actually grants `SELECT` to a role outside your allowlist — no
+    rage-block on ungranted models. (This is the one config-specific fail-safe: set-operator misses
+    are the empty set, scalar misses route to `on_missing_meta`. See the
+    [config conditions](policy-gate.md#config-conditions) table.)
+
+!!! danger "Grant role names are surfaced raw"
+    The engine lists grant roles **exactly as dbt resolved them** — env-suffix normalization
+    (e.g. `pii_reader_prod` → `pii_reader`) is a *consumer* concern. List the exact role names your
+    project grants (or every environment-suffixed variant) in the allowlist. As always, run
+    `policy test --last 20` before promoting this to `block`. The shipped example
+    `tests/resources/policies/pii_grants_allowlist.yml` arms it as `block` once backtested.
 
 ---
 

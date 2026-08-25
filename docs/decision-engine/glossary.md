@@ -14,6 +14,34 @@ The chain the vocabulary describes, in order:
 
 ---
 
+## Predicate axes — *where* a policy leaf condition matches { #predicate-axes }
+
+**Code:** `MatchAxis` (`models/schema.py`) · **JSON/policy:** the leaf key inside a `predicate`.
+
+A policy rule is a boolean tree of *leaf conditions*. Each leaf names exactly one **axis** — the
+kind of fact it matches on. Six axes exist; the rest of this glossary defines the *values* those
+axes produce.
+
+| Axis | Matches on | Reference |
+|---|---|---|
+| `change` | Facts about the changed column itself — `kind` / `semantic` / `breaking` / `model` / `column`. | [§1](#1-change-kinds-what-changed-about-a-column) · [§2](#2-semantic-classes-did-the-output-actually-move) |
+| `meta` | Any dbt `meta` key on the changed model or column, by dotted path (`critical`, `governance.tier`). | [policy guide](policy-gate.md#meta-conditions) |
+| `inferred_meta` | A `meta` key **resolved by folding UPSTREAM lineage** — a classification declared once upstream (e.g. `pii: true`) is inherited by every column that derives from it, with column-level declassification. A missing/unresolvable value is fail-safe `UNKNOWN` (even for `is_true`). | [policy guide](policy-gate.md#inferred-meta-conditions) |
+| `config` | The changed model's **resolved dbt `node.config`** by dotted path (`grants.select`, `materialized`, `tags`, `enabled`, `schema`). Model-grained; values surfaced raw. | [policy guide](policy-gate.md#config-conditions) |
+| `reach` | A *quantified* condition over the change's downstream reach (models / columns / exposures). | [§3](#3-reach-what-a-change-touches-and-how) |
+| `structural` | Booleans the pipeline already computes — `provable_test_break`, `touches_exposure`, `reaches_anything`. | [policy guide](policy-gate.md#structural) |
+
+!!! warning "One config-specific fail-safe: the empty-set rule"
+    `meta` and `inferred_meta` resolve a *missing* key to `UNKNOWN` (routed to the fail-safe knobs
+    in [§6](#6-fail-safe-knobs-how-undecidable-inputs-resolve)). `config` is the exception for
+    **set operators** (`subset_of` / `not_subset_of` / `intersects` / `superset_of`): a missing
+    dotted path resolves to the **empty set `[]`** — *present, not unknown* — so
+    `config.grants.select not_subset_of [allowlist]` on a model with no grants is `FALSE` and does
+    **not** fire. `config` **scalar** misses still resolve to `UNKNOWN → on_missing_meta`. See the
+    [config conditions table](policy-gate.md#config-conditions).
+
+---
+
 ## 1. Change kinds — *what* changed about a column
 
 **Code:** `ChangeKind` (`parrant/lineage/changeset.py`) · **JSON:** `by_change[].kind`,
@@ -202,6 +230,12 @@ The single ruling the engine emits for the whole change, combined **most-severe-
 | `intersects` | list shares ≥1 element with the given list | list |
 | `subset_of` / `not_subset_of` / `superset_of` | list containment | list |
 | `gt` / `ge` / `lt` / `le` | numeric comparison | number |
+
+The four **set** operators (`intersects` / `subset_of` / `not_subset_of` / `superset_of`) behave
+specially on the [`config` axis](#predicate-axes): a missing dotted path resolves to the *empty
+set* (present, not `UNKNOWN`), so a set-operator rule fires only on models that actually declare
+the config. On `meta` / `inferred_meta`, a set-operator miss is `UNKNOWN` like any other. Scalar
+misses always route to `on_missing_meta` ([§6](#6-fail-safe-knobs-how-undecidable-inputs-resolve)).
 
 ---
 

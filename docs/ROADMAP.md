@@ -19,7 +19,7 @@ The gate matches a leaf condition on one of these axes (see the
   classification declared once (e.g. `pii: true` on a staging column) is inherited by every
   downstream column that derives from it, with column-level declassification. Shipped in
   #119 and renamed `inferred` → `inferred_meta` in #120.
-- **`config`** *(new — this release)* — each model's resolved dbt `node.config`
+- **`config`** *(shipped)* — each model's resolved dbt `node.config`
   (`grants.select`, `materialized`, `tags`, `enabled`, `schema`, …) by dotted key, mirroring
   `meta`. Set-operator missing paths resolve to the **empty set** (present, not unknown);
   scalar missing paths resolve to `UNKNOWN` (routed to `on_missing_meta`). This makes
