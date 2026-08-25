@@ -1,3 +1,9 @@
+## [0.18.1](https://github.com/Fszta/parrant/compare/v0.18.0...v0.18.1) (2026-08-25)
+
+### Bug Fixes
+
+* **lineage:** materialize star columns on catalog-missing targets (#123) ([260fb09](https://github.com/Fszta/parrant/commit/260fb09ab76d0db646176bdb3332a971513c1c4b))
+
 ## [0.18.0](https://github.com/Fszta/parrant/compare/v0.17.2...v0.18.0) (2026-08-25)
 
 ### Features
