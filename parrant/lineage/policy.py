@@ -401,7 +401,7 @@ class MetaIndex:
         Rule 1 — the column's OWN declared (column-level) meta wins, returned *verbatim* (the
         seed / override / declassification point; e.g. a downstream ``pii: false`` stops
         propagation). This is a COLUMN-level notion: a model-level tag does NOT seed or
-        declassify ``inferred.*`` — only the column's own meta does. Rule 2 — else fold the
+        declassify ``inferred_meta.*`` — only the column's own meta does. Rule 2 — else fold the
         inferred meta of each upstream source column per the key's :class:`CombineStrategy`
         (most-restrictive). Rule 3 — else, with no own meta and no resolvable upstream, UNKNOWN
         (``present=False``), which the engine routes to ``on_missing_meta`` (fail-closed by
@@ -694,7 +694,7 @@ def _eval_inferred(op: Operator, lookup: MetaLookup, expected: Any) -> Tri:
 
     Identical to :func:`_eval_operator` once the value is resolved, but an UNRESOLVED inferred
     value (``present=False``) is ``UNKNOWN_MISSING`` for EVERY operator — including the otherwise
-    "total" ``is_true`` / ``is_false`` / ``exists``. This is the whole point of the ``inferred.*``
+    "total" ``is_true`` / ``is_false`` / ``exists``. This is the whole point of the ``inferred_meta.*``
     namespace: a classification that cannot be proven along the lineage must route to
     ``on_missing_meta`` (fail-closed) rather than silently read as ``False``. A resolved value
     (own meta, or a folded ``true`` / ``false``) is evaluated by the normal operator semantics."""
@@ -896,8 +896,8 @@ class PolicyEngine:
             return self._eval_change(predicate.change, subject)
         if predicate.meta is not None:
             return self._eval_meta_subject(predicate.meta, subject)
-        if predicate.inferred is not None:
-            return self._eval_inferred_subject(predicate.inferred, subject)
+        if predicate.inferred_meta is not None:
+            return self._eval_inferred_subject(predicate.inferred_meta, subject)
         if predicate.reach is not None:
             return self._eval_reach(predicate.reach, subject, trace)
         if predicate.structural is not None:
@@ -930,7 +930,7 @@ class PolicyEngine:
         return _eval_operator(cond.op, lookup, cond.value)
 
     def _eval_inferred_subject(self, cond: MetaCondition, subject: ColumnChange) -> Tri:
-        """``inferred.<key>`` on the subject: resolve via upstream-folding ``inferred_meta``
+        """``inferred_meta.<key>`` on the subject: resolve via upstream-folding ``inferred_meta``
         rather than the subject's own declared meta (the ``meta.*`` path). Additive — ``meta.*``
         is untouched."""
         lookup = self._meta.inferred_meta(subject.model, subject.column, cond.key)
@@ -976,11 +976,11 @@ class PolicyEngine:
             return _eval_operator(
                 predicate.meta.op, self._reached_meta(obj, predicate.meta.key), predicate.meta.value
             )
-        if predicate.inferred is not None:
+        if predicate.inferred_meta is not None:
             return _eval_inferred(
-                predicate.inferred.op,
-                self._reached_inferred(obj, predicate.inferred.key),
-                predicate.inferred.value,
+                predicate.inferred_meta.op,
+                self._reached_inferred(obj, predicate.inferred_meta.key),
+                predicate.inferred_meta.value,
             )
         # change / reach / structural are not meaningful against a reached object -> error cause.
         return Tri.UNKNOWN_ERROR
@@ -993,7 +993,7 @@ class PolicyEngine:
         return self._meta.exposure_meta(obj.name, key)
 
     def _reached_inferred(self, obj: ReachedObject, key: str) -> MetaLookup:
-        """``inferred.<key>`` on a reached object. Inferred meta is a COLUMN-level notion, so
+        """``inferred_meta.<key>`` on a reached object. Inferred meta is a COLUMN-level notion, so
         only a reached *column* resolves; a reached model / exposure has no column DAG to fold and
         is UNKNOWN (``present=False``) -> fail-safe, never a spurious match."""
         if obj.kind is ReachKind.COLUMN and obj.column:

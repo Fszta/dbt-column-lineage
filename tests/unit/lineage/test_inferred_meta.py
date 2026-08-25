@@ -1,7 +1,7 @@
-"""Tests for UPSTREAM meta propagation via the ``inferred.*`` predicate namespace.
+"""Tests for UPSTREAM meta propagation via the ``inferred_meta.*`` predicate namespace.
 
 Covers ``MetaIndex.inferred_meta`` (folding a key's value over the column DAG) and the
-``inferred.<key>`` predicate leaf on the subject, exercising the taint semantics the feature
+``inferred_meta.<key>`` predicate leaf on the subject, exercising the taint semantics the feature
 was designed around:
 
   * multi-hop inheritance (a classification declared once is inherited downstream);
@@ -10,7 +10,7 @@ was designed around:
   * the two registered fold strategies (pii = most-restrictive ``true>unknown>false``;
     secret = boolean OR) including the ``unknown outranks false`` rung;
   * diamond de-duplication + the cycle guard (memoized, no infinite loop, no double-count);
-  * a regression guard proving ``inferred.*`` and ``meta.*`` are genuinely different axes
+  * a regression guard proving ``inferred_meta.*`` and ``meta.*`` are genuinely different axes
     (own-node ``meta.pii is_true`` on an absent key is FALSE, never UNKNOWN).
 
 Mirrors the harness in ``test_policy_engine.py`` (hand-written FakeRegistry + by_change impact
@@ -96,7 +96,7 @@ def _inferred_policy(key="pii", op="is_true", action="block", defaults=None):
         "rules": [
             {
                 "id": "eff",
-                "predicate": {"inferred": {"key": key, "op": op}},
+                "predicate": {"inferred_meta": {"key": key, "op": op}},
                 "action": [{"type": action}],
             }
         ],
@@ -131,7 +131,7 @@ def _meta_policy(key="pii", op="is_true", action="block", defaults=None):
 
 def test_three_hop_inheritance_propagates_pii_and_matches():
     """source column ``pii: true`` -> int (plain rename, no meta) -> mart (no meta): the mart
-    column's INFERRED pii is true, and a subject ``inferred.pii is_true`` rule matches for real
+    column's INFERRED pii is true, and a subject ``inferred_meta.pii is_true`` rule matches for real
     (a proven TRUE, not a fail-safe fire)."""
     registry = FakeRegistry(
         column_meta={("src", "ssn"): {"pii": True}},
@@ -156,7 +156,7 @@ def test_three_hop_inheritance_propagates_pii_and_matches():
 def test_unresolved_upstream_is_unknown_and_fails_closed():
     """A downstream column whose upstream cannot be resolved (an edge with empty source_columns,
     e.g. ``select *`` / a derived expression) -> inferred UNKNOWN (present=False). A BLOCKING
-    ``inferred.pii is_true`` rule then fires via the fail-safe path under ``fail_closed`` (marked
+    ``inferred_meta.pii is_true`` rule then fires via the fail-safe path under ``fail_closed`` (marked
     ``fired_on_unknown``), and does NOT fire under ``skip`` / ``fail_open``."""
     registry = FakeRegistry(column_lineage={("mart", "ssn"): set()})
 
@@ -198,7 +198,7 @@ def test_declassification_own_false_halts_upstream_taint():
     assert lookup.present is True
     assert lookup.value is False
 
-    # An ``inferred.pii is_true`` rule must NOT fire on a declassified column.
+    # An ``inferred_meta.pii is_true`` rule must NOT fire on a declassified column.
     verdict = _engine(_inferred_policy(), registry).evaluate([_change("mart", "ssn_masked")])
     assert verdict.decision is GateDecision.ALLOW
 
@@ -372,7 +372,7 @@ def test_cycle_memoization_is_evaluation_order_independent():
     assert (b_first.present, b_first.value) == (b_second.present, b_second.value)
 
 
-# --- case 8: regression -- meta.* vs inferred.* are different axes ----------
+# --- case 8: regression -- meta.* vs inferred_meta.* are different axes ----------
 
 
 def test_meta_axis_is_own_node_only_and_absent_is_false_not_unknown():
@@ -380,7 +380,7 @@ def test_meta_axis_is_own_node_only_and_absent_is_false_not_unknown():
 
       * ``meta.pii is_true`` reads only the OWN node -> absent -> FALSE (a *total* operator, NOT
         UNKNOWN), so under the default ``fail_closed`` the blocking rule still does NOT fire;
-      * ``inferred.pii is_true`` folds the lineage -> TRUE -> the blocking rule fires.
+      * ``inferred_meta.pii is_true`` folds the lineage -> TRUE -> the blocking rule fires.
 
     Proving the two axes are genuinely distinct, exactly as designed."""
     registry = FakeRegistry(
@@ -400,6 +400,6 @@ def test_meta_axis_is_own_node_only_and_absent_is_false_not_unknown():
     assert meta_verdict.decision is GateDecision.ALLOW
     assert meta_verdict.hits == []
 
-    # inferred.pii is_true: folded => TRUE => blocks.
+    # inferred_meta.pii is_true: folded => TRUE => blocks.
     eff_verdict = _engine(_inferred_policy(), registry).evaluate([_change("mart", "ssn")])
     assert eff_verdict.blocks()

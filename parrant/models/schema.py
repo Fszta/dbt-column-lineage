@@ -389,14 +389,14 @@ class MetabaseLineage(BaseModel):
 class MatchAxis(str, Enum):
     """The axes a predicate leaf can match on.
 
-    ``INFERRED`` mirrors ``META`` but resolves a key's value by folding UPSTREAM lineage
+    ``INFERRED_META`` mirrors ``META`` but resolves a key's value by folding UPSTREAM lineage
     (a column's classification inherited from where its data comes from) rather than reading
     only the node's own declared meta — see ``inferred_meta`` in ``lineage/policy.py``.
     """
 
     CHANGE = "change"
     META = "meta"
-    INFERRED = "inferred"
+    INFERRED_META = "inferred_meta"
     REACH = "reach"
     STRUCTURAL = "structural"
 
@@ -531,10 +531,10 @@ class Predicate(BaseModel):
     not_: Optional["Predicate"] = Field(default=None, alias="not")
     change: Optional[ChangeCondition] = None
     meta: Optional[MetaCondition] = None
-    # ``inferred`` shares ``MetaCondition``'s shape (key/op/value) but resolves the key's value
-    # by folding UPSTREAM lineage rather than reading only the node's own declared meta — see
-    # ``inferred_meta`` in ``lineage/policy.py``. An unresolvable value is UNKNOWN (fail-safe).
-    inferred: Optional[MetaCondition] = None
+    # ``inferred_meta`` shares ``MetaCondition``'s shape (key/op/value) but resolves the key's
+    # value by folding UPSTREAM lineage rather than reading only the node's own declared meta —
+    # see ``inferred_meta`` in ``lineage/policy.py``. An unresolvable value is UNKNOWN (fail-safe).
+    inferred_meta: Optional[MetaCondition] = None
     reach: Optional[ReachCondition] = None
     structural: Optional[StructuralCondition] = None
 
@@ -550,7 +550,7 @@ class Predicate(BaseModel):
                 "not_",
                 "change",
                 "meta",
-                "inferred",
+                "inferred_meta",
                 "reach",
                 "structural",
             )
@@ -559,7 +559,7 @@ class Predicate(BaseModel):
         if len(set_fields) != 1:
             raise ValueError(
                 "a predicate must set exactly one of "
-                "all/any/not/change/meta/inferred/reach/structural, got: "
+                "all/any/not/change/meta/inferred_meta/reach/structural, got: "
                 f"{sorted(set_fields) or 'none'}"
             )
         return self
