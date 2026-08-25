@@ -731,19 +731,26 @@ def _eval_config(op: Operator, lookup: MetaLookup, expected: Any) -> Tri:
     deliberate difference in the *missing dotted path* case, split by operator class:
 
       * **SET operators** (``subset_of`` / ``not_subset_of`` / ``intersects`` / ``superset_of``):
-        an absent path resolves to the **EMPTY SET** ``[]`` — *present*, NOT unknown. This is the
-        generic, correct default: "no ``grants.select`` declared = the empty reader set". So
+        an absent path — OR a path present but resolving to ``None`` (e.g. ``grants.select: null``)
+        — resolves to the **EMPTY SET** ``[]`` — *present*, NOT unknown. This is the generic,
+        correct default: "no ``grants.select`` declared = the empty reader set". So
         ``config.grants.select not_subset_of [allowlist]`` on a model with no grants is
         ``[] ⊄ X == FALSE`` and does NOT fire — a model that grants to nobody cannot over-expose.
+        A ``null`` value (readers explicitly nulled out) is treated identically to absent, staying
+        consistent with the ``[]`` case rather than routing a genuine "no readers" to a
+        fail-closed block via ``UNKNOWN_ERROR``.
 
       * **SCALAR operators** (``eq`` / ``ne`` / ``matches`` / numeric …): an absent path stays
         ``UNKNOWN_MISSING`` and routes to ``on_missing_meta`` exactly like a missing ``meta`` key.
         The presence/boolean operators (``exists`` / ``absent`` / ``is_true`` / ``is_false``) remain
-        *total*, again exactly like ``meta``.
+        *total*, again exactly like ``meta``. A present-``None`` scalar value is left UNCHANGED
+        (evaluated as ``None`` by the normal operator semantics) — the empty-set mapping is a
+        set-operator-only concern.
 
     Values are surfaced RAW (as dbt resolved them); the engine never normalizes them.
     """
-    if not lookup.present and op in _SET_OPERATORS:
+    if op in _SET_OPERATORS and (not lookup.present or lookup.value is None):
+        # Absent path OR an explicit ``null`` collapse to the proven empty set for set ops.
         lookup = MetaLookup(present=True, value=[])
     return _eval_operator(op, lookup, expected)
 

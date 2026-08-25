@@ -232,6 +232,15 @@ config. It is purely additive: `meta.*` and `inferred_meta.*` are unchanged.
 | **set** (`subset_of`, `not_subset_of`, `intersects`, `superset_of`) | the **empty set** `[]` — *present, not unknown* | "no `grants.select` declared = the empty reader set". So `config.grants.select not_subset_of [allowlist]` on a model with **no grants** is `[] ⊄ X == FALSE` and does **not** fire — a model that grants to nobody cannot over-expose. This is the generic, correct default. |
 | **scalar** (`eq`, `ne`, `matches`, numeric …) | `UNKNOWN` → [`on_missing_meta`](#fail-safe-defaults) | exactly like a missing plain `meta` key. The presence/boolean operators (`exists` / `absent` / `is_true` / `is_false`) stay *total*, also like `meta`. |
 
+A key present but explicitly **`null`** (e.g. `grants.select: null`) is treated **like absent for
+set operators** — it collapses to the empty set (null readers = no readers = not exposed), staying
+consistent with the `[]` case rather than fail-closed-blocking. For scalar operators a `null` value
+is left as-is (evaluated as `None` by the operator). A value present but of the **wrong shape** for
+the operator — a *scalar in a set slot*, e.g. `grants.select: "pii_reader"` (a bare string) fed to
+`not_subset_of` — is a genuine evaluation error (`UNKNOWN_ERROR`) routed to
+[`on_error`](#fail-safe-defaults), so under the default `fail_closed` a blocking rule **fires**
+(fails safe, never a silent pass).
+
 This differs deliberately from `meta.*`, where a set operator on a missing key resolves to
 `UNKNOWN`. For `config` a set-operator miss is a **proven empty set** — the right default for the
 "grants must not exceed an allowlist" gate, so the rule fires only on models that actually grant to
