@@ -387,10 +387,16 @@ class MetabaseLineage(BaseModel):
 
 
 class MatchAxis(str, Enum):
-    """The four axes a predicate leaf can match on."""
+    """The axes a predicate leaf can match on.
+
+    ``INFERRED`` mirrors ``META`` but resolves a key's value by folding UPSTREAM lineage
+    (a column's classification inherited from where its data comes from) rather than reading
+    only the node's own declared meta — see ``inferred_meta`` in ``lineage/policy.py``.
+    """
 
     CHANGE = "change"
     META = "meta"
+    INFERRED = "inferred"
     REACH = "reach"
     STRUCTURAL = "structural"
 
@@ -525,6 +531,10 @@ class Predicate(BaseModel):
     not_: Optional["Predicate"] = Field(default=None, alias="not")
     change: Optional[ChangeCondition] = None
     meta: Optional[MetaCondition] = None
+    # ``inferred`` shares ``MetaCondition``'s shape (key/op/value) but resolves the key's value
+    # by folding UPSTREAM lineage rather than reading only the node's own declared meta — see
+    # ``inferred_meta`` in ``lineage/policy.py``. An unresolvable value is UNKNOWN (fail-safe).
+    inferred: Optional[MetaCondition] = None
     reach: Optional[ReachCondition] = None
     structural: Optional[StructuralCondition] = None
 
@@ -534,13 +544,22 @@ class Predicate(BaseModel):
     def _exactly_one(self) -> "Predicate":
         set_fields = [
             name
-            for name in ("all_", "any_", "not_", "change", "meta", "reach", "structural")
+            for name in (
+                "all_",
+                "any_",
+                "not_",
+                "change",
+                "meta",
+                "inferred",
+                "reach",
+                "structural",
+            )
             if getattr(self, name) is not None
         ]
         if len(set_fields) != 1:
             raise ValueError(
                 "a predicate must set exactly one of "
-                "all/any/not/change/meta/reach/structural, got: "
+                "all/any/not/change/meta/inferred/reach/structural, got: "
                 f"{sorted(set_fields) or 'none'}"
             )
         return self

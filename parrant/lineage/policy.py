@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Protocol, Set, Tuple
 
 import yaml
 
@@ -221,6 +221,114 @@ def _dotted_get(container: Any, key: str) -> MetaLookup:
     return MetaLookup(present=True, value=current)
 
 
+# --- inferred-meta propagation ----------------------------------------------
+#
+# A column's INFERRED meta for a key is resolved by folding its UPSTREAM lineage, so a
+# classification declared once (e.g. ``pii: true`` on a staging column) is inherited by every
+# downstream column that derives from it — without re-tagging each one. The fold is:
+#   1. the column's OWN declared meta wins (the seed / override / declassification point);
+#   2. else combine the upstream source columns' inferred values MOST-RESTRICTIVELY, per a
+#      key-specific :class:`CombineStrategy`;
+#   3. else (no own meta AND no resolvable upstream) UNKNOWN — surfaced as ``present=False`` so
+#      the engine routes it to ``on_missing_meta`` (fail-closed by default), exactly like a
+#      missing plain ``meta`` key.
+
+
+class _Lattice(Enum):
+    """A resolved inferred value as a 3-point lattice, ordered least->most restrictive so a
+    most-restrictive fold is a plain ``max`` over ``value``: ``LOW < UNKNOWN < HIGH``.
+
+    ``LOW`` = resolvably not-set/falsy; ``HIGH`` = resolvably set/truthy; ``UNKNOWN`` = could not
+    be resolved (a root with no meta, or an upstream that folded to UNKNOWN). ``UNKNOWN`` ranks
+    ABOVE ``LOW`` because "cannot prove it is not set" is more restrictive than a proven not-set.
+    """
+
+    LOW = 0
+    UNKNOWN = 1
+    HIGH = 2
+
+
+class CombineStrategy(Protocol):
+    """How a single meta key folds its upstream inferred values into one.
+
+    Pluggable per key (see ``_COMBINE_STRATEGIES``) so the fold is not hardcoded to two keys: a
+    new key registers its own strategy without touching the engine. ``to_element`` interprets a
+    resolved upstream value; ``combine`` folds the per-source elements (an empty list — no
+    resolvable upstream — must fold to ``UNKNOWN``).
+    """
+
+    def to_element(self, value: Any) -> _Lattice: ...
+
+    def combine(self, elements: List[_Lattice]) -> _Lattice: ...
+
+
+class _MostRestrictive:
+    """PII-style fold: values ordered ``true > unknown > false``. Any upstream truthy => ``HIGH``;
+    else any unresolved => ``UNKNOWN``; else ``LOW`` — i.e. the join (``max``) over the lattice."""
+
+    def to_element(self, value: Any) -> _Lattice:
+        return _Lattice.HIGH if bool(value) else _Lattice.LOW
+
+    def combine(self, elements: List[_Lattice]) -> _Lattice:
+        if not elements:
+            return _Lattice.UNKNOWN
+        return max(elements, key=lambda element: element.value)
+
+
+class _BooleanOr:
+    """Boolean-OR fold (e.g. ``secret``): any upstream truthy => ``HIGH``; else any unresolved =>
+    ``UNKNOWN``; else ``LOW``. Coincides with :class:`_MostRestrictive` for boolean inputs, kept
+    as a distinct strategy so the two keys' policies stay independent and a third key can register
+    a genuinely different lattice (e.g. a public<internal<confidential ladder) without churn."""
+
+    def to_element(self, value: Any) -> _Lattice:
+        return _Lattice.HIGH if bool(value) else _Lattice.LOW
+
+    def combine(self, elements: List[_Lattice]) -> _Lattice:
+        if any(element is _Lattice.HIGH for element in elements):
+            return _Lattice.HIGH
+        if any(element is _Lattice.UNKNOWN for element in elements):
+            return _Lattice.UNKNOWN
+        return _Lattice.LOW if elements else _Lattice.UNKNOWN
+
+
+# The fold policy per meta key. Unregistered keys fall back to the most-restrictive fold — the
+# fail-safe direction (an unclassified lineage is treated as "not proven safe").
+_DEFAULT_STRATEGY: CombineStrategy = _MostRestrictive()
+_COMBINE_STRATEGIES: Dict[str, CombineStrategy] = {
+    "pii": _MostRestrictive(),
+    "secret": _BooleanOr(),
+}
+
+
+def _combine_strategy_for(key: str) -> CombineStrategy:
+    """The fold policy for a (dotted) meta key; most-restrictive when none is registered."""
+    return _COMBINE_STRATEGIES.get(key.lower(), _DEFAULT_STRATEGY)
+
+
+def _split_ref(source: str) -> Optional[Tuple[str, str]]:
+    """Split a ``model.column`` lineage ref into ``(model, column)``, both lowercased.
+
+    Mirrors the service's split: everything before the last ``.`` is the model, the last segment
+    the column. A bare ref (no ``.``, e.g. a literal) is unresolvable -> ``None`` (skipped)."""
+    if "." not in source:
+        return None
+    parts = source.split(".")
+    if len(parts) < 2:
+        return None
+    return (".".join(parts[:-1]).lower(), parts[-1].lower())
+
+
+def _element_to_lookup(element: _Lattice) -> "MetaLookup":
+    """Map a folded lattice element to a :class:`MetaLookup`. ``UNKNOWN`` -> ``present=False`` so
+    the engine treats an unresolvable inferred value as a missing key (fail-closed)."""
+    if element is _Lattice.HIGH:
+        return MetaLookup(present=True, value=True)
+    if element is _Lattice.LOW:
+        return MetaLookup(present=True, value=False)
+    return MetaLookup(present=False, value=None)
+
+
 class MetaIndex:
     """Read-only accessor for ANY meta key on a model, column, or exposure.
 
@@ -244,6 +352,9 @@ class MetaIndex:
         self._model_cache: Dict[str, Dict[str, Any]] = {}
         self._column_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
         self._exposures: Optional[Dict[str, Any]] = None
+        # Memoize resolved inferred meta across the (immutable) column DAG, keyed by
+        # (model, column, key) lowercased — folding a diamond visits each node once.
+        self._inferred_cache: Dict[Tuple[str, str, str], MetaLookup] = {}
 
     def _model_dict(self, model: str) -> Dict[str, Any]:
         cached = self._model_cache.get(model)
@@ -283,6 +394,105 @@ class MetaIndex:
         if col.present:
             return col
         return self.model_meta(model, key)
+
+    def inferred_meta(self, model: str, column: str, key: str) -> MetaLookup:
+        """The column's INFERRED meta for ``key``, folded over UPSTREAM lineage.
+
+        Rule 1 — the column's OWN declared (column-level) meta wins, returned *verbatim* (the
+        seed / override / declassification point; e.g. a downstream ``pii: false`` stops
+        propagation). This is a COLUMN-level notion: a model-level tag does NOT seed or
+        declassify ``inferred.*`` — only the column's own meta does. Rule 2 — else fold the
+        inferred meta of each upstream source column per the key's :class:`CombineStrategy`
+        (most-restrictive). Rule 3 — else, with no own meta and no resolvable upstream, UNKNOWN
+        (``present=False``), which the engine routes to ``on_missing_meta`` (fail-closed by
+        default), exactly like a missing plain meta key.
+
+        Memoized across the DAG; a cycle guard makes diamonds / recursive refs safe (no infinite
+        loop, no double-count). Degrades honestly when the backend exposes no column lineage:
+        own meta still resolves, everything else is UNKNOWN.
+        """
+        strategy = _combine_strategy_for(key)
+        result, _ = self._inferred_lookup(model.lower(), column.lower(), key, strategy, set())
+        return result
+
+    def _inferred_lookup(
+        self,
+        model: str,
+        column: str,
+        key: str,
+        strategy: CombineStrategy,
+        visiting: Set[Tuple[str, str, str]],
+    ) -> Tuple[MetaLookup, bool]:
+        """Fold ``model.column``'s inferred value, returning ``(result, touched_cycle)``.
+
+        ``touched_cycle`` is True iff this node's fold DEPENDED on a cycle-guard hit (an upstream
+        node that was still in progress on the current recursion stack). Such a result is
+        stack-order-dependent — a different entry point into the same SCC would truncate the fold
+        elsewhere — so it must NOT be memoized: caching it would poison a later independent query
+        for that node, making the answer depend on evaluation order (see ``test_cycle_*``). The
+        flag propagates up so every ancestor whose fold consumed a guard hit is likewise left
+        uncached. Normal DAG nodes never hit a guard, so the common case still folds each node
+        exactly once (the diamond memo test).
+        """
+        memo_key = (model, column, key)
+        cached = self._inferred_cache.get(memo_key)
+        if cached is not None:
+            # A cached result is fully resolved and independent of the current stack.
+            return cached, False
+        if memo_key in visiting:
+            # Cycle guard: break the loop and signal the caller its fold touched an in-progress
+            # node, so the fold that consumes this must not be memoized.
+            return MetaLookup(present=False, value=None), True
+
+        # Rule 1: the column's own declared meta wins, verbatim. Independent of lineage, so it is
+        # always safe to memoize regardless of any surrounding cycle.
+        own = self.column_meta(model, column, key)
+        if own.present:
+            result = MetaLookup(present=True, value=own.value)
+            self._inferred_cache[memo_key] = result
+            return result, False
+
+        # Rules 2 & 3: fold the upstream source columns' inferred values.
+        visiting.add(memo_key)
+        elements: List[_Lattice] = []
+        touched_cycle = False
+        for src_model, src_column in self._upstream_source_columns(model, column):
+            child, child_touched = self._inferred_lookup(
+                src_model, src_column, key, strategy, visiting
+            )
+            touched_cycle = touched_cycle or child_touched
+            elements.append(strategy.to_element(child.value) if child.present else _Lattice.UNKNOWN)
+        visiting.discard(memo_key)
+
+        result = _element_to_lookup(strategy.combine(elements))
+        # Only memoize a fold that did NOT depend on a cycle-guard hit; a guard-truncated fold is
+        # order-dependent and possibly wrong, so caching it would make later queries flaky.
+        if not touched_cycle:
+            self._inferred_cache[memo_key] = result
+        return result, touched_cycle
+
+    def _upstream_source_columns(self, model: str, column: str) -> Iterable[Tuple[str, str]]:
+        """The distinct ``(model, column)`` upstream source columns feeding ``model.column``.
+
+        Reads the provider's ``get_column_lineage`` edges (duck-typed like the meta accessors, so
+        a metadata-only backend degrades to no upstream). Bare, unqualified refs (literals) are
+        unresolvable and skipped."""
+        getter = getattr(self._registry, "get_column_lineage", None)
+        if getter is None:
+            return []
+        try:
+            edges = getter(model, column) or []
+        except Exception:
+            return []
+        seen: Set[Tuple[str, str]] = set()
+        out: List[Tuple[str, str]] = []
+        for edge in edges:
+            for source in getattr(edge, "source_columns", None) or []:
+                pair = _split_ref(str(source))
+                if pair is not None and pair not in seen:
+                    seen.add(pair)
+                    out.append(pair)
+        return out
 
     def exposure_meta(self, exposure: str, key: str) -> MetaLookup:
         """Exposure meta plus the reserved fields ``name`` / ``type`` / ``owner``.
@@ -479,6 +689,20 @@ def _eval_operator(op: Operator, lookup: MetaLookup, expected: Any) -> Tri:
     return Tri.UNKNOWN_ERROR
 
 
+def _eval_inferred(op: Operator, lookup: MetaLookup, expected: Any) -> Tri:
+    """Evaluate an operator against an INFERRED-meta lookup.
+
+    Identical to :func:`_eval_operator` once the value is resolved, but an UNRESOLVED inferred
+    value (``present=False``) is ``UNKNOWN_MISSING`` for EVERY operator — including the otherwise
+    "total" ``is_true`` / ``is_false`` / ``exists``. This is the whole point of the ``inferred.*``
+    namespace: a classification that cannot be proven along the lineage must route to
+    ``on_missing_meta`` (fail-closed) rather than silently read as ``False``. A resolved value
+    (own meta, or a folded ``true`` / ``false``) is evaluated by the normal operator semantics."""
+    if not lookup.present:
+        return Tri.UNKNOWN_MISSING
+    return _eval_operator(op, lookup, expected)
+
+
 # --- the engine -------------------------------------------------------------
 
 
@@ -672,6 +896,8 @@ class PolicyEngine:
             return self._eval_change(predicate.change, subject)
         if predicate.meta is not None:
             return self._eval_meta_subject(predicate.meta, subject)
+        if predicate.inferred is not None:
+            return self._eval_inferred_subject(predicate.inferred, subject)
         if predicate.reach is not None:
             return self._eval_reach(predicate.reach, subject, trace)
         if predicate.structural is not None:
@@ -702,6 +928,13 @@ class PolicyEngine:
     def _eval_meta_subject(self, cond: MetaCondition, subject: ColumnChange) -> Tri:
         lookup = self._meta.subject_meta(subject.model, subject.column, cond.key)
         return _eval_operator(cond.op, lookup, cond.value)
+
+    def _eval_inferred_subject(self, cond: MetaCondition, subject: ColumnChange) -> Tri:
+        """``inferred.<key>`` on the subject: resolve via upstream-folding ``inferred_meta``
+        rather than the subject's own declared meta (the ``meta.*`` path). Additive — ``meta.*``
+        is untouched."""
+        lookup = self._meta.inferred_meta(subject.model, subject.column, cond.key)
+        return _eval_inferred(cond.op, lookup, cond.value)
 
     def _eval_reach(self, cond: ReachCondition, subject: ColumnChange, trace: _Trace) -> Tri:
         if not self._impact.is_resolved(subject):
@@ -743,6 +976,12 @@ class PolicyEngine:
             return _eval_operator(
                 predicate.meta.op, self._reached_meta(obj, predicate.meta.key), predicate.meta.value
             )
+        if predicate.inferred is not None:
+            return _eval_inferred(
+                predicate.inferred.op,
+                self._reached_inferred(obj, predicate.inferred.key),
+                predicate.inferred.value,
+            )
         # change / reach / structural are not meaningful against a reached object -> error cause.
         return Tri.UNKNOWN_ERROR
 
@@ -752,6 +991,14 @@ class PolicyEngine:
         if obj.kind is ReachKind.COLUMN:
             return self._meta.column_meta(obj.name, obj.column or "", key)
         return self._meta.exposure_meta(obj.name, key)
+
+    def _reached_inferred(self, obj: ReachedObject, key: str) -> MetaLookup:
+        """``inferred.<key>`` on a reached object. Inferred meta is a COLUMN-level notion, so
+        only a reached *column* resolves; a reached model / exposure has no column DAG to fold and
+        is UNKNOWN (``present=False``) -> fail-safe, never a spurious match."""
+        if obj.kind is ReachKind.COLUMN and obj.column:
+            return self._meta.inferred_meta(obj.name, obj.column, key)
+        return MetaLookup(present=False, value=None)
 
     def _eval_structural(
         self, cond: StructuralCondition, subject: ColumnChange, trace: _Trace
