@@ -151,23 +151,25 @@ meta: { key: governance.tier, op: eq, value: gold }   # dotted path into nested 
 Keys are dotted paths resolved against the node's merged meta (dbt's `config.meta` over
 top-level `meta`). Missing-key handling is governed by [`on_missing_meta`](#fail-safe-defaults).
 
-#### `effective` — a meta key resolved by folding UPSTREAM lineage { #effective-conditions }
+#### `inferred` — a meta key resolved by folding UPSTREAM lineage { #inferred-conditions }
 
-Same shape as `meta` (`key` / `op` / `value`), but the value is resolved from the column's
-**lineage**, not only its own declared meta — so a classification declared **once** (e.g. `pii:
-true` on a staging column) is inherited by every downstream column that derives from it, without
-re-tagging each one.
+Same shape as `meta` (`key` / `op` / `value`), but the value is *inferred* from the column's
+**lineage** rather than read only from its own declared meta — so a classification declared
+**once** (e.g. `pii: true` on a staging column) is inherited by every downstream column that
+derives from it, without re-tagging each one.
 
 ```yaml
-effective: { key: pii, op: is_true }        # true if PII anywhere upstream (unless declassified)
-effective: { key: secret, op: is_true }
+inferred: { key: pii, op: is_true }        # true if PII anywhere upstream (unless declassified)
+inferred: { key: secret, op: is_true }
 ```
 
 Resolution, per column:
 
 1. **Own meta wins.** If the column declares its own value for the key, that value is used
    verbatim — this is the seed, the override, and the **declassification** point (a downstream
-   `pii: false` on a hashed/masked column stops propagation).
+   `pii: false` on a hashed/masked column stops propagation). This is a **column-level** notion:
+   only a column's own meta seeds or declassifies `inferred.*` — a **model-level** tag does not.
+   (Seed your sources at column grain.)
 2. **Otherwise fold the upstream source columns**, combining **most-restrictively** per a
    key-specific strategy:
     - `pii` — ordered `true > unknown > false`: any upstream `true` ⇒ `true`; else any
@@ -175,19 +177,35 @@ Resolution, per column:
     - `secret` — boolean **OR** over upstream (any upstream `true` ⇒ `true`); an own `false`
       still wins by rule 1.
     - Any **other** key falls back to the most-restrictive (`pii`-style) fold.
-3. **Otherwise** — no own meta *and* no resolvable upstream (a root/source column, or a chain
-   that never reaches a declared value) — the value is **UNKNOWN**.
+3. **Otherwise** — no own meta *and* no resolvable upstream (a root/source column that was never
+   seeded, or a chain that never reaches a declared value) — the value is **UNKNOWN**.
 
-An **UNKNOWN** effective value is treated exactly like a missing plain `meta` key: it is routed
-to [`on_missing_meta`](#fail-safe-defaults), so under the default `fail_closed` a **blocking**
-rule fires. Note this differs from `meta.*`, where `is_true` / `is_false` on an absent key read
-as `False`: for `effective.*`, an unprovable classification is UNKNOWN for **every** operator
-(including `is_true`), so "we could not prove this column is *not* PII" fails closed rather than
-silently passing. `effective` is evaluated at **column** grain, so in a `reach.where` only a
-`reach.kind: column` object resolves; a reached model/exposure is UNKNOWN.
+An **UNKNOWN** inferred value is treated exactly like a missing plain `meta` key: it is routed
+to [`on_missing_meta`](#fail-safe-defaults). This differs from `meta.*`, where `is_true` /
+`is_false` on an absent key read as `False`: for `inferred.*`, an unprovable classification is
+UNKNOWN for **every** operator (including `is_true`), so "we could not prove this column is *not*
+PII" is never silently read as passing. `inferred` is evaluated at **column** grain, so in a
+`reach.where` only a `reach.kind: column` object resolves; a reached model/exposure is UNKNOWN.
 
-`effective.*` is purely additive — `meta.*` is unchanged and still reads only the node's own
+`inferred.*` is purely additive — `meta.*` is unchanged and still reads only the node's own
 declared meta.
+
+##### Rolling `inferred.*` out — advisory by default { #inferred-rollout }
+
+Introduce `inferred.*` rules with **`on_missing_meta: skip`** (advisory) — *not* to block.
+Because an un-seeded column folds to UNKNOWN, a rule under `skip` simply drops for the columns
+whose classification cannot yet be proven (reported in `skipped_missing_meta`) while still
+firing on the ones it *can* prove. That lets a rule roll out across teams that have not finished
+documenting their meta **without failing their builds** — it warns/advises where it has signal
+and stays quiet where it doesn't.
+
+Making an `inferred.pii is_true` rule **blocking** is a deliberate opt-in, and it only behaves
+sensibly once the sources are **seeded** at column grain. Without seeds nearly every column
+folds to UNKNOWN, and under `fail_closed` a blocking rule fires on almost all of them — which is
+the fail-safe direction, but not a useful gate. So: seed your `pii` / `secret` sources first,
+run the rule advisory (`skip`) to see where the signal lands, and only then promote it to
+blocking. UNKNOWN always resolves via the fail-safe knob — there is no separate "block
+everything" mode.
 
 #### `reach` — a *quantified* condition over the change's downstream reach { #reach-conditions }
 
