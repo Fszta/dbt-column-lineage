@@ -323,6 +323,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="../../ROADMAP/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../../changelog/" class="md-tabs__link">
         
   
@@ -1121,6 +1140,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#predicate-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Predicate axes — where a policy leaf condition matches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1-change-kinds-what-changed-about-a-column" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1398,6 +1428,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ROADMAP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../changelog/" class="md-nav__link">
         
   
@@ -1447,6 +1504,63 @@ source of truth for that vocabulary. Each term lists its <strong>code enum</stro
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a> change kind ──► semantic class ──► breaking? ──► reach (kind × mechanism, precision) ──► policy action ──► gate decision
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a> (what changed)  (did output move?) (fail-safe)   (what it touches, how)                  (rule effect)     (the ruling)
 </code></pre></div>
+<hr />
+<h2 id="predicate-axes">Predicate axes — <em>where</em> a policy leaf condition matches</h2>
+<p><strong>Code:</strong> <code>MatchAxis</code> (<code>models/schema.py</code>) · <strong>JSON/policy:</strong> the leaf key inside a <code>predicate</code>.</p>
+<p>A policy rule is a boolean tree of <em>leaf conditions</em>. Each leaf names exactly one <strong>axis</strong> — the
+kind of fact it matches on. Six axes exist; the rest of this glossary defines the <em>values</em> those
+axes produce.</p>
+<table>
+<thead>
+<tr>
+<th>Axis</th>
+<th>Matches on</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>change</code></td>
+<td>Facts about the changed column itself — <code>kind</code> / <code>semantic</code> / <code>breaking</code> / <code>model</code> / <code>column</code>.</td>
+<td><a href="#1-change-kinds-what-changed-about-a-column">§1</a> · <a href="#2-semantic-classes-did-the-output-actually-move">§2</a></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td>Any dbt <code>meta</code> key on the changed model or column, by dotted path (<code>critical</code>, <code>governance.tier</code>).</td>
+<td><a href="../policy-gate/#meta-conditions">policy guide</a></td>
+</tr>
+<tr>
+<td><code>inferred_meta</code></td>
+<td>A <code>meta</code> key <strong>resolved by folding UPSTREAM lineage</strong> — a classification declared once upstream (e.g. <code>pii: true</code>) is inherited by every column that derives from it, with column-level declassification. A missing/unresolvable value is fail-safe <code>UNKNOWN</code> (even for <code>is_true</code>).</td>
+<td><a href="../policy-gate/#inferred-meta-conditions">policy guide</a></td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>The changed model's <strong>resolved dbt <code>node.config</code></strong> by dotted path (<code>grants.select</code>, <code>materialized</code>, <code>tags</code>, <code>enabled</code>, <code>schema</code>). Model-grained; values surfaced raw.</td>
+<td><a href="../policy-gate/#config-conditions">policy guide</a></td>
+</tr>
+<tr>
+<td><code>reach</code></td>
+<td>A <em>quantified</em> condition over the change's downstream reach (models / columns / exposures).</td>
+<td><a href="#3-reach-what-a-change-touches-and-how">§3</a></td>
+</tr>
+<tr>
+<td><code>structural</code></td>
+<td>Booleans the pipeline already computes — <code>provable_test_break</code>, <code>touches_exposure</code>, <code>reaches_anything</code>.</td>
+<td><a href="../policy-gate/#structural">policy guide</a></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">One config-specific fail-safe: the empty-set rule</p>
+<p><code>meta</code> and <code>inferred_meta</code> resolve a <em>missing</em> key to <code>UNKNOWN</code> (routed to the fail-safe knobs
+in <a href="#6-fail-safe-knobs-how-undecidable-inputs-resolve">§6</a>). <code>config</code> is the exception for
+<strong>set operators</strong> (<code>subset_of</code> / <code>not_subset_of</code> / <code>intersects</code> / <code>superset_of</code>): a missing
+dotted path resolves to the <strong>empty set <code>[]</code></strong> — <em>present, not unknown</em> — so
+<code>config.grants.select not_subset_of [allowlist]</code> on a model with no grants is <code>FALSE</code> and does
+<strong>not</strong> fire. <code>config</code> <strong>scalar</strong> misses still resolve to <code>UNKNOWN → on_missing_meta</code>. See the
+<a href="../policy-gate/#config-conditions">config conditions table</a>.</p>
+</div>
 <hr />
 <h2 id="1-change-kinds-what-changed-about-a-column">1. Change kinds — <em>what</em> changed about a column</h2>
 <p><strong>Code:</strong> <code>ChangeKind</code> (<code>parrant/lineage/changeset.py</code>) · <strong>JSON:</strong> <code>by_change[].kind</code>,
@@ -1805,6 +1919,11 @@ metadata-agnostic replacement; the two never mix in one report. (See
 </tr>
 </tbody>
 </table>
+<p>The four <strong>set</strong> operators (<code>intersects</code> / <code>subset_of</code> / <code>not_subset_of</code> / <code>superset_of</code>) behave
+specially on the <a href="#predicate-axes"><code>config</code> axis</a>: a missing dotted path resolves to the <em>empty
+set</em> (present, not <code>UNKNOWN</code>), so a set-operator rule fires only on models that actually declare
+the config. On <code>meta</code> / <code>inferred_meta</code>, a set-operator miss is <code>UNKNOWN</code> like any other. Scalar
+misses always route to <code>on_missing_meta</code> (<a href="#6-fail-safe-knobs-how-undecidable-inputs-resolve">§6</a>).</p>
 <hr />
 <h2 id="8-confidence-coverage-can-i-trust-the-answer-is-complete">8. Confidence &amp; coverage — can I <em>trust</em> the answer is complete?</h2>
 <p>Orthogonal to every ruling above: honesty signals about the inputs, so a fail-safe block driven

@@ -323,6 +323,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="../../ROADMAP/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../../changelog/" class="md-tabs__link">
         
   
@@ -1084,6 +1103,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#config-grants-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. PII over-grant guard (the config axis)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#promoting-warn-block" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1298,6 +1328,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ROADMAP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../changelog/" class="md-nav__link">
         
   
@@ -1340,8 +1397,10 @@
 
 <h1 id="policy-recipes">Policy recipes</h1>
 <p>Blessed, copy-paste starter policies for the <a href="../policy-gate/">policy gate</a>. Each is
-<strong>safe-by-construction</strong>: it uses a presence operator (<code>is_true</code> / <code>exists</code>), so it never
-rage-blocks on a <code>meta</code> key your models don't carry.</p>
+<strong>safe-by-construction</strong>: it either uses a presence operator (<code>is_true</code> / <code>exists</code>), so it never
+rage-blocks on a <code>meta</code> key your models don't carry, or — for the <a href="../policy-gate/#config-conditions"><code>config</code> axis</a>
+recipe below — a <strong>set operator</strong> whose missing path resolves to the <em>empty set</em> (present, not
+<code>UNKNOWN</code>), so it fires only on models that actually declare the config it checks.</p>
 <div class="admonition tip">
 <p class="admonition-title">Start with <code>policy init</code>, not a blank file</p>
 <p><div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>parrant<span class="w"> </span>policy<span class="w"> </span>init<span class="w"> </span>--manifest<span class="w"> </span>target/manifest.json<span class="w"> </span>--catalog<span class="w"> </span>target/catalog.json
@@ -1436,6 +1495,46 @@ columns that never declared <code>pii</code> (see above), <code>eq</code> resolv
 PR. <code>is_true</code> resolves <code>FALSE</code> on those columns, so the rule targets <em>only</em> real PII. Even so,
 run <code>policy test --last 20</code> before promoting this to <code>block</code>, to confirm it fires only on the
 columns you expect.</p>
+</div>
+<h2 id="config-grants-guard">5. PII over-grant guard (the <code>config</code> axis)</h2>
+<p>The flagship offline governance rule: <strong>sensitive data must not be granted <code>SELECT</code> to a role
+outside the allowlist</strong> — checked straight against dbt's own <code>grants</code> config, with no
+manifest-patch bridge. It composes two axes: <a href="../policy-gate/#inferred-meta-conditions"><code>inferred_meta.pii</code></a>
+(PII declared once upstream and inherited down the lineage graph) and
+<a href="../policy-gate/#config-conditions"><code>config.grants.select</code></a> (the roles the model grants <code>SELECT</code> to):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pii-over-grant-guard</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">predicate</span><span class="p">:</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">all</span><span class="p">:</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">inferred_meta</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> key</span><span class="p">:</span><span class="w"> </span><span class="nv">pii</span><span class="p p-Indicator">,</span><span class="nt"> op</span><span class="p">:</span><span class="w"> </span><span class="nv">is_true</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># PII anywhere upstream, unless declassified</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">config</span><span class="p">:</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">            </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grants.select</span><span class="w">                        </span><span class="c1"># roles the model grants SELECT to</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">            </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">not_subset_of</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">            </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">pii_reader</span><span class="p p-Indicator">]</span><span class="w">                        </span><span class="c1"># your sensitive-data allowlist</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="nt">action</span><span class="p">:</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">warn</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">        </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">        </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"#data-governance"</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"PII</span><span class="nv"> </span><span class="s">{change.model}.{change.column}</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">granted</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">non-allowlisted</span><span class="nv"> </span><span class="s">role."</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Why this is still safe-by-construction</p>
+<p><code>not_subset_of</code> is a <strong>set</strong> operator, and on the <code>config</code> axis a <em>missing</em> <code>grants.select</code>
+path resolves to the <strong>empty set</strong> — present, not <code>UNKNOWN</code>. So <code>[] not_subset_of [pii_reader]</code>
+is <code>FALSE</code>: a model that grants to nobody cannot over-expose and simply doesn't match. The rule
+fires <strong>only</strong> on a model that actually grants <code>SELECT</code> to a role outside your allowlist — no
+rage-block on ungranted models. (This is the one config-specific fail-safe: set-operator misses
+are the empty set, scalar misses route to <code>on_missing_meta</code>. See the
+<a href="../policy-gate/#config-conditions">config conditions</a> table.)</p>
+</div>
+<div class="admonition danger">
+<p class="admonition-title">Grant role names are surfaced raw</p>
+<p>The engine lists grant roles <strong>exactly as dbt resolved them</strong> — env-suffix normalization
+(e.g. <code>pii_reader_prod</code> → <code>pii_reader</code>) is a <em>consumer</em> concern. List the exact role names your
+project grants (or every environment-suffixed variant) in the allowlist. As always, run
+<code>policy test --last 20</code> before promoting this to <code>block</code>. The shipped example
+<code>tests/resources/policies/pii_grants_allowlist.yml</code> arms it as <code>block</code> once backtested.</p>
 </div>
 <hr />
 <h2 id="promoting-warn-block">Promoting <code>warn</code> → <code>block</code></h2>
