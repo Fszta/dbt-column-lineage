@@ -78,6 +78,7 @@ def scan_project(registry: Any) -> PolicyInitScan:
     models_with_column_tests = 0
     model_meta_counts: Dict[str, int] = {}
     column_meta_counts: Dict[str, int] = {}
+    models_with_grants = 0
 
     for name, model in models.items():
         model_has_column_test = False
@@ -93,6 +94,8 @@ def scan_project(registry: Any) -> PolicyInitScan:
             models_with_column_tests += 1
         for key in _flatten_meta_keys(registry.get_model_dbt_meta(name)):
             model_meta_counts[key] = model_meta_counts.get(key, 0) + 1
+        if _has_select_grant(registry.get_model_config(name)):
+            models_with_grants += 1
 
     exposure_count = len(registry.get_exposures())
 
@@ -102,9 +105,30 @@ def scan_project(registry: Any) -> PolicyInitScan:
         column_test_count=column_test_count,
         models_with_column_tests=models_with_column_tests,
         exposure_count=exposure_count,
+        models_with_grants=models_with_grants,
         model_meta_keys=_histogram(model_meta_counts, total_models),
         column_meta_keys=_histogram(column_meta_counts, total_columns),
     )
+
+
+def _has_select_grant(config: Dict[str, Any]) -> bool:
+    """True when a model's resolved dbt ``config`` declares a non-empty ``grants.select``.
+
+    Mirrors the engine's ``config.grants.select`` dotted lookup: the roles a model grants SELECT
+    to. A missing ``grants`` block, a missing ``select`` key, or an empty/None reader list all
+    count as no grant (nothing to over-expose), so the config-axis template is only offered when a
+    real grant exists. Any non-list ``select`` (a bare string, say) is treated as present — the
+    engine surfaces it raw and would flag it as a shape error, which is still worth a template.
+    """
+    grants = config.get("grants")
+    if not isinstance(grants, dict):
+        return False
+    select = grants.get("select")
+    if select is None:
+        return False
+    if isinstance(select, (list, tuple, set)):
+        return len(select) > 0
+    return True
 
 
 # --- YAML emitter (string-templated; comments cannot survive yaml.dump) ------
@@ -325,6 +349,9 @@ def emit_policy_yaml(scan: PolicyInitScan) -> str:
     # readability with an honest omitted-count note. All coverage numbers are real (from the scan).
     lines.extend(_meta_section_lines(scan))
 
+    # Commented config-axis (PII over-grant) template — only when the scan found real dbt grants.
+    lines.extend(_config_section_lines(scan))
+
     lines.extend(_footer_lines())
 
     text = "\n".join(lines) + "\n"
@@ -347,6 +374,41 @@ def _meta_section_lines(scan: PolicyInitScan) -> List[str]:
     lines.extend(_capped_templates(scan.model_meta_keys, "model"))
     lines.extend(_capped_templates(scan.column_meta_keys, "column"))
     return lines
+
+
+def _config_section_lines(scan: PolicyInitScan) -> List[str]:
+    """Emit the commented config-axis (PII over-grant) template, or nothing.
+
+    Only offered when the scan found at least one model declaring ``config.grants.select`` — the
+    signal that a grants-based rule is even expressible here. Ships COMMENTED and as WARN, exactly
+    like the meta templates. It composes ``inferred_meta.pii`` (PII inherited over lineage) with
+    ``config.grants.select not_subset_of [...]``. Safe-by-construction: ``not_subset_of`` is a set
+    operator, and on the ``config`` axis a missing ``grants.select`` resolves to the EMPTY SET
+    (present, not UNKNOWN), so a model that grants to nobody does not fire — no rage-block.
+    """
+    if not scan.grants_present:
+        return []
+    pct = round(100 * scan.models_with_grants / scan.total_models) if scan.total_models else 0
+    coverage = f"declared on {scan.models_with_grants}/{scan.total_models} models ({pct}%)"
+    return [
+        "",
+        "  # --- Commented config-axis template: PII over-grant guard --------------",
+        f"  # `config.grants.select` {coverage}. This reads dbt's OWN resolved grants — no manifest",
+        "  # patch. Uncomment to WARN when a change touches a PII column (inferred over lineage) on",
+        "  # a model that grants SELECT to a role OUTSIDE your allowlist. Safe by construction:",
+        "  # `not_subset_of` is a SET operator, and a model with NO grants resolves to the EMPTY SET",
+        "  # -> it does NOT fire (only a model that actually over-grants matches).",
+        "  # NOTE: grant role names are surfaced RAW (no env-suffix normalization) — list the exact",
+        "  # role names your project grants. Seed `pii` on your sources first so `inferred_meta`",
+        "  # resolves. See docs/decision-engine/policy-recipes.md (PII over-grant guard).",
+        "  # - id: pii-over-grant-guard",
+        "  #   scope: change",
+        "  #   predicate:",
+        "  #     all:",
+        "  #       - inferred_meta: { key: pii, op: is_true }",
+        "  #       - config: { key: grants.select, op: not_subset_of, value: [pii_reader] }",
+        "  #   action: [{ type: warn }]",
+    ]
 
 
 def _capped_templates(rows: List[MetaKeyCoverage], subject: str) -> List[str]:

@@ -9,7 +9,7 @@ which builds the project via the ``dbt_artifacts`` fixture — the unit tier sta
 import yaml
 
 from parrant.lineage.policy import parse_policy
-from parrant.lineage.policy_init import _flatten_meta_keys, emit_policy_yaml
+from parrant.lineage.policy_init import _flatten_meta_keys, _has_select_grant, emit_policy_yaml
 from parrant.models.schema import MetaKeyCoverage, PolicyInitScan
 
 
@@ -23,6 +23,20 @@ def test_flatten_meta_keys_dotted_nesting():
 
 def test_flatten_meta_keys_empty():
     assert _flatten_meta_keys({}) == []
+
+
+def test_has_select_grant_detects_real_grant():
+    assert _has_select_grant({"grants": {"select": ["pii_reader", "analyst"]}}) is True
+    # A non-list select (raw bare string) still counts as present — the engine surfaces it raw.
+    assert _has_select_grant({"grants": {"select": "pii_reader"}}) is True
+
+
+def test_has_select_grant_false_when_absent_empty_or_null():
+    assert _has_select_grant({}) is False
+    assert _has_select_grant({"materialized": "view"}) is False  # no grants block
+    assert _has_select_grant({"grants": {}}) is False  # grants but no select
+    assert _has_select_grant({"grants": {"select": []}}) is False  # empty reader set = no grant
+    assert _has_select_grant({"grants": {"select": None}}) is False  # null = no grant
 
 
 # --- MetaKeyCoverage.pct -----------------------------------------------------
@@ -97,6 +111,35 @@ def test_meta_template_cap_notes_omitted_keys():
     )
     text = emit_policy_yaml(scan)
     assert "more model-meta key(s) not shown" in text
+
+
+# --- emitter: config-axis (PII over-grant) template --------------------------
+
+
+def test_config_template_commented_with_coverage_when_grants_present():
+    scan = PolicyInitScan(
+        total_models=40,
+        column_test_count=1,
+        exposure_count=1,
+        models_with_grants=10,
+    )
+    text = emit_policy_yaml(scan)
+    # Real coverage from the scan (10/40 = 25%), never a placeholder.
+    assert "`config.grants.select` declared on 10/40 models (25%)" in text
+    # Commented (never armed), warn-first, composing inferred_meta.pii + config.grants.select.
+    assert "  # - id: pii-over-grant-guard" in text
+    assert "\n  - id: pii-over-grant-guard" not in text  # not armed
+    assert "config: { key: grants.select, op: not_subset_of, value: [pii_reader] }" in text
+    assert "inferred_meta: { key: pii, op: is_true }" in text
+    assert "fail_open" not in text
+    parse_policy(yaml.safe_load(text))  # still valid
+
+
+def test_config_template_absent_when_no_grants():
+    scan = PolicyInitScan(total_models=40, column_test_count=1, exposure_count=1)
+    text = emit_policy_yaml(scan)
+    assert "pii-over-grant-guard" not in text
+    assert "config.grants.select" not in text
 
 
 # --- emitter: honest empty (no tests, no exposures, no meta) -----------------

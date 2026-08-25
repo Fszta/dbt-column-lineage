@@ -201,7 +201,8 @@ shifts meaning — or that can't be proven safe — is tagged `breaking`. Kills 
 noise that erodes trust in a gate.
 
 **Your rules, your gate.** — Author a versioned `policy.yml`: a predicate over *any* dbt `meta`
-(plus the change kind, the semantic signal, and the lineage reach) → an action
+(inherited down lineage via `inferred_meta`), the change kind, the semantic signal, the lineage
+reach, and dbt's own resolved `config` (e.g. `config.grants.select`) → an action
 (`block` / `warn` / `build` / `test` / `notify`). Your governance becomes CI, keyed to *your*
 metadata. `critical` below is *your* key, not a built-in:
 

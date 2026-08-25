@@ -862,6 +862,9 @@ class PolicyInitScan(BaseModel):
     column_test_count: int = 0
     models_with_column_tests: int = 0
     exposure_count: int = 0
+    # Number of models declaring a non-empty ``config.grants.select`` — gates the commented
+    # config-axis (PII over-grant) template, so it is only offered when dbt grants actually exist.
+    models_with_grants: int = 0
     # Sorted by n_present desc, then key (stable, most-covered-first).
     model_meta_keys: List[MetaKeyCoverage] = Field(default_factory=list)
     column_meta_keys: List[MetaKeyCoverage] = Field(default_factory=list)
@@ -875,3 +878,9 @@ class PolicyInitScan(BaseModel):
     def exposures_present(self) -> bool:
         """True when the scan found at least one exposure."""
         return self.exposure_count > 0
+
+    @property
+    def grants_present(self) -> bool:
+        """True when at least one model declares a ``config.grants.select`` — the signal that
+        the config-axis (PII over-grant) template is worth offering."""
+        return self.models_with_grants > 0

@@ -7,9 +7,9 @@ engine evaluates them against a pull request's changeset and returns a **verdict
 A `block` is always a [**`block-until`**](#a-block-is-a-block-until-not-a-dead-end): it states
 how it clears and lifts itself on the next push, so the gate is an exit path, not a wall.
 
-> **Every term below is defined once in the [Glossary](glossary.md)** — actions, gate
-> decisions, reach kinds/mechanisms, operators, and the fail-safe knobs, with the code enum ↔
-> UI ↔ docs alignment pinned.
+> **Every term below is defined once in the [Glossary](glossary.md)** — the [predicate
+> axes](glossary.md#predicate-axes), actions, gate decisions, reach kinds/mechanisms, operators,
+> and the fail-safe knobs, with the code enum ↔ UI ↔ docs alignment pinned.
 
 !!! abstract "The tool ships the engine — you ship the rules"
     No metadata key is privileged. `critical`, `pii`, `readable_by`, `tier` are **example
@@ -141,7 +141,7 @@ A leaf condition matches on exactly one of **six axes**:
 change: { field: breaking, op: is_true }
 ```
 
-#### `meta` — a dbt `meta` key on the changed model or column
+#### `meta` — a dbt `meta` key on the changed model or column { #meta-conditions }
 
 ```yaml
 meta: { key: pii, op: is_true }
@@ -271,7 +271,7 @@ reach:
 - `reach.where` matches on the **reached object's** `meta.*` (and, for exposures, its `type` /
   `owner` / `name`).
 
-#### `structural` — booleans the pipeline already computes
+#### `structural` — booleans the pipeline already computes { #structural }
 
 ```yaml
 structural: { fact: provable_test_break }   # the change orphans a dbt test
@@ -341,7 +341,7 @@ These live in the repo under `tests/resources/policies/` and are the canonical s
 
 ### 1. PII must not reach a reader outside the allowlist
 
-The offline analogue of a a PII-exposure gate gate, expressed as pure config: a change to a
+The offline analogue of a PII-exposure gate, expressed as pure config: a change to a
 PII-tagged column that reaches a downstream model whose declared readers are **not** a subset of
 the allowlist blocks the PR and notifies governance.
 
@@ -456,6 +456,8 @@ Sensitive data may only be granted to `pii_reader`: a model that grants `select`
 `SELECT` to a role outside the allowlist blocks. (Env-suffix normalization — e.g. `pii_reader_prod`
 → `pii_reader` — is a **consumer** concern: the engine surfaces grant roles raw, so list the exact
 role names your project grants.) Ships as `tests/resources/policies/pii_grants_allowlist.yml`.
+For the warn-first, `policy test`-before-you-arm version, see the
+[PII over-grant guard recipe](policy-recipes.md#config-grants-guard).
 
 ## Fail-safe defaults
 
