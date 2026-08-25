@@ -478,10 +478,31 @@ class ModelRegistry:
                 self._apply_star_columns(model, source_name, models[source_name])
 
     def _apply_star_columns(self, target: Model, source_name: str, source: Model) -> None:
-        """Apply star columns from source to target model."""
+        """Apply star columns from source to target model.
+
+        For a catalog-MISSING target (present in the manifest but absent from the catalog,
+        so no authoritative column list) a ``select *`` passthrough would otherwise recover
+        NO columns at all: parsing a pure ``select *`` yields only a model-level star source
+        and never an explicit projection, and this method historically only *attached*
+        lineage to columns that already existed on the target. That silently dropped the
+        entire column-lineage edge for star-passthrough intermediates — e.g. an SCD-1 collapse
+        ``select * from <scd_1 cte>`` — whenever they were deferred out of the catalog (a
+        common partial/deferred CI build). Every downstream inferred-meta / PII fold that
+        walks through such a node then hits an empty upstream and resolves to UNKNOWN,
+        silently disarming a fail-closed PII policy. So when the target is catalog-missing we
+        MATERIALIZE the star source's columns onto it (types unknown), mirroring the
+        catalog-missing branch of :meth:`_apply_column_lineage`.
+        """
+        catalog_missing = bool(target.metadata and target.metadata.get("catalog_missing"))
         for col_name, source_col in source.columns.items():
             if col_name not in target.columns:
-                continue
+                if not catalog_missing:
+                    continue
+                target.columns[col_name] = Column(
+                    name=col_name,
+                    model_name=target.name,
+                    data_type=None,
+                )
 
             target_col = target.columns[col_name]
             if not target_col.lineage:
