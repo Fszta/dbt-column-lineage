@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -17,6 +18,31 @@ RECORDED_PATH = Path(__file__).parents[2] / "resources" / "metabase" / "recorded
 
 def load_recorded() -> Dict[str, Any]:
     return json.loads(RECORDED_PATH.read_text(encoding="utf-8"))
+
+
+def build_recorded(
+    *,
+    cards: Optional[List[dict]] = None,
+    dashboards: Optional[List[dict]] = None,
+    dashboard_details: Optional[Dict[str, dict]] = None,
+    database_metadata: Optional[Dict[str, dict]] = None,
+    snippets: Optional[List[dict]] = None,
+    session_properties: Optional[dict] = None,
+) -> Dict[str, Any]:
+    """Assemble a full recorded-payload dict from inline parts, defaulting the rest.
+
+    Every key :class:`FakeSession` may index is filled so a purpose-built corpus (a
+    foreign-database card, a bespoke incremental scenario) can be constructed inline
+    without mutating the shared ``recorded.json`` (which ``test_client.py`` depends on).
+    """
+    return {
+        "cards": list(cards or []),
+        "dashboards": list(dashboards or []),
+        "dashboard_details": dict(dashboard_details or {}),
+        "database_metadata": dict(database_metadata or {}),
+        "snippets": list(snippets or []),
+        "session_properties": session_properties or {"version": {"tag": "v0.0.0-test"}},
+    }
 
 
 class FakeResponse:
@@ -43,6 +69,12 @@ class FakeSession:
     ``get_calls`` records ``(url, params)`` so tests can assert the ``legacy-mbql`` pin and
     pagination behaviour. Pass ``fail_first`` to simulate a transient 503 then success
     (exercises the client's retry/backoff).
+
+    Thread-safe: ``MetabaseClient.get_dashboards`` fans ``get`` out across a
+    :class:`~concurrent.futures.ThreadPoolExecutor`, so multiple threads may call
+    :meth:`get`/:meth:`post` concurrently. ``recorded`` is treated as read-only during a
+    run; the only mutable shared state (the call logs and the failure counter) is guarded by
+    a lock so the recorded ``(url, params)`` list never races or drops an entry.
     """
 
     def __init__(self, recorded: Dict[str, Any], fail_first: int = 0):
@@ -50,9 +82,11 @@ class FakeSession:
         self.get_calls: List[tuple] = []
         self.post_calls: List[tuple] = []
         self._remaining_failures = fail_first
+        self._lock = threading.Lock()
 
     def post(self, url: str, json: Any = None, timeout: int = 30, **kwargs: Any) -> FakeResponse:
-        self.post_calls.append((url, json))
+        with self._lock:
+            self.post_calls.append((url, json))
         if url.endswith("/api/session"):
             return FakeResponse({"id": "fake-session-token"})
         return FakeResponse({}, status_code=404)
@@ -65,9 +99,12 @@ class FakeSession:
         timeout: int = 30,
         **kwargs: Any,
     ) -> FakeResponse:
-        self.get_calls.append((url, dict(params or {})))
-        if self._remaining_failures > 0:
-            self._remaining_failures -= 1
+        with self._lock:
+            self.get_calls.append((url, dict(params or {})))
+            fail = self._remaining_failures > 0
+            if fail:
+                self._remaining_failures -= 1
+        if fail:
             return FakeResponse({}, status_code=503, headers={"Retry-After": "0"})
 
         offset = int((params or {}).get("offset", 0))

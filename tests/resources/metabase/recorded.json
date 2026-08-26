@@ -48,6 +48,7 @@
       "name": "Active accounts by country",
       "collection_id": 17,
       "archived": false,
+      "updated_at": "2024-01-01T00:00:00Z",
       "dataset_query": {
         "type": "query",
         "database": 2,
@@ -64,6 +65,7 @@
       "name": "Exec revenue (native, select *)",
       "collection_id": 4,
       "archived": false,
+      "updated_at": "2024-01-01T00:00:00Z",
       "dataset_query": {
         "type": "native",
         "database": 2,
@@ -80,6 +82,7 @@
       "name": "Revenue by region (native, column-precise)",
       "collection_id": 4,
       "archived": false,
+      "updated_at": "2024-01-01T00:00:00Z",
       "dataset_query": {
         "type": "native",
         "database": 2,
@@ -96,6 +99,7 @@
       "name": "Revenue with snippet (native)",
       "collection_id": 4,
       "archived": false,
+      "updated_at": "2024-01-01T00:00:00Z",
       "dataset_query": {
         "type": "native",
         "database": 2,
@@ -112,6 +116,7 @@
       "name": "Archived card",
       "collection_id": 4,
       "archived": true,
+      "updated_at": "2024-01-01T00:00:00Z",
       "dataset_query": {
         "type": "query",
         "database": 2,
@@ -120,13 +125,14 @@
     }
   ],
   "dashboards": [
-    {"id": 55, "name": "Executive KPIs", "collection_id": 4}
+    {"id": 55, "name": "Executive KPIs", "collection_id": 4, "updated_at": "2024-01-01T00:00:00Z"}
   ],
   "dashboard_details": {
     "55": {
       "id": 55,
       "name": "Executive KPIs",
       "collection_id": 4,
+      "updated_at": "2024-01-01T00:00:00Z",
       "dashcards": [
         {"id": 9001, "card_id": 128, "card": {"id": 128}},
         {"id": 9002, "card_id": 3391, "card": {"id": 3391}}
