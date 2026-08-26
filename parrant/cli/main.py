@@ -148,6 +148,24 @@ def cli(
             click.echo(f"Starting explore mode server on port {port}...")
             lineage_explorer = LineageExplorer(port=port)
             lineage_explorer.set_lineage_service(service)
+            # Static cross-boundary exploration: when a Metabase snapshot is supplied, build a
+            # reach index so browsing ANY column shows the Metabase cards/dashboards that read
+            # it — no changeset required (the changeset path below still adds change-scoped
+            # reach on top when a diff is provided).
+            if metabase_path:
+                from parrant.metabase.artifact import load_metabase_lineage
+                from parrant.metabase.join import build_relation_index
+                from parrant.metabase.reach import MetabaseReach
+
+                _mb_lineage = load_metabase_lineage(metabase_path)
+                if _mb_lineage is not None:
+                    _rel_index = build_relation_index(
+                        service.registry, _relation_name_resolver(service.registry)
+                    )
+                    lineage_explorer.attach_metabase_static(
+                        MetabaseReach.build(_mb_lineage, _rel_index),
+                        {d.dashboard_id: d.name for d in _mb_lineage.dashboards},
+                    )
             # when a changeset source (and optionally a policy / Metabase artifact) is
             # supplied, precompute the changeset report ONCE and hand it to the explorer so
             # every panel can surface the product signals. Absent => pure-explore mode.

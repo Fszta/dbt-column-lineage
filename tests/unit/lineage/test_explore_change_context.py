@@ -1,4 +1,4 @@
-""" explorer surfacing — change-context passthrough on the explorer API.
+"""explorer surfacing — change-context passthrough on the explorer API.
 
 These exercise the additive wiring on ``LineageExplorer`` WITHOUT a live server or a
 built dbt project: the enrichment is pure dict transformation over the stable data
@@ -248,12 +248,24 @@ def test_annotate_nodes_with_semantic_marks_nodes_and_blast_edge():
     e = LineageExplorer()
     e.set_change_context(_report())
     e.data.nodes = [
-        {"id": "col_dim_accounts_balance", "type": "column", "model": "dim_accounts",
-         "label": "balance"},
-        {"id": "col_dim_accounts_label", "type": "column", "model": "dim_accounts",
-         "label": "label"},
-        {"id": "col_fact_revenue_total", "type": "column", "model": "fact_revenue",
-         "label": "total"},
+        {
+            "id": "col_dim_accounts_balance",
+            "type": "column",
+            "model": "dim_accounts",
+            "label": "balance",
+        },
+        {
+            "id": "col_dim_accounts_label",
+            "type": "column",
+            "model": "dim_accounts",
+            "label": "label",
+        },
+        {
+            "id": "col_fact_revenue_total",
+            "type": "column",
+            "model": "fact_revenue",
+            "label": "total",
+        },
     ]
     e.data.edges = [
         {"source": "col_dim_accounts_balance", "target": "col_fact_revenue_total"},
@@ -288,3 +300,83 @@ def test_graph_node_and_edge_carry_new_optional_fields():
     assert node["boundary"] is None
     edge = GraphEdge(source="a", target="b").model_dump()
     assert edge["breaking"] is None
+
+
+# --- static cross-boundary reach (no changeset needed) ---------------------
+
+
+class _FakeReach:
+    """Stand-in for MetabaseReach: returns fixed reached-dashboard entries."""
+
+    def __init__(self, entries):
+        self._entries = entries
+
+    def reached_dashboards(self, columns, models):
+        return list(self._entries)
+
+
+def _entry():
+    return {
+        "name": "metabase.dashboard.137",
+        "type": "dashboard",
+        "url": "https://mb/dashboard/137",
+        "source": "metabase",
+        "meta": {},
+        "via_cards": [1, 2, 3],
+        "via_columns": [{"model": "transactions", "column": "project_id"}],
+        "precision": "column",
+    }
+
+
+def test_static_metabase_reach_injects_boundary_node_without_changeset():
+    # Browsing a column (no change context) must still surface the Metabase dashboards that
+    # read it — as boundary nodes anchored to the column, with the human dashboard name.
+    exp = LineageExplorer()
+    exp.data.nodes = [
+        {
+            "id": "col_transactions_project_id",
+            "label": "project_id",
+            "type": "column",
+            "model": "transactions",
+        }
+    ]
+    exp.data.main_node = "col_transactions_project_id"
+    exp._start_model, exp._start_column = "transactions", "project_id"
+
+    exp.attach_metabase_static(_FakeReach([_entry()]), {137: "Revenue KPIs"})
+    exp._populate_static_reach("transactions", "project_id")
+    exp._annotate_boundary_nodes()
+
+    mb = [n for n in exp.data.nodes if n.get("boundary") == "metabase"]
+    assert len(mb) == 1
+    node = mb[0]
+    assert node["label"] == "Revenue KPIs"  # human name, not metabase.dashboard.137
+    assert node["model"] == "metabase.dashboard.137"  # stable id-based key preserved
+    assert node["exposure_data"]["url"] == "https://mb/dashboard/137"
+    assert node["exposure_data"]["via_cards"] == [1, 2, 3]
+    # an edge links the explored column to the dashboard
+    assert any(
+        e.get("source") == "col_transactions_project_id"
+        and e.get("target") == "exposure_metabase.dashboard.137"
+        for e in exp.data.edges
+    )
+
+
+def test_static_reach_absent_is_noop():
+    # No snapshot attached => pure dbt lineage, no boundary nodes (backward compatible).
+    exp = LineageExplorer()
+    exp.data.nodes = [{"id": "col_m_c", "label": "c", "type": "column", "model": "m"}]
+    exp.data.main_node = "col_m_c"
+    exp._start_model, exp._start_column = "m", "c"
+    exp._populate_static_reach("m", "c")
+    exp._annotate_boundary_nodes()
+    assert not any(n.get("boundary") == "metabase" for n in exp.data.nodes)
+
+
+def test_changeset_takes_precedence_over_static_reach():
+    # When a change context is loaded, the static path must NOT also fire (avoid double reach).
+    exp = LineageExplorer()
+    exp._change_report = {"some": "report"}  # marks changeset mode
+    exp.attach_metabase_static(_FakeReach([_entry()]), {137: "Revenue KPIs"})
+    exp._populate_static_reach("transactions", "project_id")
+    assert ("transactions", "project_id") not in exp._metabase_reach_by_change
