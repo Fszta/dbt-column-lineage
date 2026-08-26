@@ -84,6 +84,13 @@ def _load_dashboard_meta(path: Optional[str]) -> Dict:
     help="Concurrency for dashboard detail fetches.",
 )
 @click.option(
+    "--timeout",
+    type=int,
+    default=120,
+    help="Per-request HTTP timeout (seconds). The bulk /api/card list can be large on big "
+    "instances (tens of MB, ~90s), so the default is generous.",
+)
+@click.option(
     "--fail-under",
     type=float,
     help="Exit non-zero if (column + table) coverage ratio < this value.",
@@ -101,6 +108,7 @@ def metabase_extract(
     dashboard_meta_file: Optional[str],
     previous: Optional[str],
     max_workers: int,
+    timeout: int,
     fail_under: Optional[float],
 ) -> None:
     """Snapshot Metabase card→column and card→dashboard lineage into an offline artifact."""
@@ -111,6 +119,7 @@ def metabase_extract(
             api_key=metabase_api_key,
             username=metabase_username,
             password=metabase_password,
+            timeout=timeout,
         )
         previous_lineage = load_metabase_lineage(previous)
         config = ExtractConfig(

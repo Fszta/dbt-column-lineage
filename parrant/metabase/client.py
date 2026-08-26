@@ -30,6 +30,10 @@ LEGACY_MBQL_PARAM = {"legacy-mbql": "true"}
 
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
+# Runaway backstop for the (rarely-used) envelope pagination path: even if a deployment
+# ignores ``offset`` and re-serves the same page, iteration is bounded rather than infinite.
+_MAX_PAGES = 10_000
+
 
 class MetabaseAuthError(Exception):
     """No usable credential (neither an API key nor username+password) was supplied,
@@ -158,23 +162,32 @@ class MetabaseClient:
         self._sleep(delay + (attempt % 3) * 0.1)
 
     def _paginate(self, path: str, extra_params: Optional[Dict[str, Any]] = None) -> Iterator[dict]:
-        """Yield items from a list endpoint, defensively paging with limit/offset.
+        """Yield every item from a Metabase list endpoint.
 
-        Metabase's ``/api/card`` and ``/api/dashboard`` historically return the full list
-        with no cursor; when they do, the first page is short and we stop. Where a
-        deployment supports ``limit``/``offset`` we keep paging until a short page.
+        Metabase's bulk list endpoints (``/api/card``, ``/api/dashboard``,
+        ``/api/native-query-snippet``) return the ENTIRE result set as a **bare JSON array**
+        in a single response and IGNORE ``limit``/``offset``. A bare-array response is
+        therefore already complete — we must NOT request another "page", or the endpoint
+        re-returns the whole list and we loop forever (on a 17k-card / 232MB instance this
+        hangs and 503s the gateway). So we probe once *without* limit/offset: a list body is
+        the full result. Only an envelope body (``{"data": [...]}``) is genuinely paginated;
+        that path advances by ``offset`` and is hard-capped by ``_MAX_PAGES`` so it can never
+        loop indefinitely even if a deployment also ignores ``offset``.
         """
+        body = self._get(path, params=extra_params)
+        if not isinstance(body, dict):
+            yield from body or []
+            return
+
         offset = 0
-        while True:
-            params: Dict[str, Any] = {"limit": self.page_size, "offset": offset}
-            if extra_params:
-                params.update(extra_params)
-            body = self._get(path, params=params)
-            items = body if isinstance(body, list) else body.get("data", [])
+        for _ in range(_MAX_PAGES):
+            params: Dict[str, Any] = dict(extra_params or {})
+            params.update({"limit": self.page_size, "offset": offset})
+            page = self._get(path, params=params)
+            items = page.get("data", []) if isinstance(page, dict) else (page or [])
             if not items:
                 return
-            for item in items:
-                yield item
+            yield from items
             if len(items) < self.page_size:
                 return
             offset += len(items)

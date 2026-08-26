@@ -17,6 +17,72 @@ def _client(session: FakeSession, **kwargs) -> MetabaseClient:
     )
 
 
+class _Resp:
+    def __init__(self, body):
+        self.status_code = 200
+        self.headers: dict = {}
+        self._body = body
+
+    def json(self):
+        return self._body
+
+    def raise_for_status(self):
+        pass
+
+
+class _CountingSession:
+    """Serves a fixed body on every GET and counts calls. If ``ignore_paging`` is set, it
+    returns the SAME body regardless of limit/offset — i.e. Metabase's real ``/api/card``
+    behaviour, which used to send the pager into an infinite re-fetch loop."""
+
+    def __init__(self, body, ignore_paging=True):
+        self.body = body
+        self.ignore_paging = ignore_paging
+        self.gets = 0
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        self.gets += 1
+        if self.ignore_paging or not isinstance(self.body, dict):
+            return _Resp(self.body)
+        params = params or {}
+        off = int(params.get("offset", 0))
+        lim = int(params.get("limit", 1_000_000))
+        data = self.body["data"][off : off + lim]
+        return _Resp({"data": data, "total": len(self.body["data"])})
+
+
+def test_paginate_bare_array_is_fetched_once_not_looped():
+    # Regression: a bare-array list endpoint that ignores limit/offset (real /api/card) must
+    # be fetched EXACTLY once and returned in full — never re-paged into an infinite loop.
+    cards = [{"id": i} for i in range(500)]  # 500 >= page_size, the old loop trigger
+    session = _CountingSession(cards, ignore_paging=True)
+    client = _client(session, api_key="k", page_size=200)
+    out = list(client._paginate("/api/card"))
+    assert len(out) == 500
+    assert session.gets == 1  # one shot; no re-fetch of the same 500
+
+
+def test_paginate_envelope_pages_through_all():
+    # A genuinely paginated envelope ({"data": [...], "total": N}) is walked to completion.
+    items = {"data": [{"id": i} for i in range(450)], "total": 450}
+    session = _CountingSession(items, ignore_paging=False)
+    client = _client(session, api_key="k", page_size=200)
+    out = list(client._paginate("/api/things"))
+    assert [x["id"] for x in out] == list(range(450))
+
+
+def test_paginate_envelope_ignoring_offset_is_bounded(monkeypatch):
+    # Pathological: an envelope endpoint that ignores offset (always returns a full page).
+    # Must terminate via the _MAX_PAGES backstop rather than hang.
+    monkeypatch.setattr("parrant.metabase.client._MAX_PAGES", 4)
+    full_page = {"data": [{"id": i} for i in range(3)], "total": 9999}  # always len==page_size
+    session = _CountingSession(full_page, ignore_paging=True)  # same body every call
+    # ignore_paging returns the dict as-is each call; len(data)==3==page_size, never short.
+    client = _client(session, api_key="k", page_size=3)
+    out = list(client._paginate("/api/things"))
+    assert len(out) == 4 * 3  # exactly _MAX_PAGES pages, then stops (bounded, no hang)
+
+
 def test_api_key_auth_sets_header_and_pins_legacy_mbql():
     session = FakeSession(load_recorded())
     client = _client(session, api_key="secret-key")
