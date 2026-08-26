@@ -71,6 +71,8 @@ def test_json_impact_carries_confidence_block(dbt_artifacts):
         "parse_failed",
         "no_column_info_models",
         "parse_failed_models",
+        "no_column_info_truncated",
+        "parse_failed_truncated",
         "level",
     }
     # Everything reachable is in the catalog and parsed, so confidence is full even
@@ -81,6 +83,11 @@ def test_json_impact_carries_confidence_block(dbt_artifacts):
     assert confidence["unanalyzable_models"] == 0
     assert confidence["no_column_info"] == 0
     assert confidence["parse_failed"] == 0
+    # Machine output is never truncated; the lists are complete and match the counts.
+    assert confidence["no_column_info_truncated"] is False
+    assert confidence["parse_failed_truncated"] is False
+    assert len(confidence["no_column_info_models"]) == confidence["no_column_info"]
+    assert len(confidence["parse_failed_models"]) == confidence["parse_failed"]
 
 
 def test_text_prints_quiet_complete_footer(dbt_artifacts):

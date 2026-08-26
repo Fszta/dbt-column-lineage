@@ -18,10 +18,6 @@ logger = logging.getLogger(__name__)
 # downstream node is reached by several changed columns.
 _SEVERITY_RANK: Dict[str, int] = {"critical": 2, "low_impact": 1}
 
-# Cap on the number of unanalyzable model names carried in the confidence block, so a
-# huge coverage gap doesn't bloat the impact payload. Totals stay in the integer counts.
-_IMPACT_CONFIDENCE_NAME_CAP = 100
-
 # A downstream column's ``transformation_type`` → the plain-language *mechanism* by which
 # the change reaches it. This is the machine-readable twin of the markdown's mechanism
 # split (derived recompute / row-set filter / pass-through): it lets an agent or the
@@ -242,15 +238,18 @@ class LineageService:
 
         unanalyzable_reachable = parse_failed | no_column_info
         level: Literal["full", "partial"] = "full" if not unanalyzable_reachable else "partial"
-        cap = _IMPACT_CONFIDENCE_NAME_CAP
+        # Machine surface carries the COMPLETE name lists (no cap) so a fail-closed
+        # consumer can never miss a model we couldn't analyze; the display layer caps.
         return ImpactConfidence(
             reachable_models=len(reachable),
             resolved_models=resolved_models,
             unanalyzable_models=len(unanalyzable_reachable),
             no_column_info=len(no_column_info),
             parse_failed=len(parse_failed),
-            no_column_info_models=sorted(no_column_info)[:cap],
-            parse_failed_models=sorted(parse_failed)[:cap],
+            no_column_info_models=sorted(no_column_info),
+            parse_failed_models=sorted(parse_failed),
+            no_column_info_truncated=False,
+            parse_failed_truncated=False,
             level=level,
         ).model_dump()
 

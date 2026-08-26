@@ -201,8 +201,12 @@ const ImpactModule = (function() {
             return '';
         }
         const total = confidence.unanalyzable_models || items.length;
-        const more = Math.max(0, total - items.length);
-        const listHtml = items.map(it =>
+        // The JSON confidence block carries the complete lists; cap the rendered names
+        // here so a wide coverage gap stays readable, and show how many were elided.
+        const DISPLAY_CAP = 100;
+        const shown = items.slice(0, DISPLAY_CAP);
+        const more = Math.max(0, items.length - shown.length);
+        const listHtml = shown.map(it =>
             `<li><span class="confidence-why-model">${escapeHtml(it.name)}</span>`
             + `<span class="confidence-why-tag">${it.tag}</span></li>`
         ).join('');
