@@ -9,7 +9,7 @@ from parrant.lineage.sqlglot_provider import build_sqlglot_provider
 if TYPE_CHECKING:
     from parrant.lineage.changeset import ColumnChange
     from parrant.metabase.reach import MetabaseReach
-from parrant.models.schema import ColumnLineage, Coverage, ImpactConfidence
+from parrant.models.schema import ColumnLineage, Coverage, ImpactConfidence, Selection
 from parrant.parser.sql_parser_utils import strip_sql_comments
 
 logger = logging.getLogger(__name__)
@@ -104,6 +104,97 @@ def _mechanism_breakdown(affected_columns: List[Dict[str, Any]]) -> Dict[str, in
         label = _MECHANISM_LABELS.get(raw, raw)
         breakdown[label] = breakdown.get(label, 0) + 1
     return breakdown
+
+
+def _change_is_breaking(entry: Dict[str, Any]) -> bool:
+    """Whether a ``by_change`` entry contributes its reach to the rebuild set (fail-closed).
+
+    Only a *proven* additive change is safe to skip: ``kind == "added"`` with a semantic that
+    is not a meaning change (added columns carry no semantic; a cosmetic ``equivalent`` edit is
+    never emitted as a change in the first place). Every other kind — ``removed`` /
+    ``type_changed`` / any ``logic_changed`` — and any change we could not resolve is treated as
+    breaking, so its reached models rebuild. This is the fail-safe ``is_breaking`` contract
+    surfaced over the already-emitted change facts; it re-derives no semantics.
+    """
+    proven_additive = entry.get("kind") == "added" and entry.get("semantic") in (
+        None,
+        "equivalent",
+    )
+    return not proven_additive
+
+
+def build_selection(
+    reachable: Set[str],
+    changed_models: Set[str],
+    by_change: List[Dict[str, Any]],
+    confidence: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Derive the policy-free minimal rebuild set from an already-computed changeset impact.
+
+    Pure function over the diff facts (reachability, the per-change reach in ``by_change``, and
+    the confidence block) — it re-walks no lineage and consults no policy. Returns
+    ``Selection(...).model_dump()``.
+
+    Fail-closed at every branch:
+      - every edited model is rebuilt (folded into the universe explicitly, since
+        ``_dag_reachable_models`` excludes the seed);
+      - every model reached by a non-additive change is rebuilt (see :func:`_change_is_breaking`);
+      - every reachable model parrant could not analyze (``no_column_info`` / ``parse_failed``,
+        the COMPLETE machine lists) is rebuilt;
+      - if confidence is not ``full`` OR any display list was truncated, ``skippable_models`` is
+        empty and ``rebuild_models`` widens to the whole reachable universe.
+
+    ``skippable_models`` is the reachable complement and is non-empty only at full confidence
+    with nothing truncated. All emitted lists are sorted for determinism.
+    """
+    # The universe every model is partitioned over: the strictly-downstream reachable set plus
+    # the edited models themselves (which the DAG walk excludes but which always rebuild).
+    universe: Set[str] = set(reachable) | set(changed_models)
+
+    # The COMPLETE unanalyzable lists (uncapped in machine output). A model parrant could not
+    # analyze is assumed affected — this is the whole reason the lists must be complete.
+    unanalyzable: Set[str] = set(confidence.get("no_column_info_models", [])) | set(
+        confidence.get("parse_failed_models", [])
+    )
+    truncated = bool(
+        confidence.get("no_column_info_truncated") or confidence.get("parse_failed_truncated")
+    )
+
+    breaking_reached: Set[str] = set()
+    for entry in by_change:
+        if not _change_is_breaking(entry):
+            continue
+        for reached in entry.get("reached_models", []) or []:
+            name = reached.get("name") if isinstance(reached, dict) else None
+            if name is not None:
+                breaking_reached.add(name)
+
+    rebuild: Set[str] = (
+        (set(changed_models) & universe) | (breaking_reached & universe) | (unanalyzable & universe)
+    )
+
+    level = confidence["level"]
+    widened = level != "full" or truncated
+    if widened:
+        rebuild = set(universe)
+        skippable: List[str] = []
+    else:
+        skippable = sorted(universe - rebuild)
+
+    rebuild_models = sorted(rebuild)
+    has_rebuild = len(rebuild_models) > 0
+    # Sentinel guard: the selector is the empty string exactly when has_rebuild is False, so a
+    # consumer never feeds a bare "" to ``dbt build --select``.
+    rebuild_selector = " ".join(rebuild_models) if has_rebuild else ""
+
+    return Selection(
+        has_rebuild=has_rebuild,
+        rebuild_models=rebuild_models,
+        skippable_models=skippable,
+        rebuild_selector=rebuild_selector,
+        confidence_level=level,
+        widened_to_all_reachable=widened,
+    ).model_dump()
 
 
 @dataclass
@@ -960,11 +1051,17 @@ class LineageService:
 
         # Guarded so a stub service without a real registry omits confidence rather than erroring.
         confidence: Optional[Dict[str, Any]] = None
+        selection: Optional[Dict[str, Any]] = None
         if getattr(self, "registry", None) is not None:
             reachable: Set[str] = set()
             for change in changes:
                 reachable |= self._dag_reachable_models(change.model)
             confidence = self._impact_confidence(reachable, len(affected_models))
+            # Policy-free rebuild selection: the edited models plus everything reached by a
+            # non-additive change plus everything unanalyzable. Lowercase the edited names so
+            # the universe partitions cleanly against the (lowercased) reachable set.
+            changed_models = {change.model.lower() for change in changes}
+            selection = build_selection(reachable, changed_models, by_change, confidence)
 
         return {
             "summary": {
@@ -982,4 +1079,5 @@ class LineageService:
             "affected_exposures": [affected_exposures[name] for name in sorted(affected_exposures)],
             "by_change": by_change,
             "confidence": confidence,
+            "selection": selection,
         }

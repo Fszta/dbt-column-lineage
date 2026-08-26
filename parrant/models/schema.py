@@ -258,6 +258,38 @@ class ImpactConfidence(BaseModel):
     level: Literal["full", "partial"]
 
 
+class Selection(BaseModel):
+    """Policy-free minimal rebuild set, derived purely from the lineage diff.
+
+    This is the policy-independent base the ``PolicyVerdict.build_set`` overlay sits on:
+    it answers "which models must CI rebuild?" from the diff alone, with no authored policy.
+    The rule is fail-closed —
+    ``rebuild_models = {models with a non-equivalent reaching change}
+    ∪ {reachable models parrant could not analyze} ∪ {the edited models themselves}`` —
+    and ``skippable_models`` is the reachable complement (reached only by a provably
+    additive/passthrough change at full confidence). When confidence is not full or any
+    display list was truncated, ``skippable_models`` is emitted empty and ``rebuild_models``
+    widens to every reachable model (``widened_to_all_reachable``): the honest "we could
+    not prove anything safe to skip" state.
+    """
+
+    # Sentinel so a consumer never runs ``dbt build --select ""`` (which selects nothing
+    # and exits green): branch on this, never on the selector string's emptiness.
+    has_rebuild: bool = False
+    # Sorted, deduplicated dbt node names that must be rebuilt.
+    rebuild_models: List[str] = Field(default_factory=list)
+    # Sorted reachable complement — reached only by an additive/passthrough change at full
+    # confidence. Informational: the consumer decides whether to actually skip these.
+    skippable_models: List[str] = Field(default_factory=list)
+    # Space-joined ``rebuild_models`` — a drop-in for ``dbt build --select $(...)``.
+    # Empty string exactly when ``has_rebuild`` is False.
+    rebuild_selector: str = ""
+    # Mirrors ``ImpactConfidence.level``.
+    confidence_level: Literal["full", "partial"]
+    # True when the widening branch fired: rebuild == all reachable, skippable == [].
+    widened_to_all_reachable: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Metabase cross-boundary lineage artifact (metabase_lineage.json).
 #

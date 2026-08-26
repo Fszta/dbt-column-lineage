@@ -55,6 +55,13 @@ inputs:
       audit). Default 'false' honors the pragmas.
     required: false
     default: "false"
+  emit-selector:
+    description: >-
+      Emit the policy-free rebuild selection (has_rebuild + rebuild_selector) as Action outputs
+      for a selective `dbt build --select`. Additive; never changes the gate or posts a comment.
+      Default 'false'.
+    required: false
+    default: "false"
   github-token:
     description: "Token used to post the sticky PR comment (needs pull-requests: write)"
     default: ${{ github.token }}
@@ -108,6 +115,17 @@ outputs:
       Number of honored override pragmas (allow-change / allow-break) that lowered a
       contribution on this change. 0 when none.
     value: ${{ steps.impact.outputs.overrides_applied }}
+  has_rebuild:
+    description: >-
+      Whether any model must be rebuilt (true|false). Branch on this — never on selector
+      emptiness — to avoid running `dbt build --select ""`. Emitted only with emit-selector.
+    value: ${{ steps.impact.outputs.has_rebuild }}
+  rebuild_selector:
+    description: >-
+      Space-joined dbt node-name selector for a selective build; empty when has_rebuild is
+      false. The consumer validates names against `dbt ls` and fail-closes on any it cannot
+      resolve. Emitted only with emit-selector.
+    value: ${{ steps.impact.outputs.rebuild_selector }}
 
 runs:
   using: "composite"
@@ -149,4 +167,5 @@ runs:
         [ -n "${{ inputs.adapter }}" ] && args+=(--adapter "${{ inputs.adapter }}")
         [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
         [ "${{ inputs.no-overrides }}" = "true" ] && args+=(--no-overrides)
+        [ "${{ inputs.emit-selector }}" = "true" ] && args+=(--emit-selector)
         parrant "${args[@]}"
