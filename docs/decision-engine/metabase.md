@@ -67,6 +67,8 @@ parrant metabase-extract \
 | `--include-archived` | Include archived cards. |
 | `--dashboard-meta-file` | JSON mapping dashboards → consumer `meta` (see below). |
 | `--fail-under` | Exit non-zero if resolution coverage is below this ratio. |
+| `--previous` | A prior `metabase_lineage.json` snapshot for **incremental reuse** — dashboards whose `updated_at` is unchanged skip the detail fetch (see below). |
+| `--max-workers` | Concurrency for the dashboard detail fan-out (default `8`). |
 
 Credentials come from env/flags and are **never** written into the snapshot — only the non-secret
 base URL is stamped in provenance.
@@ -110,6 +112,46 @@ Wrote metabase_lineage.json: 812 cards (604 column-precise, 158 table-only,
 - **unresolved** — no warehouse relation resolved; counted, never guessed.
 
 Use `--fail-under 0.8` to fail the extract if resolution drops below a threshold.
+
+### Scaling the extract — scoping, concurrency, incremental reuse
+
+On a large instance (hundreds of dashboards, thousands of cards) the extract does three things
+to stay fast and honest:
+
+- **Connection scoping now _filters_ cards.** A card whose query targets a Metabase database
+  outside `--database-id` is **dropped** — absent from the snapshot and not counted in coverage
+  — rather than resolved against the wrong warehouse. (Previously every card was included; a
+  foreign-connection card only polluted the artifact and dragged coverage down.) A malformed card
+  with no `database` at all keeps the old behaviour of being resolved. A dashboard left with no
+  in-scope cards is dropped entirely.
+- **Dashboards are fetched concurrently.** The per-dashboard detail fetch (`dashcards`) is the
+  N+1 cost at scale, so it fans out over a bounded thread pool. Tune with `--max-workers`
+  (default `8`); a single dashboard or `--max-workers 1` runs sequentially. A per-dashboard
+  failure fails the whole extract loudly — a partial snapshot is never emitted.
+- **Incremental reuse skips unchanged dashboards.** Pass yesterday's snapshot via `--previous`
+  and any dashboard whose Metabase `updated_at` matches the previous snapshot is **reused**
+  without a detail round-trip. Reuse is still honest: card ids are re-intersected against the
+  currently in-scope cards (a card that left the connection is dropped from the reused dashboard),
+  and `meta` is **always** recomputed from the fresh `--dashboard-meta-file` mapping — never
+  copied from the previous snapshot — so a taxonomy change lands even on a reused dashboard.
+  Reuse requires the **same `--database-id` scope** as the `--previous` snapshot: if the scope
+  changed, reuse is disabled and the run does a full (correct) refetch, so a card newly entering
+  scope on an unedited dashboard is never silently missed. (A missing `--previous` path is treated
+  as a cold start too, so a scheduled job can pass the flag unconditionally.)
+
+This pairs directly with the daily S3 pattern below: **download yesterday's snapshot, pass it as
+`--previous`, upload the new one.** The first run of the day still pays the full fetch; subsequent
+runs only fetch the dashboards that actually changed.
+
+!!! note "Snapshot schema is now `schema_version: 2`"
+    v2 stamps a per-card / per-dashboard `updated_at` so a later extract can reuse unchanged
+    entities. The offline gate reads **both** v1 and v2 snapshots — a v1 snapshot (no `updated_at`)
+    loads unchanged and simply can't be used as a `--previous` base for reuse (everything refetches).
+
+    **Rollout order: upgrade consumers before producers.** Every new extract now emits v2. An
+    older `parrant` install only accepts v1 and will **hard-fail** on a v2 snapshot (by design —
+    the gate never silently drops reach). So upgrade the `parrant` on your PR-gate runners to a
+    v2-aware version *before* the scheduled job starts publishing v2 snapshots to the shared store.
 
 ### Scheduling & where the snapshot lives
 
