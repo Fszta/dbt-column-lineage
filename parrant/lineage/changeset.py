@@ -351,6 +351,15 @@ class ChangesetBuilder:
             # lineage (nothing to diff precisely).
             if self._logic_changed(model_name):
                 classified = self._logic_changed_columns(base_model, head_model)
+                if not classified:
+                    # The compiled SQL provably changed, yet no output column's per-column
+                    # signature moved: the edit lives where the signature does not reach —
+                    # a JOIN ``ON`` predicate or a WHERE/join-side filter — which can still
+                    # shift downstream output *values*. Rather than fall silent and
+                    # confidently report "no changes" on a model whose SQL changed (a false
+                    # negative at full confidence — the one direction the gate must never
+                    # take), fail safe: flag every head output column INDETERMINATE. See #129.
+                    classified = self._unattributed_logic_fallback(model_name, head_model)
                 for column in sorted(classified):
                     diff = classified[column]
                     record(
@@ -468,6 +477,42 @@ class ChangesetBuilder:
                 self._column_expressions(head_model, column),
             )
         return changed
+
+    def _unattributed_logic_fallback(self, model_name: str, head_model) -> Dict[str, "_ColumnDiff"]:
+        """Fail-safe for a proven compiled-SQL change that no output column can explain.
+
+        ``_logic_changed`` proved the compiled SQL differs, but ``_logic_changed_columns``
+        attributed the change to no output column — the edit lives somewhere the per-column
+        signature does not fold in (a JOIN ``ON`` predicate, a WHERE/join-side filter), whose
+        change can still shift downstream output *values* (issue #129).
+
+        We first tell a genuinely semantic statement-level change apart from a purely cosmetic
+        one with a statement-level AST compare: an identifier-case / whitespace-only edit makes
+        ``_logic_changed`` (a string compare) fire while the per-column AST diff correctly
+        suppresses every column, and that difference is proven ``EQUIVALENT`` here — so we keep
+        the confident silence and record nothing. Only a non-``EQUIVALENT`` verdict (a real
+        meaning change, or one we cannot parse) trips the backstop, flagging every head output
+        column ``INDETERMINATE`` — mirroring the neither-side-parsed fallback so the change is
+        never silently dropped and downstream tracing still runs.
+        """
+        base_sql = self._safe_compiled_sql(self.base, model_name)
+        head_sql = self._safe_compiled_sql(self.head, model_name)
+        if compare_expressions(base_sql, head_sql, self._dialect).equal:
+            # Statement-level difference is provably cosmetic — no output value changed.
+            return {}
+        reason = (
+            "compiled SQL changed but the change could not be attributed to a specific "
+            "column (e.g. a JOIN or WHERE predicate) — treated as breaking (fail-safe)"
+        )
+        return {
+            column: _ColumnDiff(
+                kind=SemanticChangeKind.INDETERMINATE,
+                reason=reason,
+                base_expression=None,
+                head_expression=None,
+            )
+            for column in head_model.columns
+        }
 
     def _classify_change(self, base_exprs: List[str], head_exprs: List[str]) -> "_ColumnDiff":
         """Classify a signature-differing column, keeping the reason and compared expressions.
