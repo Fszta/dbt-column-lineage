@@ -1,0 +1,78 @@
+# Live-Metabase end-to-end tier — OUT of the per-push gate ON PURPOSE.
+#
+# This workflow boots a REAL Metabase in Docker, seeds representative content through the
+# REST API, and runs `parrant metabase-extract` against it, asserting a non-zero-coverage
+# extract. It runs across a Metabase VERSION MATRIX so API-serialization drift (e.g. the
+# pMBQL / MBQL-5 change in v0.57+ that breaks card resolution) is caught automatically.
+#
+# It is intentionally NOT triggered on push/PR (that gate lives in test.yml and runs the
+# directory tiers unit/integration/e2e). This tier is slow (Metabase takes 30-90s to boot),
+# needs Docker, and depends on a moving external surface — so it runs nightly + on demand.
+
+name: Metabase Live
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Nightly at 03:17 UTC (off the hour to dodge cron congestion).
+    - cron: "17 3 * * *"
+
+jobs:
+  metabase-live:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # At minimum a pMBQL version (>=0.57) and an older legacy-MBQL version, so a
+        # serialization regression on either side turns the matrix red.
+        metabase-image:
+          - "metabase/metabase:v0.63.15.1"  # pMBQL / MBQL-5 serialization
+          - "metabase/metabase:v0.55.11"    # legacy MBQL serialization
+    services:
+      metabase:
+        image: ${{ matrix.metabase-image }}
+        ports:
+          - 3000:3000
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          # Mirror test.yml: pin Poetry 2.1.3 (matches the lockfile generator; "latest"
+          # 2.4.1 fails to install on the runners).
+          version: 2.1.3
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Wait for Metabase to be healthy
+        run: |
+          echo "Waiting for Metabase (${{ matrix.metabase-image }}) at http://localhost:3000 ..."
+          for i in $(seq 1 60); do
+            status=$(curl -sf http://localhost:3000/api/health | grep -o '"status":"ok"' || true)
+            if [ -n "$status" ]; then
+              echo "Metabase is healthy."
+              exit 0
+            fi
+            echo "  attempt $i: not ready yet; sleeping 5s"
+            sleep 5
+          done
+          echo "Metabase did not become healthy in time." >&2
+          exit 1
+
+      - name: Run live-Metabase tests
+        env:
+          RUN_METABASE_LIVE: "1"
+          METABASE_URL: "http://localhost:3000"
+        run: poetry run pytest tests/live -v
