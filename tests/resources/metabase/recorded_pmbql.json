@@ -1,0 +1,2094 @@
+{
+  "_comment": "Ground-truth pMBQL (MBQL 5) responses captured from Metabase v0.63.15.1 (EE v1.63) for resolver tests.",
+  "session_properties": {
+    "version": {
+      "date": "2026-08-25",
+      "tag": "v0.63.15.1",
+      "hash": "ab5ffba"
+    }
+  },
+  "database_metadata": {
+    "1": {
+      "uploads_schema_name": null,
+      "description": "Some example data for you to play around with.",
+      "features": [
+        "database-routing",
+        "window-functions/cumulative",
+        "test/dynamic-dataset-loading",
+        "basic-aggregations",
+        "temporal-extract",
+        "identifiers-with-spaces",
+        "window-functions/offset",
+        "now",
+        "parameterized-sql",
+        "jdbc/statements",
+        "expression-literals",
+        "expressions/today",
+        "test/jvm-timezone-setting",
+        "date-arithmetics",
+        "parameters/table-reference",
+        "expressions/date",
+        "expression-aggregations",
+        "describe-is-nullable",
+        "saved-question-sandboxing",
+        "distinct-where",
+        "table-privileges",
+        "left-join",
+        "expressions/datetime",
+        "expressions/text",
+        "native-parameters",
+        "nested-queries",
+        "test/uuids-in-create-table-statements",
+        "expressions",
+        "test/create-table-without-data",
+        "jdbc/set-query-timeout",
+        "describe-default-expr",
+        "binning",
+        "metadata/key-constraints",
+        "dependencies/native",
+        "datetime-diff",
+        "upload-with-auto-pk",
+        "describe-is-generated",
+        "inner-join",
+        "native-temporal-units",
+        "fingerprint",
+        "native-parameter-card-reference"
+      ],
+      "uploads_table_prefix": null,
+      "cache_field_values_schedule": "0 0 19 * * ? *",
+      "router_database_id": null,
+      "write_data_details": null,
+      "timezone": "UTC",
+      "is_attached_dwh": false,
+      "auto_run_queries": true,
+      "is_stub": false,
+      "metadata_sync_schedule": "0 48 * * * ? *",
+      "name": "Sample Database",
+      "settings": null,
+      "caveats": "You probably don't want to use this for your business-critical analyses, but hey, it's your world, we're just living in it.",
+      "tables": [
+        {
+          "description": "Confirmed Sample Company orders for a product, from a user.",
+          "entity_type": "entity/TransactionTable",
+          "view_count": 0,
+          "schema": "",
+          "is_writable": true,
+          "database_require_filter": null,
+          "collection_id": null,
+          "show_in_getting_started": false,
+          "name": "ORDERS",
+          "transform_target": false,
+          "fields": [
+            {
+              "description": "This is a unique ID for the product. It is also called the \u201cInvoice number\u201d or \u201cConfirmation number\u201d in customer facing emails and screens.",
+              "database_type": "BIGINT",
+              "semantic_type": "type/PK",
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": null,
+              "name": "ID",
+              "fingerprint_version": 0,
+              "has_field_values": "none",
+              "database_is_pk": true,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:12.893918Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/BigInteger",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 9,
+              "last_analyzed": null,
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 0,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "ID",
+              "database_position": 0,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": null,
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/BigInteger",
+              "points_of_interest": null
+            },
+            {
+              "description": "The id of the user who made this order. Note that in some cases where an order was created on behalf of a customer who phoned the order in, this might be the employee who handled the request.",
+              "database_type": "INTEGER",
+              "semantic_type": "type/FK",
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.6377106144717425,
+              "name": "USER_ID",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": 4,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Integer",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 11,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 1,
+              "visibility_type": "normal",
+              "target": {
+                "description": "A unique identifier given to each user.",
+                "database_type": "BIGINT",
+                "semantic_type": "type/PK",
+                "table_id": 1,
+                "coercion_strategy": null,
+                "database_indexed": null,
+                "dimension_interestingness": null,
+                "name": "ID",
+                "fingerprint_version": 0,
+                "has_field_values": "none",
+                "database_is_pk": true,
+                "settings": null,
+                "caveats": null,
+                "fk_target_field_id": null,
+                "updated_at": "2026-08-26T11:15:12.931262Z",
+                "custom_position": 0,
+                "database_default": null,
+                "effective_type": "type/BigInteger",
+                "active": true,
+                "nfc_path": null,
+                "parent_id": null,
+                "id": 4,
+                "last_analyzed": null,
+                "database_partitioned": null,
+                "database_is_auto_increment": false,
+                "json_unfolding": false,
+                "position": 0,
+                "visibility_type": "normal",
+                "preview_display": true,
+                "database_is_generated": false,
+                "display_name": "ID",
+                "database_position": 0,
+                "database_required": false,
+                "database_is_nullable": true,
+                "fingerprint": null,
+                "created_at": "2026-08-26T11:15:11.483272Z",
+                "base_type": "type/BigInteger",
+                "points_of_interest": null
+              },
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "User ID",
+              "database_position": 1,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 929,
+                  "nil%": 0.0
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Integer",
+              "points_of_interest": null
+            },
+            {
+              "description": "The product ID. This is an internal identifier for the product, NOT the SKU.",
+              "database_type": "INTEGER",
+              "semantic_type": "type/FK",
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.6530685281944006,
+              "name": "PRODUCT_ID",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": 8,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Integer",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 14,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 2,
+              "visibility_type": "normal",
+              "target": {
+                "description": "The numerical product number. Only used internally. All external communication should use the title or EAN.",
+                "database_type": "BIGINT",
+                "semantic_type": "type/PK",
+                "table_id": 3,
+                "coercion_strategy": null,
+                "database_indexed": null,
+                "dimension_interestingness": null,
+                "name": "ID",
+                "fingerprint_version": 0,
+                "has_field_values": "none",
+                "database_is_pk": true,
+                "settings": null,
+                "caveats": null,
+                "fk_target_field_id": null,
+                "updated_at": "2026-08-26T11:15:12.958895Z",
+                "custom_position": 0,
+                "database_default": null,
+                "effective_type": "type/BigInteger",
+                "active": true,
+                "nfc_path": null,
+                "parent_id": null,
+                "id": 8,
+                "last_analyzed": null,
+                "database_partitioned": null,
+                "database_is_auto_increment": false,
+                "json_unfolding": false,
+                "position": 0,
+                "visibility_type": "normal",
+                "preview_display": true,
+                "database_is_generated": false,
+                "display_name": "ID",
+                "database_position": 0,
+                "database_required": false,
+                "database_is_nullable": true,
+                "fingerprint": null,
+                "created_at": "2026-08-26T11:15:11.483272Z",
+                "base_type": "type/BigInteger",
+                "points_of_interest": null
+              },
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Product ID",
+              "database_position": 2,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 200,
+                  "nil%": 0.0
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Integer",
+              "points_of_interest": null
+            },
+            {
+              "description": "The raw, pre-tax cost of the order. Note that this might be different in the future from the product price due to promotions, credits, etc.",
+              "database_type": "DOUBLE PRECISION",
+              "semantic_type": null,
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.8638108180517818,
+              "name": "SUBTOTAL",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Float",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 10,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 3,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Subtotal",
+              "database_position": 3,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 340,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Number": {
+                    "skewness": 0.33808811044008374,
+                    "min": 15.691943673970439,
+                    "q1": 49.81864156655383,
+                    "q3": 105.11984419607644,
+                    "excess-kurtosis": -0.97062867219018,
+                    "zero-fraction": 0.0,
+                    "mode-fraction": 0.0125,
+                    "top-3-fraction": 0.0324,
+                    "max": 148.22900526552291,
+                    "sd": 32.53981765232651,
+                    "avg": 77.0129546535657
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Float",
+              "points_of_interest": null
+            },
+            {
+              "description": "This is the amount of local and federal taxes that are collected on the purchase. Note that other governmental fees on some products are not included here, but instead are accounted for in the subtotal.",
+              "database_type": "DOUBLE PRECISION",
+              "semantic_type": null,
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.8667407822154232,
+              "name": "TAX",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Float",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 6,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 4,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Tax",
+              "database_position": 4,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 797,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Number": {
+                    "skewness": 0.33488097430719194,
+                    "min": 0.0,
+                    "q1": 2.27,
+                    "q3": 5.32,
+                    "excess-kurtosis": -0.3936116877849267,
+                    "zero-fraction": 0.0941,
+                    "mode-fraction": 0.0941,
+                    "top-3-fraction": 0.1041,
+                    "max": 11.12,
+                    "sd": 2.321019579643588,
+                    "avg": 3.8722099999999995
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Float",
+              "points_of_interest": null
+            },
+            {
+              "description": "The total billed amount.",
+              "database_type": "DOUBLE PRECISION",
+              "semantic_type": null,
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.8638801456627624,
+              "name": "TOTAL",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Float",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 5,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 5,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Total",
+              "database_position": 5,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 4426,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Number": {
+                    "skewness": 0.33667279435844716,
+                    "min": 8.93914247937167,
+                    "q1": 50.85568729900663,
+                    "q3": 110.70215255778119,
+                    "excess-kurtosis": -0.9552713331762646,
+                    "zero-fraction": 0.0,
+                    "mode-fraction": 0.0017,
+                    "top-3-fraction": 0.0049,
+                    "max": 159.34900526552292,
+                    "sd": 34.27092180309014,
+                    "avg": 80.35871658771225
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Float",
+              "points_of_interest": null
+            },
+            {
+              "description": "Discount amount.",
+              "database_type": "DOUBLE PRECISION",
+              "semantic_type": "type/Discount",
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.6993202351249115,
+              "name": "DISCOUNT",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Float",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 3,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 6,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Discount",
+              "database_position": 6,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 701,
+                  "nil%": 0.898
+                },
+                "type": {
+                  "type/Number": {
+                    "skewness": 6.2586328576942405,
+                    "min": 0.17088996672584322,
+                    "q1": 2.988925240608706,
+                    "q3": 7.325520035511883,
+                    "excess-kurtosis": 113.9628104030112,
+                    "zero-fraction": 0.0,
+                    "mode-fraction": 0.00196078431372549,
+                    "top-3-fraction": 0.0058823529411764705,
+                    "max": 61.69684269960571,
+                    "sd": 3.053970586361223,
+                    "avg": 5.16125554758032
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Float",
+              "points_of_interest": null
+            },
+            {
+              "description": "The date and time an order was submitted.",
+              "database_type": "TIMESTAMP",
+              "semantic_type": "type/CreationTimestamp",
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.9475,
+              "name": "CREATED_AT",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/DateTime",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 13,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 7,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Created At",
+              "database_position": 7,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 10040,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/DateTime": {
+                    "earliest": "2025-04-30T18:56:13.352Z",
+                    "latest": "2029-04-19T14:07:15.657Z",
+                    "mode-fraction": 0.0001,
+                    "top-3-fraction": 0.0003
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/DateTime",
+              "points_of_interest": null
+            },
+            {
+              "description": "Number of products bought.",
+              "database_type": "INTEGER",
+              "semantic_type": "type/Quantity",
+              "table_id": 2,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.7965029340547762,
+              "name": "QUANTITY",
+              "fingerprint_version": 6,
+              "has_field_values": "list",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Integer",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 2,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 8,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Quantity",
+              "database_position": 8,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 62,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Number": {
+                    "skewness": 9.806017343366301,
+                    "min": 0.0,
+                    "q1": 2.0,
+                    "q3": 5.0,
+                    "excess-kurtosis": 143.19046634881838,
+                    "zero-fraction": 0.0037,
+                    "mode-fraction": 0.2444,
+                    "top-3-fraction": 0.5718,
+                    "max": 100.0,
+                    "sd": 4.214258386403786,
+                    "avg": 3.7014999999999985
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Integer",
+              "points_of_interest": null
+            }
+          ],
+          "caveats": "You can join this on the Products and Orders table using the ID fields. Discount is left null if not applicable.",
+          "segments": [],
+          "owner_email": null,
+          "transform_id": null,
+          "updated_at": "2026-08-26T11:15:12.740746Z",
+          "is_published": false,
+          "owner_user_id": null,
+          "active": true,
+          "id": 2,
+          "db_id": 1,
+          "archived_at": null,
+          "data_source": null,
+          "visibility_type": null,
+          "field_order": "database",
+          "deactivated_at": null,
+          "data_authority": "unconfigured",
+          "is_upload": false,
+          "initial_sync_status": "complete",
+          "display_name": "Orders",
+          "data_layer": "final",
+          "metrics": [
+            {
+              "cache_invalidated_at": null,
+              "description": "Canonical metric for number of orders placed",
+              "archived": false,
+              "view_count": 0,
+              "collection_position": null,
+              "source_card_id": null,
+              "table_id": 2,
+              "result_metadata": [
+                {
+                  "description": "The date and time an order was submitted.",
+                  "semantic_type": "type/CreationTimestamp",
+                  "coercion_strategy": null,
+                  "unit": "month",
+                  "name": "CREATED_AT",
+                  "settings": {
+                    "time_enabled": "milliseconds"
+                  },
+                  "fk_target_field_id": null,
+                  "field_ref": [
+                    "field",
+                    13,
+                    {
+                      "base-type": "type/DateTime",
+                      "temporal-unit": "month"
+                    }
+                  ],
+                  "effective_type": "type/DateTime",
+                  "id": 13,
+                  "visibility_type": "normal",
+                  "display_name": "Created At: Month",
+                  "base_type": "type/DateTime"
+                },
+                {
+                  "base_type": "type/BigInteger",
+                  "display_name": "Count",
+                  "effective_type": "type/BigInteger",
+                  "field_ref": [
+                    "aggregation",
+                    0
+                  ],
+                  "name": "count",
+                  "semantic_type": "type/Quantity"
+                }
+              ],
+              "embedding_type": null,
+              "initially_published_at": null,
+              "card_schema": 23,
+              "database_id": 1,
+              "enable_embedding": false,
+              "collection_id": 2,
+              "query_type": "query",
+              "name": "Number of Orders",
+              "document_id": null,
+              "last_used_at": "2026-08-26T11:15:11.483272Z",
+              "type": "metric",
+              "dimensions": null,
+              "creator_id": 13371338,
+              "updated_at": "2026-08-26T11:15:11.483272Z",
+              "made_public_by_id": null,
+              "embedding_params": null,
+              "query_description": "Orders, Count, Grouped by Created At: Month, Filtered by Created At is in the previous 3 years or this year",
+              "cache_ttl": null,
+              "dataset_query": {
+                "lib/type": "mbql/query",
+                "stages": [
+                  {
+                    "lib/type": "mbql.stage/mbql",
+                    "aggregation": [
+                      [
+                        "count",
+                        {
+                          "lib/uuid": "02849463-e1bf-405b-9128-9ee66ed1471d"
+                        }
+                      ]
+                    ],
+                    "breakout": [
+                      [
+                        "field",
+                        {
+                          "base-type": "type/DateTime",
+                          "temporal-unit": "month",
+                          "lib/uuid": "4f0ee01f-714d-4712-8813-0d8ad6fd2d80",
+                          "effective-type": "type/DateTime"
+                        },
+                        13
+                      ]
+                    ],
+                    "source-table": 2,
+                    "filters": [
+                      [
+                        "time-interval",
+                        {
+                          "include-current": true,
+                          "lib/uuid": "bbb5d4f2-b24e-4a80-8a7b-63e18490cbf6"
+                        },
+                        [
+                          "field",
+                          {
+                            "base-type": "type/DateTime",
+                            "lib/uuid": "8d12d4b9-afff-4ff0-a7f2-798426e42f2c",
+                            "effective-type": "type/DateTime"
+                          },
+                          13
+                        ],
+                        -3,
+                        "year"
+                      ]
+                    ]
+                  }
+                ],
+                "database": 1
+              },
+              "dimension_mappings": null,
+              "id": 19,
+              "legacy_query": "{\"database\":1,\"query\":{\"aggregation\":[[\"count\"]],\"breakout\":[[\"field\",13,{\"base-type\":\"type/DateTime\",\"temporal-unit\":\"month\"}]],\"filter\":[\"time-interval\",[\"field\",13,{\"base-type\":\"type/DateTime\"}],-3,\"year\",{\"include-current\":true}],\"source-table\":2},\"type\":\"query\"}",
+              "parameter_mappings": [],
+              "display": "line",
+              "archived_directly": false,
+              "entity_id": "8EdazRgPwfxdiltp7NCjS",
+              "collection_preview": true,
+              "visualization_settings": {
+                "graph.dimensions": [
+                  "CREATED_AT"
+                ],
+                "graph.metrics": [
+                  "count"
+                ]
+              },
+              "metabase_version": null,
+              "parameters": [],
+              "dashboard_id": null,
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "public_uuid": null
+            },
+            {
+              "cache_invalidated_at": null,
+              "description": "Canonical metric for revenue across all product lines",
+              "archived": false,
+              "view_count": 0,
+              "collection_position": null,
+              "source_card_id": null,
+              "table_id": 2,
+              "result_metadata": [
+                {
+                  "description": "The date and time an order was submitted.",
+                  "database_type": "TIMESTAMP",
+                  "semantic_type": "type/CreationTimestamp",
+                  "table_id": 2,
+                  "coercion_strategy": null,
+                  "unit": "quarter",
+                  "name": "CREATED_AT",
+                  "settings": {
+                    "time_enabled": "milliseconds"
+                  },
+                  "source": "breakout",
+                  "fk_target_field_id": null,
+                  "field_ref": [
+                    "field",
+                    13,
+                    {
+                      "base-type": "type/DateTime",
+                      "temporal-unit": "quarter"
+                    }
+                  ],
+                  "effective_type": "type/DateTime",
+                  "active": true,
+                  "nfc_path": null,
+                  "parent_id": null,
+                  "id": 13,
+                  "position": 7,
+                  "visibility_type": "normal",
+                  "display_name": "Created At: Quarter",
+                  "base_type": "type/DateTime"
+                },
+                {
+                  "base_type": "type/Float",
+                  "display_name": "Sum of Total",
+                  "field_ref": [
+                    "aggregation",
+                    0
+                  ],
+                  "name": "sum",
+                  "semantic_type": "type/Currency",
+                  "settings": {
+                    "currency": "USD"
+                  },
+                  "source": "aggregation"
+                }
+              ],
+              "embedding_type": null,
+              "initially_published_at": null,
+              "card_schema": 23,
+              "database_id": 1,
+              "enable_embedding": false,
+              "collection_id": 2,
+              "query_type": "query",
+              "name": "Revenue",
+              "document_id": null,
+              "last_used_at": "2026-08-26T11:15:11.483272Z",
+              "type": "metric",
+              "dimensions": null,
+              "creator_id": 13371338,
+              "updated_at": "2026-08-26T11:15:11.483272Z",
+              "made_public_by_id": null,
+              "embedding_params": null,
+              "query_description": "Orders, Sum of Total, Grouped by Created At: Quarter, Filtered by Created At is in the previous 12 quarters or this quarter",
+              "cache_ttl": null,
+              "dataset_query": {
+                "lib/type": "mbql/query",
+                "stages": [
+                  {
+                    "lib/type": "mbql.stage/mbql",
+                    "aggregation": [
+                      [
+                        "sum",
+                        {
+                          "lib/uuid": "e7ce09b0-0ae7-46c5-b8aa-246895f33728"
+                        },
+                        [
+                          "field",
+                          {
+                            "base-type": "type/Float",
+                            "lib/uuid": "2a0efb67-d6e3-4773-97f2-8295a1e5e3da",
+                            "effective-type": "type/Float"
+                          },
+                          5
+                        ]
+                      ]
+                    ],
+                    "breakout": [
+                      [
+                        "field",
+                        {
+                          "base-type": "type/DateTime",
+                          "temporal-unit": "quarter",
+                          "lib/uuid": "ff7d8286-1e66-4411-bdd9-a806ae435326",
+                          "effective-type": "type/DateTime"
+                        },
+                        13
+                      ]
+                    ],
+                    "source-table": 2,
+                    "filters": [
+                      [
+                        "time-interval",
+                        {
+                          "include-current": true,
+                          "lib/uuid": "334fd104-fc0c-49ec-90dd-6223c0142019"
+                        },
+                        [
+                          "field",
+                          {
+                            "base-type": "type/DateTime",
+                            "lib/uuid": "15b6b629-ce0d-4e38-89d8-f2333b092142",
+                            "effective-type": "type/DateTime"
+                          },
+                          13
+                        ],
+                        -12,
+                        "quarter"
+                      ]
+                    ]
+                  }
+                ],
+                "database": 1
+              },
+              "dimension_mappings": null,
+              "id": 9,
+              "legacy_query": "{\"database\":1,\"query\":{\"aggregation\":[[\"sum\",[\"field\",5,{\"base-type\":\"type/Float\"}]]],\"breakout\":[[\"field\",13,{\"base-type\":\"type/DateTime\",\"temporal-unit\":\"quarter\"}]],\"filter\":[\"time-interval\",[\"field\",13,{\"base-type\":\"type/DateTime\"}],-12,\"quarter\",{\"include-current\":true}],\"source-table\":2},\"type\":\"query\"}",
+              "parameter_mappings": [],
+              "display": "line",
+              "archived_directly": false,
+              "entity_id": "skXR69-dlhJST5C7Rd9nR",
+              "collection_preview": true,
+              "visualization_settings": {
+                "graph.dimensions": [
+                  "CREATED_AT"
+                ],
+                "graph.metrics": [
+                  "sum"
+                ]
+              },
+              "metabase_version": null,
+              "parameters": [],
+              "dashboard_id": null,
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "public_uuid": null
+            }
+          ],
+          "created_at": "2026-08-26T11:15:11.483272Z",
+          "estimated_row_count": null,
+          "points_of_interest": "Is it? You tell us!"
+        },
+        {
+          "description": "Information on the user accounts registered with Sample Company.",
+          "entity_type": "entity/UserTable",
+          "view_count": 0,
+          "schema": "",
+          "is_writable": true,
+          "database_require_filter": null,
+          "collection_id": null,
+          "show_in_getting_started": false,
+          "name": "PEOPLE",
+          "transform_target": false,
+          "fields": [
+            {
+              "description": "A unique identifier given to each user.",
+              "database_type": "BIGINT",
+              "semantic_type": "type/PK",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": null,
+              "name": "ID",
+              "fingerprint_version": 0,
+              "has_field_values": "none",
+              "database_is_pk": true,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:12.931262Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/BigInteger",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 4,
+              "last_analyzed": null,
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 0,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "ID",
+              "database_position": 0,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": null,
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/BigInteger",
+              "points_of_interest": null
+            },
+            {
+              "description": "The street address of the account\u2019s billing address",
+              "database_type": "CHARACTER VARYING",
+              "semantic_type": null,
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.7178513219652934,
+              "name": "ADDRESS",
+              "fingerprint_version": 6,
+              "has_field_values": "search",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 51,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 1,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Address",
+              "database_position": 1,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2490,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 0.0,
+                    "percent-state": 0.0,
+                    "percent-blank": 0.0,
+                    "average-length": 20.85,
+                    "mode-fraction": 0.0004,
+                    "top-3-fraction": 0.0012
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "The contact email for the account.",
+              "database_type": "CHARACTER VARYING",
+              "semantic_type": "type/Email",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.687811241751318,
+              "name": "EMAIL",
+              "fingerprint_version": 6,
+              "has_field_values": "search",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 7,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 2,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Email",
+              "database_position": 2,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2500,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 1.0,
+                    "percent-state": 0.0,
+                    "percent-blank": 0.0,
+                    "average-length": 24.1824,
+                    "mode-fraction": 0.0004,
+                    "top-3-fraction": 0.0012
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "This is the salted password of the user. It should not be visible",
+              "database_type": "CHARACTER VARYING",
+              "semantic_type": null,
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.717811241751318,
+              "name": "PASSWORD",
+              "fingerprint_version": 6,
+              "has_field_values": "search",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 54,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 3,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Password",
+              "database_position": 3,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2500,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 0.0,
+                    "percent-state": 0.0,
+                    "percent-blank": 0.0,
+                    "average-length": 36.0,
+                    "mode-fraction": 0.0004,
+                    "top-3-fraction": 0.0012
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "The name of the user who owns an account",
+              "database_type": "CHARACTER VARYING",
+              "semantic_type": "type/Name",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.7178152425515314,
+              "name": "NAME",
+              "fingerprint_version": 6,
+              "has_field_values": "search",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 48,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 4,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Name",
+              "database_position": 4,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2499,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 0.0,
+                    "percent-state": 0.0,
+                    "percent-blank": 0.0,
+                    "average-length": 13.532,
+                    "mode-fraction": 0.0004,
+                    "top-3-fraction": 0.0012
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "The city of the account\u2019s billing address",
+              "database_type": "CHARACTER VARYING",
+              "semantic_type": "type/City",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.7702141388528099,
+              "name": "CITY",
+              "fingerprint_version": 6,
+              "has_field_values": "search",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 53,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 5,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "City",
+              "database_position": 5,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 1966,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 0.0,
+                    "percent-state": 0.002,
+                    "percent-blank": 0.0,
+                    "average-length": 8.284,
+                    "mode-fraction": 0.0024,
+                    "top-3-fraction": 0.0056
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "This is the longitude of the user on sign-up. It might be updated in the future to the last seen location.",
+              "database_type": "DOUBLE PRECISION",
+              "semantic_type": "type/Longitude",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.7987497328876176,
+              "name": "LONGITUDE",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Float",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 58,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 6,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Longitude",
+              "database_position": 6,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2491,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Number": {
+                    "skewness": -1.4255238890251432,
+                    "min": -166.5425726,
+                    "q1": -101.574374,
+                    "q3": -84.6495801,
+                    "excess-kurtosis": 3.192748512765297,
+                    "zero-fraction": 0.0,
+                    "mode-fraction": 0.0004,
+                    "top-3-fraction": 0.0012,
+                    "max": -67.96735199999999,
+                    "sd": 15.4034020641059,
+                    "avg": -95.18741780363989
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Float",
+              "points_of_interest": null
+            },
+            {
+              "description": "The state or province of the account\u2019s billing address",
+              "database_type": "CHARACTER",
+              "semantic_type": "type/State",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.8624,
+              "name": "STATE",
+              "fingerprint_version": 6,
+              "has_field_values": "list",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 1,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 7,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "State",
+              "database_position": 7,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 49,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 0.0,
+                    "percent-state": 1.0,
+                    "percent-blank": 0.0,
+                    "average-length": 2.0,
+                    "mode-fraction": 0.0776,
+                    "top-3-fraction": 0.1624
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "The channel through which we acquired this user. Valid values include: Affiliate, Facebook, Google, Organic and Twitter",
+              "database_type": "CHARACTER VARYING",
+              "semantic_type": "type/Source",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.7700000000000001,
+              "name": "SOURCE",
+              "fingerprint_version": 6,
+              "has_field_values": "list",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 30,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 8,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Source",
+              "database_position": 8,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 5,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 0.0,
+                    "percent-state": 0.0,
+                    "percent-blank": 0.0,
+                    "average-length": 7.4084,
+                    "mode-fraction": 0.2048,
+                    "top-3-fraction": 0.6084
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "The date of birth of the user",
+              "database_type": "DATE",
+              "semantic_type": null,
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.8568478439425052,
+              "name": "BIRTH_DATE",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Date",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 12,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 9,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Birth Date",
+              "database_position": 9,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2308,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/DateTime": {
+                    "earliest": "1958-04-26",
+                    "latest": "2000-04-03",
+                    "mode-fraction": 0.0012,
+                    "top-3-fraction": 0.0032
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Date",
+              "points_of_interest": null
+            },
+            {
+              "description": "The postal code of the account\u2019s billing address",
+              "database_type": "CHARACTER",
+              "semantic_type": "type/ZipCode",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.7689317367894043,
+              "name": "ZIP",
+              "fingerprint_version": 6,
+              "has_field_values": "search",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Text",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 61,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 10,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Zip",
+              "database_position": 10,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2235,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Text": {
+                    "percent-json": 0.0,
+                    "percent-url": 0.0,
+                    "percent-email": 0.0,
+                    "percent-state": 0.0,
+                    "percent-blank": 0.0,
+                    "average-length": 5.0,
+                    "mode-fraction": 0.0012,
+                    "top-3-fraction": 0.0036
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Text",
+              "points_of_interest": null
+            },
+            {
+              "description": "This is the latitude of the user on sign-up. It might be updated in the future to the last seen location.",
+              "database_type": "DOUBLE PRECISION",
+              "semantic_type": "type/Latitude",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.8362169905685243,
+              "name": "LATITUDE",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/Float",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 52,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 11,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Latitude",
+              "database_position": 11,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2490,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/Number": {
+                    "skewness": 0.9276221363439162,
+                    "min": 25.775827,
+                    "q1": 35.3121184,
+                    "q3": 43.7183199,
+                    "excess-kurtosis": 2.5697139200347703,
+                    "zero-fraction": 0.0,
+                    "mode-fraction": 0.0004,
+                    "top-3-fraction": 0.0012,
+                    "max": 70.6355001,
+                    "sd": 6.392706954078982,
+                    "avg": 39.87934670484004
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/Float",
+              "points_of_interest": null
+            },
+            {
+              "description": "The date the user record was created. Also referred to as the user\u2019s \"join date\"",
+              "database_type": "TIMESTAMP",
+              "semantic_type": "type/CreationTimestamp",
+              "table_id": 1,
+              "coercion_strategy": null,
+              "database_indexed": null,
+              "dimension_interestingness": 0.9475,
+              "name": "CREATED_AT",
+              "fingerprint_version": 6,
+              "has_field_values": "none",
+              "database_is_pk": null,
+              "settings": null,
+              "caveats": null,
+              "fk_target_field_id": null,
+              "updated_at": "2026-08-26T11:15:14.079594Z",
+              "custom_position": 0,
+              "database_default": null,
+              "effective_type": "type/DateTime",
+              "active": true,
+              "nfc_path": null,
+              "parent_id": null,
+              "id": 50,
+              "last_analyzed": "2026-08-26T11:15:14.079594Z",
+              "database_partitioned": null,
+              "database_is_auto_increment": false,
+              "json_unfolding": false,
+              "position": 12,
+              "visibility_type": "normal",
+              "target": null,
+              "preview_display": true,
+              "database_is_generated": false,
+              "display_name": "Created At",
+              "database_position": 12,
+              "database_required": false,
+              "database_is_nullable": true,
+              "fingerprint": {
+                "global": {
+                  "distinct-count": 2500,
+                  "nil%": 0.0
+                },
+                "type": {
+                  "type/DateTime": {
+                    "earliest": "2025-04-19T21:35:18.752Z",
+                    "latest": "2028-04-19T14:06:27.3Z",
+                    "mode-fraction": 0.0004,
+                    "top-3-fraction": 0.0012
+                  }
+                }
+              },
+              "created_at": "2026-08-26T11:15:11.483272Z",
+              "base_type": "type/DateTime",
+              "points_of_interest": null
+            }
+          ],
+          "caveats": "Note that employees and customer support staff will have accounts.",
+          "segments": [],
+          "owner_email": null,
+          "transform_id": null,
+          "updated_at": "2026-08-26T11:15:12.729955Z",
+          "is_published": false,
+          "owner_user_id": null,
+          "active": true,
+          "id": 1,
+          "db_id": 1,
+          "archived_at": null,
+          "data_source": null,
+          "visibility_type": null,
+          "field_order": "database",
+          "deactivated_at": null,
+          "data_authority": "unconfigured",
+          "is_upload": false,
+          "initial_sync_status": "complete",
+          "display_name": "People",
+          "data_layer": "final",
+          "metrics": [],
+          "created_at": "2026-08-26T11:15:11.483272Z",
+          "estimated_row_count": null,
+          "points_of_interest": "Is it? You tell us!"
+        }
+      ],
+      "creator_id": 13371338,
+      "is_full_sync": true,
+      "updated_at": "2026-08-26T11:15:12.67908Z",
+      "provider_name": null,
+      "cache_ttl": null,
+      "details": {
+        "db": "/plugins/sample-database.sqlite",
+        "read-only?": true
+      },
+      "is_sample": true,
+      "id": 1,
+      "is_on_demand": false,
+      "engine": "sqlite",
+      "initial_sync_status": "complete",
+      "is_audit": false,
+      "dbms_version": {
+        "flavor": "SQLite",
+        "version": "3.50.3",
+        "semantic-version": [
+          3,
+          50
+        ]
+      },
+      "uploads_enabled": false,
+      "refingerprint": null,
+      "created_at": "2026-08-26T11:15:11.483272Z",
+      "points_of_interest": "You can find all sorts of different joinable tables ranging from products to people to reviews here.",
+      "admin_details": null
+    }
+  },
+  "snippets": [
+    {
+      "description": null,
+      "archived": false,
+      "creator": {
+        "email": "api-key-user-ab97b517-5d04-4e60-997f-a0a76dce05c5@api-key.invalid",
+        "first_name": "parrant-rehearsal",
+        "is_data_analyst": false,
+        "last_login": null,
+        "is_qbnewb": true,
+        "is_superuser": true,
+        "id": 2,
+        "last_name": "",
+        "tenant_id": null,
+        "date_joined": "2026-08-26T11:18:02.869964Z",
+        "common_name": "parrant-rehearsal"
+      },
+      "content": "total > 0",
+      "collection_id": null,
+      "name": "active2",
+      "is_remote_synced": null,
+      "creator_id": 2,
+      "updated_at": "2026-08-26T11:24:26.182458Z",
+      "id": 2,
+      "entity_id": "k_a05fRU4A0UzSpwlN0fe",
+      "template_tags": {},
+      "created_at": "2026-08-26T11:24:26.182458Z"
+    },
+    {
+      "description": null,
+      "archived": false,
+      "creator": {
+        "email": "api-key-user-ab97b517-5d04-4e60-997f-a0a76dce05c5@api-key.invalid",
+        "first_name": "parrant-rehearsal",
+        "is_data_analyst": false,
+        "last_login": null,
+        "is_qbnewb": true,
+        "is_superuser": true,
+        "id": 2,
+        "last_name": "",
+        "tenant_id": null,
+        "date_joined": "2026-08-26T11:18:02.869964Z",
+        "common_name": "parrant-rehearsal"
+      },
+      "content": "total > 0",
+      "collection_id": null,
+      "name": "active_filter",
+      "is_remote_synced": null,
+      "creator_id": 2,
+      "updated_at": "2026-08-26T11:23:33.620132Z",
+      "id": 1,
+      "entity_id": "qjFlIpF3B286mixepY9hH",
+      "template_tags": {},
+      "created_at": "2026-08-26T11:23:33.620132Z"
+    }
+  ],
+  "cards": [
+    {
+      "id": 41,
+      "name": "account txns",
+      "collection_id": null,
+      "archived": false,
+      "dataset_query": {
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "SELECT a.account_holder, t.transaction_id FROM test.main.stg_accounts a JOIN test.main.stg_transactions t ON a.account_id = t.account_id"
+          }
+        ],
+        "lib/type": "mbql/query",
+        "database": 1
+      },
+      "database_id": 1,
+      "updated_at": "2026-08-26T11:18:02.595023Z"
+    },
+    {
+      "id": 42,
+      "name": "all txns",
+      "collection_id": null,
+      "archived": false,
+      "dataset_query": {
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "SELECT * FROM test.main.transactions"
+          }
+        ],
+        "lib/type": "mbql/query",
+        "database": 1
+      },
+      "database_id": 1,
+      "updated_at": "2026-08-26T11:18:02.616296Z"
+    },
+    {
+      "id": 44,
+      "name": "pmbql join",
+      "collection_id": null,
+      "archived": false,
+      "dataset_query": {
+        "stages": [
+          {
+            "joins": [
+              {
+                "lib/type": "mbql/join",
+                "alias": "People",
+                "conditions": [
+                  [
+                    "=",
+                    {
+                      "lib/uuid": "8c2b0bc7-c399-45d4-99a2-dc1a0cbeca94"
+                    },
+                    [
+                      "field",
+                      {
+                        "base-type": "type/Integer",
+                        "lib/uuid": "68b78b52-7cd1-4e7d-bc73-5c2f3dd160b4",
+                        "effective-type": "type/Integer"
+                      },
+                      11
+                    ],
+                    [
+                      "field",
+                      {
+                        "base-type": "type/BigInteger",
+                        "join-alias": "People",
+                        "lib/uuid": "80c05b2f-c777-4509-a035-df48c26517ac",
+                        "effective-type": "type/BigInteger"
+                      },
+                      4
+                    ]
+                  ]
+                ],
+                "stages": [
+                  {
+                    "lib/type": "mbql.stage/mbql",
+                    "source-table": 1
+                  }
+                ]
+              }
+            ],
+            "lib/type": "mbql.stage/mbql",
+            "source-table": 2,
+            "fields": [
+              [
+                "field",
+                {
+                  "base-type": "type/Float",
+                  "lib/uuid": "4cb32471-da33-44dd-b6df-4a412c59abd3",
+                  "effective-type": "type/Float"
+                },
+                5
+              ],
+              [
+                "field",
+                {
+                  "base-type": "type/Text",
+                  "join-alias": "People",
+                  "lib/uuid": "5e415795-4557-433d-96ad-af24067feaa2",
+                  "effective-type": "type/Text"
+                },
+                48
+              ]
+            ]
+          }
+        ],
+        "lib/type": "mbql/query",
+        "database": 1
+      },
+      "database_id": 1,
+      "updated_at": "2026-08-26T11:23:33.430485Z"
+    },
+    {
+      "id": 50,
+      "name": "pmbql native tags2",
+      "collection_id": null,
+      "archived": false,
+      "dataset_query": {
+        "stages": [
+          {
+            "template-tags": [
+              {
+                "dimension": [
+                  "field",
+                  {
+                    "base-type": "type/DateTime",
+                    "lib/uuid": "83f7fd2f-9b79-4bb1-ad2c-e60ad60e2bf7",
+                    "effective-type": "type/DateTime"
+                  },
+                  13
+                ],
+                "type": "dimension",
+                "name": "created",
+                "display-name": "Created",
+                "widget-type": "date/all-options"
+              },
+              {
+                "snippet-name": "active2",
+                "type": "snippet",
+                "name": "snippet: active2",
+                "display-name": "Active2",
+                "snippet-id": 2
+              },
+              {
+                "display-name": "Ref",
+                "type": "card",
+                "name": "#49",
+                "card-id": 49
+              }
+            ],
+            "lib/type": "mbql.stage/native",
+            "native": "SELECT id FROM orders WHERE {{snippet: active2}} AND {{created}} AND id IN ({{#49}})"
+          }
+        ],
+        "lib/type": "mbql/query",
+        "database": 1
+      },
+      "database_id": 1,
+      "updated_at": "2026-08-26T11:24:26.312302Z"
+    },
+    {
+      "id": 45,
+      "name": "pmbql on card",
+      "collection_id": null,
+      "archived": false,
+      "dataset_query": {
+        "stages": [
+          {
+            "lib/type": "mbql.stage/mbql",
+            "source-card": 43
+          }
+        ],
+        "lib/type": "mbql/query",
+        "database": 1
+      },
+      "database_id": 1,
+      "updated_at": "2026-08-26T11:23:33.535946Z"
+    },
+    {
+      "id": 43,
+      "name": "pmbql structured",
+      "collection_id": null,
+      "archived": false,
+      "dataset_query": {
+        "stages": [
+          {
+            "breakout": [
+              [
+                "field",
+                {
+                  "base-type": "type/DateTime",
+                  "temporal-unit": "month",
+                  "lib/uuid": "e98618e8-30ef-44e5-a0dd-b0b36e3e92cb",
+                  "effective-type": "type/DateTime"
+                },
+                13
+              ]
+            ],
+            "lib/type": "mbql.stage/mbql",
+            "source-table": 2,
+            "aggregation": [
+              [
+                "sum",
+                {
+                  "lib/uuid": "781eac5a-f642-4d69-b27f-436e0f24cf60"
+                },
+                [
+                  "field",
+                  {
+                    "base-type": "type/Float",
+                    "lib/uuid": "09da7cf5-366f-430f-a723-91e381adaa80",
+                    "effective-type": "type/Float"
+                  },
+                  5
+                ]
+              ]
+            ],
+            "filters": [
+              [
+                ">",
+                {
+                  "lib/uuid": "d56a5e7b-32e1-46e0-94cf-b4124a4fc593"
+                },
+                [
+                  "field",
+                  {
+                    "base-type": "type/Float",
+                    "lib/uuid": "746782ae-ba68-408f-872c-e86947959af7",
+                    "effective-type": "type/Float"
+                  },
+                  5
+                ],
+                10
+              ]
+            ]
+          }
+        ],
+        "lib/type": "mbql/query",
+        "database": 1
+      },
+      "database_id": 1,
+      "updated_at": "2026-08-26T11:23:33.320213Z"
+    },
+    {
+      "id": 40,
+      "name": "txn columns",
+      "collection_id": null,
+      "archived": false,
+      "dataset_query": {
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "SELECT transaction_id, account_id FROM test.main.stg_transactions WHERE account_id > 0"
+          }
+        ],
+        "lib/type": "mbql/query",
+        "database": 1
+      },
+      "database_id": 1,
+      "updated_at": "2026-08-26T11:18:02.53519Z"
+    }
+  ],
+  "dashboards": []
+}
