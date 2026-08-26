@@ -242,11 +242,101 @@ class ImpactConfidence(BaseModel):
     # merely absent from the catalog but has parseable SQL is analyzable and NOT counted.
     no_column_info: int = 0
     parse_failed: int = 0
-    # Sample of the actual unanalyzable model names, for UI/agent drill-down. Capped;
-    # the *_models integer counts above remain the source of truth for totals.
+    # The actual unanalyzable model names, for UI/agent drill-down. In the machine
+    # (JSON) surface these are the COMPLETE lists — a fail-closed consumer that
+    # force-rebuilds "the models parrant couldn't analyze" must never miss one, so
+    # len(no_column_info_models) == no_column_info and
+    # len(parse_failed_models) == parse_failed always hold in machine output.
+    # Display layers (markdown) cap the rendered names and set the *_truncated flags
+    # below; the integer counts above remain the source of truth for totals.
     no_column_info_models: List[str] = Field(default_factory=list)
     parse_failed_models: List[str] = Field(default_factory=list)
+    # Display-only truncation signals: False in machine output (lists are complete),
+    # set True only by a display layer when it elided names from the rendered list.
+    no_column_info_truncated: bool = False
+    parse_failed_truncated: bool = False
     level: Literal["full", "partial"]
+
+
+class Selection(BaseModel):
+    """Policy-free minimal rebuild set, derived purely from the lineage diff.
+
+    This is the policy-independent base the ``PolicyVerdict.build_set`` overlay sits on:
+    it answers "which models must CI rebuild?" from the diff alone, with no authored policy.
+    The rule is fail-closed —
+    ``rebuild_models = {models with a non-equivalent reaching change}
+    ∪ {reachable models parrant could not analyze} ∪ {the edited models themselves}`` —
+    and ``skippable_models`` is the reachable complement (reached only by a provably
+    additive/passthrough change at full confidence). When confidence is not full or any
+    display list was truncated, ``skippable_models`` is emitted empty and ``rebuild_models``
+    widens to every reachable model (``widened_to_all_reachable``): the honest "we could
+    not prove anything safe to skip" state.
+    """
+
+    # Sentinel so a consumer never runs ``dbt build --select ""`` (which selects nothing
+    # and exits green): branch on this, never on the selector string's emptiness.
+    has_rebuild: bool = False
+    # Sorted, deduplicated dbt node names that must be rebuilt.
+    rebuild_models: List[str] = Field(default_factory=list)
+    # Sorted reachable complement — reached only by an additive/passthrough change at full
+    # confidence. Informational: the consumer decides whether to actually skip these.
+    skippable_models: List[str] = Field(default_factory=list)
+    # Space-joined ``rebuild_models`` — a drop-in for ``dbt build --select $(...)``.
+    # Empty string exactly when ``has_rebuild`` is False.
+    rebuild_selector: str = ""
+    # Mirrors ``ImpactConfidence.level``.
+    confidence_level: Literal["full", "partial"]
+    # True when the widening branch fired: rebuild == all reachable, skippable == [].
+    widened_to_all_reachable: bool = False
+
+
+class ModelResolution(BaseModel):
+    """Per-reachable-model column-resolution disposition (display/emission only).
+
+    ``status`` retains, per model, the same partition the confidence pass already computes:
+    ``catalog_backed``/``parsed`` are *resolved* (parrant has this model's columns);
+    ``no_column_info``/``parse_failed``/``unresolved`` are *unanalyzable* (no columns to trace).
+    A model with a resolved status has ``reason == None``.
+
+    ``reason`` is a coarse, advisory hint at WHY an unanalyzable model could not be resolved —
+    a prioritization signal for closing resolution gaps, not a load-bearing one. It NEVER
+    upgrades a status and is NEVER consulted by the rebuild decision; stripping it leaves every
+    status and every rebuild/skippable membership unchanged.
+    """
+
+    status: Literal["catalog_backed", "parsed", "no_column_info", "parse_failed", "unresolved"]
+    # One of: star_off_cte, star_modifier, missing_catalog, python_model, unsupported_sql, other.
+    reason: Optional[str] = None
+
+
+class ResolutionReasonCount(BaseModel):
+    """One coarse resolution reason and how many unanalyzable models carry it."""
+
+    reason: str
+    count: int
+
+
+class ResolutionSummary(BaseModel):
+    """Aggregate roll-up of the per-model resolution statuses over the reachable set.
+
+    The per-status counts reconcile exactly with the confidence counts
+    (``no_column_info`` + ``unresolved`` == confidence ``no_column_info``;
+    ``parse_failed`` == confidence ``parse_failed``) and the total equals ``reachable``.
+    """
+
+    reachable: int = 0
+    catalog_backed: int = 0
+    parsed: int = 0
+    no_column_info: int = 0
+    parse_failed: int = 0
+    unresolved: int = 0
+    # |rebuild_models ∩ {models whose status is not catalog_backed/parsed}|: how many rebuilds
+    # are forced because parrant could not resolve the model, rather than by a proven reaching
+    # change. Consumers can log this as a fraction of |rebuild_models| to measure how much
+    # rebuild volume is driven by unresolved models rather than proven changes.
+    rebuild_forced_by_nonresolution: int = 0
+    # Coarse reasons ranked by frequency (advisory): the ranked resolution-gap backlog.
+    top_reasons: List[ResolutionReasonCount] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

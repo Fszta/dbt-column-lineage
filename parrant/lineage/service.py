@@ -1,15 +1,26 @@
 from pathlib import Path
 from typing import Dict, List, Literal, Set, Optional, Any, Tuple, Union, TYPE_CHECKING
 from dataclasses import dataclass, field
+from collections import Counter
 import logging
+import re
 
+from parrant.artifacts.exceptions import ModelNotFoundError
 from parrant.lineage.provider import LineageAndMetadataProvider
 from parrant.lineage.sqlglot_provider import build_sqlglot_provider
 
 if TYPE_CHECKING:
     from parrant.lineage.changeset import ColumnChange
     from parrant.metabase.reach import MetabaseReach
-from parrant.models.schema import ColumnLineage, Coverage, ImpactConfidence
+from parrant.models.schema import (
+    ColumnLineage,
+    Coverage,
+    ImpactConfidence,
+    ModelResolution,
+    ResolutionReasonCount,
+    ResolutionSummary,
+    Selection,
+)
 from parrant.parser.sql_parser_utils import strip_sql_comments
 
 logger = logging.getLogger(__name__)
@@ -17,10 +28,6 @@ logger = logging.getLogger(__name__)
 # Higher rank == more severe. Used to keep the worst severity when the same
 # downstream node is reached by several changed columns.
 _SEVERITY_RANK: Dict[str, int] = {"critical": 2, "low_impact": 1}
-
-# Cap on the number of unanalyzable model names carried in the confidence block, so a
-# huge coverage gap doesn't bloat the impact payload. Totals stay in the integer counts.
-_IMPACT_CONFIDENCE_NAME_CAP = 100
 
 # A downstream column's ``transformation_type`` → the plain-language *mechanism* by which
 # the change reaches it. This is the machine-readable twin of the markdown's mechanism
@@ -108,6 +115,198 @@ def _mechanism_breakdown(affected_columns: List[Dict[str, Any]]) -> Dict[str, in
         label = _MECHANISM_LABELS.get(raw, raw)
         breakdown[label] = breakdown.get(label, 0) + 1
     return breakdown
+
+
+def _change_is_breaking(entry: Dict[str, Any]) -> bool:
+    """Whether a ``by_change`` entry contributes its reach to the rebuild set (fail-closed).
+
+    Only a *proven* additive change is safe to skip: ``kind == "added"`` with a semantic that
+    is not a meaning change (added columns carry no semantic; a cosmetic ``equivalent`` edit is
+    never emitted as a change in the first place). Every other kind — ``removed`` /
+    ``type_changed`` / any ``logic_changed`` — and any change we could not resolve is treated as
+    breaking, so its reached models rebuild. This is the fail-safe ``is_breaking`` contract
+    surfaced over the already-emitted change facts; it re-derives no semantics.
+    """
+    proven_additive = entry.get("kind") == "added" and entry.get("semantic") in (
+        None,
+        "equivalent",
+    )
+    return not proven_additive
+
+
+def build_selection(
+    reachable: Set[str],
+    changed_models: Set[str],
+    by_change: List[Dict[str, Any]],
+    confidence: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Derive the policy-free minimal rebuild set from an already-computed changeset impact.
+
+    Pure function over the diff facts (reachability, the per-change reach in ``by_change``, and
+    the confidence block) — it re-walks no lineage and consults no policy. Returns
+    ``Selection(...).model_dump()``.
+
+    Fail-closed at every branch:
+      - every edited model is rebuilt (folded into the universe explicitly, since
+        ``_dag_reachable_models`` excludes the seed);
+      - every model reached by a non-additive change is rebuilt (see :func:`_change_is_breaking`);
+      - every reachable model parrant could not analyze (``no_column_info`` / ``parse_failed``,
+        the COMPLETE machine lists) is rebuilt;
+      - if confidence is not ``full`` OR any display list was truncated, ``skippable_models`` is
+        empty and ``rebuild_models`` widens to the whole reachable universe.
+
+    ``skippable_models`` is the reachable complement and is non-empty only at full confidence
+    with nothing truncated. All emitted lists are sorted for determinism.
+    """
+    # The universe every model is partitioned over: the strictly-downstream reachable set plus
+    # the edited models themselves (which the DAG walk excludes but which always rebuild).
+    universe: Set[str] = set(reachable) | set(changed_models)
+
+    # The COMPLETE unanalyzable lists (uncapped in machine output). A model parrant could not
+    # analyze is assumed affected — this is the whole reason the lists must be complete.
+    unanalyzable: Set[str] = set(confidence.get("no_column_info_models", [])) | set(
+        confidence.get("parse_failed_models", [])
+    )
+    truncated = bool(
+        confidence.get("no_column_info_truncated") or confidence.get("parse_failed_truncated")
+    )
+
+    breaking_reached: Set[str] = set()
+    for entry in by_change:
+        if not _change_is_breaking(entry):
+            continue
+        for reached in entry.get("reached_models", []) or []:
+            name = reached.get("name") if isinstance(reached, dict) else None
+            if name is not None:
+                breaking_reached.add(name)
+
+    rebuild: Set[str] = (
+        (set(changed_models) & universe) | (breaking_reached & universe) | (unanalyzable & universe)
+    )
+
+    level = confidence["level"]
+    widened = level != "full" or truncated
+    if widened:
+        rebuild = set(universe)
+        skippable: List[str] = []
+    else:
+        skippable = sorted(universe - rebuild)
+
+    rebuild_models = sorted(rebuild)
+    has_rebuild = len(rebuild_models) > 0
+    # Sentinel guard: the selector is the empty string exactly when has_rebuild is False, so a
+    # consumer never feeds a bare "" to ``dbt build --select``.
+    rebuild_selector = " ".join(rebuild_models) if has_rebuild else ""
+
+    return Selection(
+        has_rebuild=has_rebuild,
+        rebuild_models=rebuild_models,
+        skippable_models=skippable,
+        rebuild_selector=rebuild_selector,
+        confidence_level=level,
+        widened_to_all_reachable=widened,
+    ).model_dump()
+
+
+@dataclass
+class _ReachPartition:
+    """The reachable set split by column-resolution outcome (computed once, reused).
+
+    ``resolved`` are models parrant has columns for; ``catalog_backed`` (real catalog truth)
+    and ``parsed`` (columns recovered from SQL) are its disjoint halves. ``no_column_info`` and
+    ``parse_failed`` are the unanalyzable halves. The five leaf sets — ``catalog_backed``,
+    ``parsed``, ``no_column_info``, ``parse_failed`` — partition ``reachable`` exactly.
+    """
+
+    resolved: Set[str]
+    no_column_info: Set[str]
+    parse_failed: Set[str]
+    catalog_backed: Set[str]
+    parsed: Set[str]
+
+
+# A ``SELECT *`` immediately followed by a column-set modifier (Snowflake EXCLUDE/RENAME/
+# REPLACE, BigQuery EXCEPT/REPLACE, DuckDB EXCLUDE/REPLACE). Best-effort, advisory: used only
+# to label WHY a star-sourced model is unanalyzable, never to change a status or a rebuild.
+_STAR_MODIFIER_RE = re.compile(r"\*\s*(?:exclude|except|replace|rename)\b", re.IGNORECASE)
+
+
+def _resolve_reason(
+    registry: LineageAndMetadataProvider, name: str
+) -> Tuple[Literal["no_column_info", "unresolved"], Optional[str]]:
+    """(status, reason) for a reachable model that has no column info.
+
+    Best-effort and advisory. A python model is surfaced as ``unresolved``/``python_model``;
+    every other no-column model keeps the ``no_column_info`` status and carries a coarse reason
+    inferred from star detection and catalog presence. The reason never upgrades the status and
+    is never consulted by the rebuild decision.
+    """
+    try:
+        model = registry.get_model(name)
+    except ModelNotFoundError:
+        return "no_column_info", "other"
+    if (model.language or "").lower() == "python":
+        return "unresolved", "python_model"
+    star_sources = (model.metadata or {}).get("star_sources") if model.metadata else None
+    if star_sources:
+        compiled = registry.get_compiled_sql(name) or ""
+        if _STAR_MODIFIER_RE.search(compiled):
+            return "no_column_info", "star_modifier"
+        return "no_column_info", "star_off_cte"
+    if not registry.is_catalog_backed(name):
+        return "no_column_info", "missing_catalog"
+    return "no_column_info", "other"
+
+
+def build_resolution(
+    registry: LineageAndMetadataProvider,
+    partition: _ReachPartition,
+    rebuild_models: Set[str],
+) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """Retain the reachable partition per model as a resolution status + advisory reason.
+
+    Pure emission over already-computed facts (the confidence partition, the catalog-backed
+    flag, and coarse language/SQL-shape hints) — it re-walks no lineage and consults no policy.
+    Returns ``(per_model_map, resolution_summary_dict)``. Every reachable model appears exactly
+    once in the map; the summary counts reconcile exactly with the confidence counts.
+    """
+    per_model: Dict[str, Dict[str, Any]] = {}
+    for name in partition.catalog_backed:
+        per_model[name] = ModelResolution(status="catalog_backed", reason=None).model_dump()
+    for name in partition.parsed:
+        per_model[name] = ModelResolution(status="parsed", reason=None).model_dump()
+    for name in partition.parse_failed:
+        per_model[name] = ModelResolution(
+            status="parse_failed", reason="unsupported_sql"
+        ).model_dump()
+    for name in partition.no_column_info:
+        status, reason = _resolve_reason(registry, name)
+        per_model[name] = ModelResolution(status=status, reason=reason).model_dump()
+
+    status_counts: Counter[str] = Counter(entry["status"] for entry in per_model.values())
+    reason_counts: Counter[str] = Counter(
+        entry["reason"] for entry in per_model.values() if entry["reason"] is not None
+    )
+    top_reasons = [
+        ResolutionReasonCount(reason=reason, count=count)
+        for reason, count in sorted(reason_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    forced = sum(
+        1
+        for name in rebuild_models
+        if name in per_model and per_model[name]["status"] not in ("catalog_backed", "parsed")
+    )
+    summary = ResolutionSummary(
+        reachable=len(per_model),
+        catalog_backed=status_counts.get("catalog_backed", 0),
+        parsed=status_counts.get("parsed", 0),
+        no_column_info=status_counts.get("no_column_info", 0),
+        parse_failed=status_counts.get("parse_failed", 0),
+        unresolved=status_counts.get("unresolved", 0),
+        rebuild_forced_by_nonresolution=forced,
+        top_reasons=top_reasons,
+    ).model_dump()
+    return per_model, summary
 
 
 @dataclass
@@ -210,6 +409,40 @@ class LineageService:
                     queue.append(child)
         return reachable
 
+    def _partition_reachable(self, reachable: Set[str]) -> _ReachPartition:
+        """Split ``reachable`` by column-resolution outcome — the single source of truth.
+
+        Both the confidence block and the per-model resolution status consume this, so the two
+        surfaces reconcile by construction. A reachable model with columns is *resolved* (and is
+        ``catalog_backed`` when the catalog carries its column truth, else ``parsed``); otherwise
+        it is ``parse_failed`` (had SQL the parser could not read) or ``no_column_info``.
+        """
+        models = self.registry.get_models()
+        parse_failed_names = self.registry.get_parse_failed_models()
+
+        resolved: Set[str] = set()
+        parse_failed: Set[str] = set()
+        no_column_info: Set[str] = set()
+        for name in reachable:
+            model = models.get(name)
+            if model is not None and model.columns:
+                resolved.add(name)  # analyzable: we have columns to trace
+                continue
+            if name in parse_failed_names:
+                parse_failed.add(name)
+            else:
+                no_column_info.add(name)
+
+        catalog_backed = {name for name in resolved if self.registry.is_catalog_backed(name)}
+        parsed = resolved - catalog_backed
+        return _ReachPartition(
+            resolved=resolved,
+            no_column_info=no_column_info,
+            parse_failed=parse_failed,
+            catalog_backed=catalog_backed,
+            parsed=parsed,
+        )
+
     def _impact_confidence(self, reachable: Set[str], resolved_models: int) -> Dict[str, Any]:
         """Confidence block: "full" when every reachable model was analyzable, else "partial".
 
@@ -226,31 +459,24 @@ class LineageService:
           a non-table relation such as a semantic view, a python model, or a relation
           dbt has not built/compiled. We deliberately do NOT claim these are "not built".
         """
-        models = self.registry.get_models()
-        parse_failed_names = self.registry.get_parse_failed_models()
-
-        parse_failed: Set[str] = set()
-        no_column_info: Set[str] = set()
-        for name in reachable:
-            model = models.get(name)
-            if model is not None and model.columns:
-                continue  # analyzable: we have columns to trace
-            if name in parse_failed_names:
-                parse_failed.add(name)
-            else:
-                no_column_info.add(name)
+        partition = self._partition_reachable(reachable)
+        no_column_info = partition.no_column_info
+        parse_failed = partition.parse_failed
 
         unanalyzable_reachable = parse_failed | no_column_info
         level: Literal["full", "partial"] = "full" if not unanalyzable_reachable else "partial"
-        cap = _IMPACT_CONFIDENCE_NAME_CAP
+        # Machine surface carries the COMPLETE name lists (no cap) so a fail-closed
+        # consumer can never miss a model we couldn't analyze; the display layer caps.
         return ImpactConfidence(
             reachable_models=len(reachable),
             resolved_models=resolved_models,
             unanalyzable_models=len(unanalyzable_reachable),
             no_column_info=len(no_column_info),
             parse_failed=len(parse_failed),
-            no_column_info_models=sorted(no_column_info)[:cap],
-            parse_failed_models=sorted(parse_failed)[:cap],
+            no_column_info_models=sorted(no_column_info),
+            parse_failed_models=sorted(parse_failed),
+            no_column_info_truncated=False,
+            parse_failed_truncated=False,
             level=level,
         ).model_dump()
 
@@ -961,11 +1187,26 @@ class LineageService:
 
         # Guarded so a stub service without a real registry omits confidence rather than erroring.
         confidence: Optional[Dict[str, Any]] = None
+        selection: Optional[Dict[str, Any]] = None
+        resolution: Optional[Dict[str, Dict[str, Any]]] = None
+        resolution_summary: Optional[Dict[str, Any]] = None
         if getattr(self, "registry", None) is not None:
             reachable: Set[str] = set()
             for change in changes:
                 reachable |= self._dag_reachable_models(change.model)
             confidence = self._impact_confidence(reachable, len(affected_models))
+            # Policy-free rebuild selection: the edited models plus everything reached by a
+            # non-additive change plus everything unanalyzable. Lowercase the edited names so
+            # the universe partitions cleanly against the (lowercased) reachable set.
+            changed_models = {change.model.lower() for change in changes}
+            selection = build_selection(reachable, changed_models, by_change, confidence)
+            # Per-model resolution status + aggregate summary: retain the confidence partition
+            # per model (advisory reason attached) so a consumer can measure how much of the
+            # rebuild set was forced by non-resolution rather than a proven reaching change.
+            partition = self._partition_reachable(reachable)
+            resolution, resolution_summary = build_resolution(
+                self.registry, partition, set(selection["rebuild_models"])
+            )
 
         return {
             "summary": {
@@ -983,4 +1224,7 @@ class LineageService:
             "affected_exposures": [affected_exposures[name] for name in sorted(affected_exposures)],
             "by_change": by_change,
             "confidence": confidence,
+            "selection": selection,
+            "resolution": resolution,
+            "resolution_summary": resolution_summary,
         }

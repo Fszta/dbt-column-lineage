@@ -23,6 +23,10 @@ _MAX_SQL_CHARS = 400
 # Cap the matched-reach sample shown per fired policy rule in the "why this verdict" section:
 # enough to be concrete ("it reaches `marts.revenue`"), not a wall on a wide fan-out.
 _MAX_REACH_INLINE = 3
+# Cap the unanalyzable model names listed in the folded coverage-gap disclosure, so a huge
+# blast radius stays readable. The JSON confidence block carries the complete lists; this
+# cap is display-only and, when it elides names, is signalled with a "… +N more" line.
+_UNANALYZABLE_NAME_CAP = 100
 
 # Subtle attribution appended to every rendered report so an adopting repo's PRs
 # passively surface where the analysis came from. Kept to one muted line.
@@ -128,6 +132,49 @@ def _confidence_reason_words(confidence: Dict[str, Any]) -> str:
     if no_column_info:
         return " (they expose no column-level information)"
     return ""
+
+
+def _capped_name_lines(names: List[str], label: str) -> Tuple[List[str], bool]:
+    """Render up to the display cap of sorted model names, with a "… +N more" line
+    when the source list is longer. Returns the lines and whether names were elided."""
+    if not names:
+        return [], False
+    ordered = sorted(names)
+    shown = ordered[:_UNANALYZABLE_NAME_CAP]
+    lines = [f"- {label}: " + ", ".join(f"`{name}`" for name in shown)]
+    extra = len(ordered) - len(shown)
+    truncated = extra > 0
+    if truncated:
+        lines.append(f"  - … +{extra} more")
+    return lines, truncated
+
+
+def _render_unanalyzable_names(confidence: Dict[str, Any]) -> List[str]:
+    """A folded ``<details>`` disclosure of the reachable models that couldn't be
+    analyzed, capped for readability. Mutates ``confidence`` to set the display-only
+    ``*_truncated`` flags True when it actually elided names (the JSON surface, which is
+    emitted before any markdown render, always carries the complete lists and False
+    flags). Returns an empty list when there are no unanalyzable models."""
+    no_column_info = confidence.get("no_column_info_models") or []
+    parse_failed = confidence.get("parse_failed_models") or []
+    if not no_column_info and not parse_failed:
+        return []
+    total = len(no_column_info) + len(parse_failed)
+    body: List[str] = []
+    nci_lines, nci_truncated = _capped_name_lines(no_column_info, "No column info")
+    pf_lines, pf_truncated = _capped_name_lines(parse_failed, "Parse failed")
+    body.extend(nci_lines)
+    body.extend(pf_lines)
+    confidence["no_column_info_truncated"] = nci_truncated
+    confidence["parse_failed_truncated"] = pf_truncated
+    return [
+        "<details>",
+        f"<summary>Models that couldn't be analyzed ({total})</summary>",
+        "",
+        *body,
+        "",
+        "</details>",
+    ]
 
 
 # Policy gate decision → a one-glyph severity marker (amber reserved for the one blocking
@@ -653,6 +700,7 @@ def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> 
             f"Break detection skipped {_plural(unattributable, 'dbt test')} it couldn't tie "
             f"to a column (singular/custom tests); a clean ruling is a lower bound."
         )
+    unanalyzable_disclosure: List[str] = []
     if confidence:
         if confidence.get("level") == "full":
             footer.append(
@@ -667,6 +715,7 @@ def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> 
                 f"couldn't be analyzed{_confidence_reason_words(confidence)}, so the impact above "
                 f"may be incomplete."
             )
+            unanalyzable_disclosure = _render_unanalyzable_names(confidence)
     coverage = report.get("coverage")
     if coverage and not coverage.get("complete", False):
         footer.append(
@@ -695,6 +744,8 @@ def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> 
         footer.append(bits + ".")
     if footer:
         out += ["<sub>" + " · ".join(footer) + "</sub>", ""]
+    if unanalyzable_disclosure:
+        out += unanalyzable_disclosure + [""]
 
     out.append(_CREDIT_LINE)
     out.append("")

@@ -16,6 +16,7 @@ from parrant.lineage.ci import (
     resolve_pr_number,
     with_marker,
     write_github_outputs,
+    write_selector_outputs,
 )
 
 
@@ -108,6 +109,63 @@ class TestWriteGithubOutputs:
     def test_noop_without_env(self, monkeypatch):
         monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
         assert write_github_outputs({"summary": {"affected_models": 5}}) is False
+
+
+class TestWriteSelectorOutputs:
+    def test_writes_rebuild_keys(self, tmp_path, monkeypatch):
+        out_file = tmp_path / "gh_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(out_file))
+        report = {
+            "selection": {
+                "has_rebuild": True,
+                "rebuild_selector": "int_orders marts_orders",
+            }
+        }
+        assert write_selector_outputs(report) is True
+        written = dict(
+            line.split("=", 1) for line in out_file.read_text().splitlines() if "=" in line
+        )
+        # Lowercased boolean (shell-friendly) and a single-line space-joined selector, projected
+        # byte-for-byte from report["selection"] — never recomputed.
+        assert written["has_rebuild"] == "true"
+        assert written["rebuild_selector"] == "int_orders marts_orders"
+        assert written["rebuild_selector"] == report["selection"]["rebuild_selector"]
+
+    def test_no_rebuild_emits_false_and_empty_selector(self, tmp_path, monkeypatch):
+        out_file = tmp_path / "gh_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(out_file))
+        report = {"selection": {"has_rebuild": False, "rebuild_selector": ""}}
+        assert write_selector_outputs(report) is True
+        lines = out_file.read_text().splitlines()
+        assert "has_rebuild=false" in lines
+        # The sentinel says false and the selector value is empty (no dbt build --select "").
+        assert "rebuild_selector=" in lines
+
+    def test_noop_without_env(self, monkeypatch):
+        monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+        report = {"selection": {"has_rebuild": True, "rebuild_selector": "x"}}
+        assert write_selector_outputs(report) is False
+
+    def test_noop_when_no_selection_block(self, tmp_path, monkeypatch):
+        out_file = tmp_path / "gh_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(out_file))
+        assert write_selector_outputs({"summary": {}}) is False
+        assert not out_file.exists() or out_file.read_text() == ""
+
+    def test_keys_are_distinct_from_github_outputs(self, tmp_path, monkeypatch):
+        # Under --ci --emit-selector both emitters run; their keys must not collide, so each
+        # selection key is written exactly once.
+        out_file = tmp_path / "gh_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(out_file))
+        report = {
+            "summary": {"affected_models": 1},
+            "selection": {"has_rebuild": True, "rebuild_selector": "a b"},
+        }
+        write_github_outputs(report)
+        write_selector_outputs(report)
+        content = out_file.read_text()
+        assert content.count("has_rebuild=") == 1
+        assert content.count("rebuild_selector=") == 1
 
 
 def test_fail_on_blocks_property():

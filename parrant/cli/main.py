@@ -483,6 +483,15 @@ def _build_explore_change_context(
     "policy `reach: {kind: exposure}` rule. Consumed OFFLINE — no Metabase credentials.",
 )
 @click.option(
+    "--emit-selector",
+    is_flag=True,
+    default=False,
+    help="Write has_rebuild and rebuild_selector to $GITHUB_OUTPUT for a selective dbt build. "
+    "Additive; composes with --format json; posts no comment and never changes the exit code "
+    "(gating stays --fail-on). The selector is space-joined dbt node names — the consumer "
+    "validates them against `dbt ls` and treats any unresolved name as fail-closed.",
+)
+@click.option(
     "--github-token",
     envvar="GITHUB_TOKEN",
     help="GitHub token for posting the PR comment (defaults to $GITHUB_TOKEN).",
@@ -512,6 +521,7 @@ def impact(
     fail_on: str,
     policy_path: Optional[str],
     metabase_path: Optional[str],
+    emit_selector: bool,
     github_token: Optional[str],
     repo: Optional[str],
     pr_number: Optional[int],
@@ -734,6 +744,14 @@ def impact(
     except Exception as e:
         click.echo(f"Error: {str(e)}", err=True)
         sys.exit(1)
+
+    # Selector emission is a pure side-channel to $GITHUB_OUTPUT: independent of --ci, it posts
+    # no comment and never calls sys.exit, so the exit code stays owned by --fail-on. Placed after
+    # the try/except so a hard render error (which already exited 1) never emits a green selector.
+    if emit_selector:
+        from parrant.lineage.ci import write_selector_outputs
+
+        write_selector_outputs(report)
 
     # CI wiring is deliberately outside the try/except above: a failure to render
     # the report is a hard error, but the CI gate deciding to fail the check

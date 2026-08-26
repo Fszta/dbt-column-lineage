@@ -142,6 +142,41 @@ def write_github_outputs(report: Dict[str, Any]) -> bool:
     return True
 
 
+def write_selector_outputs(report: Dict[str, Any]) -> bool:
+    """Emit the policy-free rebuild selection to ``$GITHUB_OUTPUT`` for a selective build.
+
+    Projects ``report["selection"]`` verbatim — it never recomputes — writing exactly two keys:
+    ``has_rebuild`` (lowercased ``true``/``false``, so a shell ``[ "$x" = "true" ]`` works) and
+    ``rebuild_selector`` (the space-joined dbt node-name selector, a single line, empty exactly
+    when ``has_rebuild`` is false). Keys are distinct from :func:`write_github_outputs`, so both
+    may run in one invocation without clobbering each other.
+
+    A no-op returning ``False`` when ``$GITHUB_OUTPUT`` is unset (running outside GitHub Actions
+    is unaffected) or when the report carries no selection block. Never raises and never affects
+    the process exit code.
+    """
+    output_path = os.environ.get("GITHUB_OUTPUT")
+    if not output_path:
+        return False
+
+    selection = report.get("selection")
+    if not isinstance(selection, dict):
+        return False
+
+    values = {
+        "has_rebuild": str(bool(selection.get("has_rebuild", False))).lower(),
+        "rebuild_selector": str(selection.get("rebuild_selector", "")),
+    }
+    try:
+        with open(output_path, "a", encoding="utf-8") as handle:
+            for key, value in values.items():
+                handle.write(f"{key}={value}\n")
+    except OSError as exc:
+        logger.warning("Could not write selector GitHub Action outputs: %s", exc)
+        return False
+    return True
+
+
 def with_marker(body: str) -> str:
     """Prefix a comment body with the hidden sticky marker (idempotent)."""
     if COMMENT_MARKER in body:
