@@ -1,4 +1,4 @@
-""" — the two card resolvers, converging on one warehouse anchor.
+"""— the two card resolvers, converging on one warehouse anchor.
 
 Both resolvers terminate at a warehouse ``database.schema.table.column`` and return the same
 :class:`ResolvedCard`, so the extractor treats them uniformly:
@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
 from parrant.models.schema import MetabaseColumnRef
 from parrant.parser.sql_parser import SQLColumnParser
+from parrant.metabase.pmbql import normalize_dataset_query
 from parrant.metabase.warehouse_meta import CardCorpus, WarehouseMeta
 
 # The roles a resolved column may carry (matches ``MetabaseColumnRef.role``).
@@ -47,10 +48,6 @@ class ResolvedCard:
     upstream_card_ids: List[int] = field(default_factory=list)
     snippet_ids: List[int] = field(default_factory=list)
     unresolved_reason: Optional[str] = None
-
-
-def _dataset_query(card: dict) -> dict:
-    return card.get("dataset_query") or {}
 
 
 def _iter_field_refs(node: Any) -> List[list]:
@@ -87,10 +84,25 @@ class CardResolver:
 
     # --- entry point ------------------------------------------------------
     def resolve_card(self, card: dict) -> ResolvedCard:
+        """Resolve ``card`` to a :class:`ResolvedCard`.
+
+        **Mutates ``card`` in place**: a pMBQL (MBQL 5) ``dataset_query`` — as returned by
+        Metabase v0.57+ — is normalized to the legacy MBQL shape and written back to
+        ``card["dataset_query"]`` at entry. This keeps all downstream resolution logic (and
+        its recursion into upstream cards) legacy-only, and — critically — lets
+        :func:`parrant.metabase.extract._to_card` read the corrected ``dataset_query["type"]``
+        / ``["database"]`` (e.g. a native pMBQL card ends up ``type == "native"``). Legacy
+        input passes through untouched (the normalizer is a no-op / idempotent).
+        """
         card_id = card.get("id")
         if isinstance(card_id, int) and card_id in self._cache:
             return self._cache[card_id]
-        query = _dataset_query(card)
+        raw_query = card.get("dataset_query")
+        if isinstance(raw_query, dict):
+            query = normalize_dataset_query(raw_query)
+            card["dataset_query"] = query
+        else:
+            query = {}
         if query.get("type") == "native":
             resolved = self.resolve_native(query, card)
         elif query.get("type") == "query":
