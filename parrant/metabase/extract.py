@@ -1,4 +1,4 @@
-""" — the extract pipeline: fetch → resolve → normalize → coverage-stamp.
+"""— the extract pipeline: fetch → resolve → normalize → coverage-stamp.
 
 All network I/O is behind :class:`~parrant.metabase.client.MetabaseClient`, and
 the SQL dialect for the native resolver is supplied by the caller (from the dbt manifest /
@@ -41,6 +41,12 @@ class ExtractConfig:
     # never hardcodes an org's taxonomy. Shape:
     #   {"by_collection": {<collection_id>: {...}}, "by_dashboard": {<dashboard_id>: {...}}}
     dashboard_meta: Dict[str, Dict[Any, Dict[str, Any]]] = field(default_factory=dict)
+    # A previously-loaded snapshot for incremental reuse. When provided, dashboards whose
+    # Metabase ``updated_at`` matches the previous snapshot are reused rather than refetched
+    # (the N+1 detail fetch is the expensive part at 500+ dashboards). ``None`` = full extract.
+    previous: Optional["MetabaseLineage"] = None
+    # Concurrency for the dashboard detail fan-out (``client.get_dashboards``).
+    max_workers: int = 8
 
 
 def build_dashboard_meta_resolver(
@@ -96,6 +102,7 @@ def _to_card(card: dict, resolved: ResolvedCard) -> MetabaseCard:
         upstream_card_ids=resolved.upstream_card_ids,
         snippet_ids=resolved.snippet_ids,
         unresolved_reason=resolved.unresolved_reason,
+        updated_at=card.get("updated_at"),
     )
 
 
@@ -108,40 +115,102 @@ def run_extract(config: ExtractConfig, client: MetabaseClient) -> MetabaseLineag
     meta = WarehouseMeta.from_database_metadata(metadatas)
     corpus = CardCorpus(raw_cards, snippets)
 
-    # 2. Resolve cards.
+    # 2. Resolve cards. Scope to the configured connection(s): a card whose query targets a
+    # foreign Metabase database pollutes the artifact and drags down coverage, so skip it. A
+    # malformed card with no ``database`` (db is None) keeps the old behavior of being resolved.
     resolver = CardResolver(meta, corpus, config.dialect)
+    scoped_db_ids = set(config.database_ids)
     cards: List[MetabaseCard] = []
+    included_card_ids: Set[int] = set()
     used_relations: Set[str] = set()
     for raw_card in raw_cards:
         if not isinstance(raw_card.get("id"), int):
             continue
         if raw_card.get("archived") and not config.include_archived:
             continue
+        query = raw_card.get("dataset_query") or {}
+        db = query.get("database")
+        if db is not None and db not in scoped_db_ids:
+            continue
         resolved = resolver.resolve_card(raw_card)
         card = _to_card(raw_card, resolved)
         cards.append(card)
+        included_card_ids.add(card.card_id)
         for ref in card.columns:
             used_relations.add(ref.relation)
         used_relations.update(card.table_relations)
 
-    # 3. Attach dashboards (with consumer-supplied meta).
+    # 3. Attach dashboards (with consumer-supplied meta), concurrent + incremental. Fetch
+    # detail only for dashboards new-or-changed since the previous snapshot; reuse the rest.
     meta_resolver = build_dashboard_meta_resolver(config.dashboard_meta)
-    dashboards: List[MetabaseDashboard] = []
-    for summary in client.list_dashboards():
-        dashboard_id = summary.get("id")
-        if not isinstance(dashboard_id, int):
+    shells = client.list_dashboards()
+    # Reuse is only sound when the previous snapshot was taken over the SAME connection scope:
+    # a reused dashboard's ``card_ids`` were already filtered to the previous run's in-scope
+    # cards, so re-intersecting can only shrink them. If ``--database-id`` widened (or otherwise
+    # changed) since the previous run, a card that newly entered scope on an unedited dashboard
+    # (same ``updated_at``) would be silently dropped. Guard against that by disabling reuse
+    # entirely on a scope mismatch — the run degrades to a full (but correct) refetch.
+    prev_scope_matches = config.previous is not None and set(
+        config.previous.provenance.database_ids
+    ) == set(config.database_ids)
+    prev_by_id: Dict[int, MetabaseDashboard] = (
+        {d.dashboard_id: d for d in config.previous.dashboards}
+        if config.previous is not None and prev_scope_matches
+        else {}
+    )
+
+    # Decide reuse vs fetch per shell; a shell is reusable only when both its and the previous
+    # snapshot's ``updated_at`` are present and equal (a missing stamp forces a refetch).
+    shells_by_id: Dict[int, dict] = {}
+    fetch_ids: List[int] = []
+    reused_ids: Set[int] = set()
+    for shell in shells:
+        shell_id = shell.get("id")
+        if not isinstance(shell_id, int):
             continue
-        detail = client.get_dashboard(dashboard_id)
+        shells_by_id[shell_id] = shell
+        prev = prev_by_id.get(shell_id)
+        shell_updated = shell.get("updated_at")
+        if (
+            prev is not None
+            and prev.updated_at is not None
+            and shell_updated is not None
+            and shell_updated == prev.updated_at
+        ):
+            reused_ids.add(shell_id)
+        else:
+            fetch_ids.append(shell_id)
+
+    details = client.get_dashboards(fetch_ids, max_workers=config.max_workers) if fetch_ids else {}
+
+    dashboards: List[MetabaseDashboard] = []
+    for dashboard_id, shell in shells_by_id.items():
+        if dashboard_id in reused_ids:
+            prev = prev_by_id[dashboard_id]
+            raw_card_ids = list(prev.card_ids)
+            name = shell.get("name") or prev.name or ""
+        else:
+            detail = details[dashboard_id]
+            raw_card_ids = _dashcard_card_ids(detail)
+            name = detail.get("name") or shell.get("name") or ""
+        # Intersect with the scoped cards (order-preserved); this also drops cards that left
+        # the connection since the previous snapshot. Meta is ALWAYS recomputed from the shell
+        # (the consumer's mapping may have changed even when the dashboard itself did not).
+        card_ids = [cid for cid in raw_card_ids if cid in included_card_ids]
+        if not card_ids:
+            continue
         dashboards.append(
             MetabaseDashboard(
                 dashboard_id=dashboard_id,
-                name=detail.get("name") or summary.get("name") or "",
-                collection_id=detail.get("collection_id"),
+                name=name,
+                collection_id=shell.get("collection_id"),
                 url=f"{config.metabase_base_url.rstrip('/')}/dashboard/{dashboard_id}",
-                card_ids=_dashcard_card_ids(detail),
-                meta=meta_resolver(detail),
+                card_ids=card_ids,
+                meta=meta_resolver(shell),
+                updated_at=shell.get("updated_at"),
             )
         )
+    dashboards.sort(key=lambda d: d.dashboard_id)
 
     # 4. Relations actually referenced (de-duplicated), + coverage + provenance.
     relations: Dict[str, MetabaseRelation] = {
@@ -157,7 +226,6 @@ def run_extract(config: ExtractConfig, client: MetabaseClient) -> MetabaseLineag
         dbt_adapter=config.dialect,
     )
     return MetabaseLineage(
-        schema_version=1,
         provenance=provenance,
         coverage=coverage,
         relations=relations,

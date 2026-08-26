@@ -1,4 +1,4 @@
-""" — the ``metabase-extract`` CLI subcommand (credentialed).
+"""— the ``metabase-extract`` CLI subcommand (credentialed).
 
 Wired into ``cli/main.py:main()`` as an additive dispatch branch, mirroring the existing
 ``impact`` subcommand. Credentials come from env/flags and live only here + the client;
@@ -16,7 +16,7 @@ from typing import Dict, Optional, Tuple
 import click
 
 from parrant.artifacts.manifest import ManifestReader
-from parrant.metabase.artifact import dump_metabase_lineage
+from parrant.metabase.artifact import dump_metabase_lineage, load_metabase_lineage
 from parrant.metabase.client import MetabaseClient
 from parrant.metabase.extract import ExtractConfig, coverage_ratio, run_extract
 
@@ -71,6 +71,19 @@ def _load_dashboard_meta(path: Optional[str]) -> Dict:
     '"by_dashboard": {...}}. The tool never hardcodes a taxonomy (tier/owner).',
 )
 @click.option(
+    "--previous",
+    type=click.Path(),
+    help="Previous metabase_lineage.json to reuse unchanged dashboards from (incremental). "
+    "Download the last snapshot from your artifact store and pass it here. A missing path is "
+    "treated as a cold start (full extract), so a scheduled job can pass it unconditionally.",
+)
+@click.option(
+    "--max-workers",
+    type=int,
+    default=8,
+    help="Concurrency for dashboard detail fetches.",
+)
+@click.option(
     "--fail-under",
     type=float,
     help="Exit non-zero if (column + table) coverage ratio < this value.",
@@ -86,6 +99,8 @@ def metabase_extract(
     output: str,
     include_archived: bool,
     dashboard_meta_file: Optional[str],
+    previous: Optional[str],
+    max_workers: int,
     fail_under: Optional[float],
 ) -> None:
     """Snapshot Metabase card→column and card→dashboard lineage into an offline artifact."""
@@ -97,6 +112,7 @@ def metabase_extract(
             username=metabase_username,
             password=metabase_password,
         )
+        previous_lineage = load_metabase_lineage(previous)
         config = ExtractConfig(
             metabase_base_url=metabase_url,
             database_ids=list(database_ids),
@@ -104,6 +120,8 @@ def metabase_extract(
             dialect=dialect,
             include_archived=include_archived,
             dashboard_meta=_load_dashboard_meta(dashboard_meta_file),
+            previous=previous_lineage,
+            max_workers=max_workers,
         )
         lineage = run_extract(config, client)
         dump_metabase_lineage(lineage, output)
@@ -113,11 +131,26 @@ def metabase_extract(
 
     cov = lineage.coverage
     ratio = coverage_ratio(cov)
+    incremental = ""
+    if previous_lineage is not None:
+        # Reused = dashboards carried over unchanged from the previous snapshot (same id and
+        # matching, non-null ``updated_at``) that survived into the new snapshot.
+        prev_stamps = {
+            d.dashboard_id: d.updated_at
+            for d in previous_lineage.dashboards
+            if d.updated_at is not None
+        }
+        reused = sum(
+            1
+            for d in lineage.dashboards
+            if d.updated_at is not None and prev_stamps.get(d.dashboard_id) == d.updated_at
+        )
+        incremental = f" (incremental: {reused} dashboards reused)"
     click.echo(
         f"Wrote {output}: {cov.cards_total} cards "
         f"({cov.cards_resolved_column} column-precise, {cov.cards_resolved_table_only} "
         f"table-only, {cov.cards_unresolved} unresolved), "
-        f"{cov.dashboards_total} dashboards. Coverage {ratio:.0%}.",
+        f"{cov.dashboards_total} dashboards. Coverage {ratio:.0%}.{incremental}",
         err=True,
     )
     if fail_under is not None and ratio < fail_under:
