@@ -902,5 +902,14 @@ Outputs for downstream steps: `policy_decision` (`block`/`warn`/`allow`), `build
 emits `overrides_applied`: the number of honored override pragmas that lowered the ruling on this
 run (always present; `0` when none fired).
 
+!!! note "Policy `build_set` vs. the policy-free rebuild selection"
+    The policy `build_set` is the **policy overlay** — the models your `add-to-build-set` rules
+    chose. Beneath it sits a **policy-independent** rebuild set derived from the diff alone: the
+    `selection` block in the JSON report and the `has_rebuild` / `rebuild_selector` action outputs
+    (enabled with the `emit-selector` input). Use `selection` when you want the minimal fail-closed
+    rebuild set with no policy authored; use `build_set` when you want exactly the models your rules
+    selected. See [Selective builds](../features/impact-analysis.md#selective-builds) and
+    [`selection` in the JSON reference](../reference/json-output.md#selection-the-minimal-rebuild-set).
+
 To evaluate the **raw gate** in CI — ignoring every `-- lineage:allow-*` pragma, e.g. to backtest
 override reliance — set the `no-overrides` input to `true` (threads through to `--no-overrides`).

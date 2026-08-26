@@ -61,6 +61,8 @@ The action exposes the impact result so later workflow steps can react to it:
 | `verdict` | Overall ruling — `safe`, `review`, or `block`. |
 | `tripped_level` | Highest severity band reached — `none`, `any`, `critical`, `exposures`, or `tests`. |
 | `overrides_applied` | Number of honored `-- lineage:allow-*` override pragmas that lowered the ruling on this run (`0` when none). |
+| `has_rebuild` | Whether any model must be rebuilt (`true`/`false`). Only emitted when the `emit-selector` input is `true` — see [Selective builds](#selective-builds) below. |
+| `rebuild_selector` | Space-joined dbt node-name selector for a selective `dbt build --select`; empty when `has_rebuild` is `false`. Only emitted when `emit-selector` is `true`. |
 
 Give the action an `id` and read `steps.<id>.outputs.*` in a later step:
 
@@ -82,6 +84,48 @@ Give the action an `id` and read `steps.<id>.outputs.*` in a later step:
 
 The outputs are populated even when `fail-on` trips the gate, so a downstream step still
 runs on failure with `if: always()`.
+
+### Selective builds
+
+Set the `emit-selector` input to `true` to have the action publish the **minimal rebuild set** for
+the change — the models CI must rebuild, and nothing more. This is derived purely from the diff
+(no policy required) and exposed as two outputs, `has_rebuild` and `rebuild_selector`, so a later
+step can run a selective `dbt build` instead of a full one.
+
+```yaml
+      - name: Column-level impact assessment
+        id: impact
+        uses: Fszta/parrant@v0
+        with:
+          manifest: artifacts/head/manifest.json
+          catalog: artifacts/head/catalog.json
+          base-manifest: artifacts/base/manifest.json
+          base-catalog: artifacts/base/catalog.json
+          emit-selector: "true"
+          fail-on: none
+
+      - name: Selective rebuild
+        if: steps.impact.outputs.has_rebuild == 'true'
+        run: dbt build --select ${{ steps.impact.outputs.rebuild_selector }}
+```
+
+The rebuild set is **fail-closed**: it includes the edited models, every model reached by a change
+that is not provably additive, and every model parrant could not analyze. When confidence is
+partial it widens to every reachable model rather than risk skipping one. See
+[`selection` in the JSON reference](../reference/json-output.md#selection-the-minimal-rebuild-set)
+for the exact rule and the honesty invariants.
+
+!!! warning "Branch on `has_rebuild`, not on the selector string"
+    When nothing needs rebuilding, `has_rebuild` is `false` and `rebuild_selector` is empty. Always
+    guard the build step with `if: steps.impact.outputs.has_rebuild == 'true'` — running
+    `dbt build --select ""` selects **nothing** and exits green, silently skipping a build that may
+    have been needed.
+
+!!! tip "Validate the selector, fail closed on unknowns"
+    The selector uses dbt node names. Validate them against `dbt ls` and treat any name you cannot
+    resolve (renamed, removed, new, or a Python model) as a model to rebuild. `emit-selector` is
+    additive: it never posts a comment and never changes the exit code — gating stays with
+    `fail-on`.
 
 ## Use Cases
 
