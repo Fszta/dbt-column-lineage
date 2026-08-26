@@ -1,4 +1,4 @@
-""" — client auth, the legacy-mbql pin, pagination and retry/backoff."""
+"""— client auth, the legacy-mbql pin, pagination and retry/backoff."""
 
 from __future__ import annotations
 
@@ -60,3 +60,54 @@ def test_server_version_best_effort():
     session = FakeSession(load_recorded())
     client = _client(session, api_key="k")
     assert client.server_version() == "v0.51.6"
+
+
+def test_ensure_auth_is_public_and_posts_session_once():
+    session = FakeSession(load_recorded())
+    client = _client(session, username="u", password="p")
+
+    client.ensure_auth()
+    client.ensure_auth()  # idempotent — must not re-authenticate.
+
+    session_posts = [url for url, _ in session.post_calls if url.endswith("/api/session")]
+    assert len(session_posts) == 1
+
+
+def _recorded_with_dashboards(dashboard_ids: list[int]) -> dict:
+    """Clone the recorded fixture with a detail body per requested dashboard id."""
+    recorded = load_recorded()
+    template = recorded["dashboard_details"]["55"]
+    recorded["dashboard_details"] = {str(did): {**template, "id": did} for did in dashboard_ids}
+    return recorded
+
+
+def test_get_dashboards_concurrent_returns_keyed_details_and_auths_once():
+    ids = [55, 100, 200, 300]
+    session = FakeSession(_recorded_with_dashboards(ids))
+    client = _client(session, username="u", password="p")
+
+    result = client.get_dashboards(ids, max_workers=4)
+
+    assert set(result.keys()) == set(ids)
+    for did in ids:
+        assert result[did]["id"] == did
+    # Auth happened exactly once up front, before fan-out.
+    session_posts = [url for url, _ in session.post_calls if url.endswith("/api/session")]
+    assert len(session_posts) == 1
+    # Every dashboard was fetched exactly once.
+    detail_gets = [url for url, _ in session.get_calls if "/api/dashboard/" in url]
+    assert len(detail_gets) == len(ids)
+
+
+def test_get_dashboards_sequential_with_max_workers_one():
+    ids = [55, 100]
+    session = FakeSession(_recorded_with_dashboards(ids))
+    client = _client(session, username="u", password="p")
+
+    result = client.get_dashboards(ids, max_workers=1)
+
+    assert set(result.keys()) == set(ids)
+    for did in ids:
+        assert result[did]["id"] == did
+    session_posts = [url for url, _ in session.post_calls if url.endswith("/api/session")]
+    assert len(session_posts) == 1

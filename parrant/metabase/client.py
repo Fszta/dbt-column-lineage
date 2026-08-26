@@ -1,4 +1,4 @@
-""" — the Metabase API client.
+"""— the Metabase API client.
 
 **This is the ONLY module in the package that holds credentials or does network I/O.**
 The offline gate/artifact path imports :mod:`artifact` (and later the reach index) and
@@ -13,6 +13,7 @@ resolvers and extract pipeline run end-to-end with no live Metabase.
 
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import time
 from typing import Any, Callable, Dict, Iterator, List, Optional
@@ -105,6 +106,14 @@ class MetabaseClient:
             "--metabase-username/--metabase-password."
         )
 
+    def ensure_auth(self) -> None:
+        """Public entry point to resolve credentials into a session token eagerly.
+
+        Callers warm the session token once on the main thread (``ensure_auth()``) before
+        fanning out to worker threads, so concurrent workers never race on the lazy
+        ``_ensure_auth`` and duplicate the ``POST /api/session``."""
+        self._ensure_auth()
+
     def _headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
@@ -186,6 +195,36 @@ class MetabaseClient:
     def get_dashboard(self, dashboard_id: int) -> dict:
         """One dashboard with its ``dashcards`` (``GET /api/dashboard/:id``)."""
         return self._get(f"/api/dashboard/{dashboard_id}")
+
+    def get_dashboards(self, dashboard_ids: List[int], max_workers: int = 8) -> Dict[int, dict]:
+        """Fetch many dashboards concurrently, returning ``{id: detail}``.
+
+        Auth is warmed once up front (:meth:`ensure_auth`) so worker threads never race on
+        the lazy ``POST /api/session``. Work fans out over a bounded
+        :class:`~concurrent.futures.ThreadPoolExecutor`. A single id, or ``max_workers <= 1``,
+        runs sequentially (deterministic, no pool overhead). Per-dashboard failures propagate
+        — a partial snapshot must fail loud rather than silently drop a dashboard."""
+        if not dashboard_ids:
+            return {}
+        self.ensure_auth()
+
+        if max_workers <= 1 or len(dashboard_ids) == 1:
+            return {did: self.get_dashboard(did) for did in dashboard_ids}
+
+        workers = max(1, min(max_workers, len(dashboard_ids)))
+        results: Dict[int, dict] = {}
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+        try:
+            futures = {executor.submit(self.get_dashboard, did): did for did in dashboard_ids}
+            for future in concurrent.futures.as_completed(futures):
+                # Re-raise the first per-dashboard error (fail loud on a partial snapshot).
+                results[futures[future]] = future.result()
+        finally:
+            # On the error path this cancels queued-but-unstarted fetches so the abort surfaces
+            # promptly instead of waiting out the whole batch's retry ladders; on the happy path
+            # every future is already done, so it is a no-op.
+            executor.shutdown(wait=True, cancel_futures=True)
+        return results
 
     def list_snippets(self) -> List[dict]:
         """All native-query snippets (``GET /api/native-query-snippet``)."""
