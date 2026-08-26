@@ -205,3 +205,65 @@ def test_connection_filter_drops_foreign_db_card_and_orphaned_dashboard():
     dash_ids = {d.dashboard_id for d in lineage.dashboards}
     assert dash_ids == {10}  # dashboard 20 (only the foreign card) dropped
     assert next(d for d in lineage.dashboards if d.dashboard_id == 10).card_ids == [1]
+
+
+# --- asset metadata (link, description, collection name, creator) ----------
+
+
+def test_cards_and_dashboards_carry_asset_metadata():
+    # A card/dashboard should surface a deep link plus human context (description, collection
+    # name, creator, last editor) so reached assets are clickable and attributable.
+    card = _mbql_card(1, database=2)
+    card.update(
+        {
+            "description": "Revenue by region",
+            "collection": {"id": 1, "name": "Finance"},
+            "creator": {"email": "alice@example.com", "first_name": "Alice"},
+            "last-edit-info": {"email": "bob@example.com"},
+        }
+    )
+    recorded = build_recorded(
+        cards=[card],
+        dashboards=[{"id": 10, "name": "Fin dash", "collection_id": 1, "updated_at": "u10"}],
+        dashboard_details={
+            "10": {
+                "id": 10,
+                "name": "Fin dash",
+                "description": "Finance KPIs",
+                "collection": {"id": 1, "name": "Finance"},
+                "creator": {"email": "carol@example.com"},
+                "last-edit-info": {"first_name": "Dan", "last_name": "Ng"},
+                "dashcards": [{"card_id": 1, "card": {"id": 1}}],
+            }
+        },
+        database_metadata=_DB_META_2,
+    )
+    client = MetabaseClient(
+        base_url="https://mb.example.com",
+        api_key="k",
+        session=FakeSession(recorded),
+        sleep=lambda _s: None,
+    )
+    lineage = run_extract(
+        ExtractConfig(
+            metabase_base_url="https://mb.example.com",
+            database_ids=[2],
+            extractor_version="9.9.9",
+            dialect="snowflake",
+        ),
+        client,
+    )
+
+    c = next(x for x in lineage.cards if x.card_id == 1)
+    assert c.url == "https://mb.example.com/question/1"
+    assert c.description == "Revenue by region"
+    assert c.collection_name == "Finance"
+    assert c.creator == "alice@example.com"  # email preferred
+    assert c.last_edited_by == "bob@example.com"
+
+    d = next(x for x in lineage.dashboards if x.dashboard_id == 10)
+    assert d.url == "https://mb.example.com/dashboard/10"
+    assert d.description == "Finance KPIs"
+    assert d.collection_name == "Finance"
+    assert d.creator == "carol@example.com"
+    assert d.last_edited_by == "Dan Ng"  # falls back to display name when no email

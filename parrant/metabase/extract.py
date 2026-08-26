@@ -86,7 +86,29 @@ def _dashcard_card_ids(dashboard: dict) -> List[int]:
     return ids
 
 
-def _to_card(card: dict, resolved: ResolvedCard) -> MetabaseCard:
+def _person(obj: Any) -> Optional[str]:
+    """A human identifier from a Metabase ``creator`` / ``last-edit-info`` object.
+
+    Prefers email (actionable for ownership routing), falls back to a display name; ``None``
+    when nothing usable is present."""
+    if not isinstance(obj, dict):
+        return None
+    email = obj.get("email")
+    if email:
+        return str(email)
+    name = " ".join(str(x) for x in (obj.get("first_name"), obj.get("last_name")) if x).strip()
+    return name or None
+
+
+def _collection_name(obj: Any) -> Optional[str]:
+    """The name of an embedded Metabase ``collection`` object, if present."""
+    if isinstance(obj, dict):
+        name = obj.get("name")
+        return str(name) if name else None
+    return None
+
+
+def _to_card(card: dict, resolved: ResolvedCard, base_url: str) -> MetabaseCard:
     query = card.get("dataset_query") or {}
     kind = "native" if query.get("type") == "native" else "mbql"
     return MetabaseCard(
@@ -103,6 +125,11 @@ def _to_card(card: dict, resolved: ResolvedCard) -> MetabaseCard:
         snippet_ids=resolved.snippet_ids,
         unresolved_reason=resolved.unresolved_reason,
         updated_at=card.get("updated_at"),
+        url=f"{base_url.rstrip('/')}/question/{card['id']}",
+        description=card.get("description"),
+        collection_name=_collection_name(card.get("collection")),
+        creator=_person(card.get("creator")),
+        last_edited_by=_person(card.get("last-edit-info")),
     )
 
 
@@ -133,7 +160,7 @@ def run_extract(config: ExtractConfig, client: MetabaseClient) -> MetabaseLineag
         if db is not None and db not in scoped_db_ids:
             continue
         resolved = resolver.resolve_card(raw_card)
-        card = _to_card(raw_card, resolved)
+        card = _to_card(raw_card, resolved, config.metabase_base_url)
         cards.append(card)
         included_card_ids.add(card.card_id)
         for ref in card.columns:
@@ -186,13 +213,23 @@ def run_extract(config: ExtractConfig, client: MetabaseClient) -> MetabaseLineag
     dashboards: List[MetabaseDashboard] = []
     for dashboard_id, shell in shells_by_id.items():
         if dashboard_id in reused_ids:
+            # Reused = unchanged since the previous snapshot, so carry its asset metadata
+            # forward rather than re-fetching detail.
             prev = prev_by_id[dashboard_id]
             raw_card_ids = list(prev.card_ids)
             name = shell.get("name") or prev.name or ""
+            description = prev.description
+            collection_name = prev.collection_name
+            creator = prev.creator
+            last_edited_by = prev.last_edited_by
         else:
             detail = details[dashboard_id]
             raw_card_ids = _dashcard_card_ids(detail)
             name = detail.get("name") or shell.get("name") or ""
+            description = detail.get("description")
+            collection_name = _collection_name(detail.get("collection"))
+            creator = _person(detail.get("creator"))
+            last_edited_by = _person(detail.get("last-edit-info"))
         # Intersect with the scoped cards (order-preserved); this also drops cards that left
         # the connection since the previous snapshot. Meta is ALWAYS recomputed from the shell
         # (the consumer's mapping may have changed even when the dashboard itself did not).
@@ -208,6 +245,10 @@ def run_extract(config: ExtractConfig, client: MetabaseClient) -> MetabaseLineag
                 card_ids=card_ids,
                 meta=meta_resolver(shell),
                 updated_at=shell.get("updated_at"),
+                description=description,
+                collection_name=collection_name,
+                creator=creator,
+                last_edited_by=last_edited_by,
             )
         )
     dashboards.sort(key=lambda d: d.dashboard_id)
