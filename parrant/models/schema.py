@@ -435,6 +435,13 @@ class MetabaseCard(BaseModel):
     unresolved_reason: Optional[str] = None  # select_star | parse_failed | unknown_table | ...
     # snapshot-time last-modified stamp (ISO-8601 UTC), used for incremental reuse
     updated_at: Optional[str] = None
+    # Asset metadata — a deep link to the card and human/ownership context, so a reached card
+    # in impact/explorer output is clickable and attributable. All best-effort (None if absent).
+    url: Optional[str] = None  # {base}/question/{card_id}
+    description: Optional[str] = None
+    collection_name: Optional[str] = None
+    creator: Optional[str] = None  # email (else display name) of the card's creator
+    last_edited_by: Optional[str] = None  # email/name from Metabase's last-edit-info
 
 
 class MetabaseDashboard(BaseModel):
@@ -456,6 +463,11 @@ class MetabaseDashboard(BaseModel):
     meta: Dict[str, Any] = Field(default_factory=dict)  # tier/owner/... for policy reach.where
     # snapshot-time last-modified stamp (ISO-8601 UTC), used for incremental reuse
     updated_at: Optional[str] = None
+    # Asset metadata (best-effort; None if absent). ``url`` is already populated above.
+    description: Optional[str] = None
+    collection_name: Optional[str] = None
+    creator: Optional[str] = None  # email (else display name) of the dashboard's creator
+    last_edited_by: Optional[str] = None
 
 
 class MetabaseLineage(BaseModel):
