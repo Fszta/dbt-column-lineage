@@ -234,6 +234,68 @@ def test_builder_logic_change_flags_all_columns_when_lineage_missing():
     assert logic == {"a", "b"}, logic
 
 
+def test_builder_join_predicate_only_change_fails_safe_indeterminate():
+    # Regression for #129: the compiled SQL changes ONLY in a JOIN `ON` predicate. Every
+    # output column's per-column lineage is byte-identical on both sides (order_id/amount are
+    # plain pass-throughs; country_code is still `direct` from stg_customers.country_code), so
+    # `_logic_changed_columns` attributes the change to NO column and returns {}. Before the fix
+    # this yielded total_changes: 0 — a false negative at full confidence on a model whose
+    # compiled SQL provably changed (country_code now resolves to a different customer row for
+    # every order whose customer_key is null). The backstop must flag every head output column
+    # INDETERMINATE (fail-safe) instead of falling silent.
+    base_cols = {
+        "order_id": _LinCol("int", [_Lin({"stg_orders.order_id"}, "direct", "orders.order_id")]),
+        "amount": _LinCol("numeric", [_Lin({"stg_orders.amount"}, "direct", "orders.amount")]),
+        "country_code": _LinCol(
+            "text", [_Lin({"stg_customers.country_code"}, "direct", "customers.country_code")]
+        ),
+    }
+    # Head lineage is identical — the join key lives in the ON clause, never in the signature.
+    head_cols = {name: _LinCol(col.data_type, list(col.lineage)) for name, col in base_cols.items()}
+    select = (
+        "select orders.order_id as order_id, orders.amount as amount, "
+        "customers.country_code as country_code "
+        "from stg_orders as orders left join stg_customers as customers"
+    )
+    base = _FakeRegistry(
+        {"mart_orders": _Model(base_cols)},
+        compiled={"mart_orders": f"{select} on orders.customer_key = customers.customer_key"},
+    )
+    head = _FakeRegistry(
+        {"mart_orders": _Model(head_cols)},
+        compiled={
+            "mart_orders": f"{select} on coalesce(orders.customer_key, orders.fallback_key) "
+            "= customers.customer_key"
+        },
+    )
+    changes = ChangesetBuilder(base, head).build()
+
+    # Before the fix this was empty; now the model's SQL change is reported, not dropped.
+    assert changes, "join-predicate-only change must not be reported as total_changes: 0"
+    logic = {c.column for c in changes if c.kind == ChangeKind.LOGIC_CHANGED}
+    assert logic == {"order_id", "amount", "country_code"}, logic
+    for change in changes:
+        assert change.kind == ChangeKind.LOGIC_CHANGED
+        assert change.semantic == SemanticChangeKind.INDETERMINATE
+        assert change.reason is not None and "could not be attributed" in change.reason
+
+
+def test_builder_statement_level_cosmetic_change_is_still_silent():
+    # Counterpart to the #129 backstop: when the ONLY compiled-SQL difference is cosmetic at the
+    # statement level (identifier case here), the statement-level AST compare proves EQUIVALENT,
+    # so the backstop must NOT fire — no false positive. `_logic_changed` (a string compare)
+    # fires on the case difference, but nothing real changed.
+    base = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "UP.A")])})},
+        compiled={"m": "select UP.A as a from UP"},
+    )
+    head = _FakeRegistry(
+        {"m": _Model({"a": _LinCol("text", [_Lin({"up.a"}, "direct", "up.a")])})},
+        compiled={"m": "select up.a as a from up"},
+    )
+    assert ChangesetBuilder(base, head).build() == []
+
+
 def test_structural_diff_available_requires_catalog_on_both_sides():
     base = _FakeRegistry({"m": _Model({"a": _Col("int")})})
     head = _FakeRegistry({"m": _Model({"a": _Col("int")})})
