@@ -69,6 +69,7 @@ parrant metabase-extract \
 | `--fail-under` | Exit non-zero if resolution coverage is below this ratio. |
 | `--previous` | A prior `metabase_lineage.json` snapshot for **incremental reuse** — dashboards whose `updated_at` is unchanged skip the detail fetch (see below). |
 | `--max-workers` | Concurrency for the dashboard detail fan-out (default `8`). |
+| `--timeout` | Per-request HTTP timeout in seconds (default `120`). Metabase's `/api/card` returns the **entire** card list in one (uncursored) response — tens of MB and ~90s on a large instance — so the default is deliberately generous. |
 
 Credentials come from env/flags and are **never** written into the snapshot — only the non-secret
 base URL is stamped in provenance.
