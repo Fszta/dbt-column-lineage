@@ -1,4 +1,4 @@
-""" — offline IO for the ``metabase_lineage.json`` artifact.
+"""— offline IO for the ``metabase_lineage.json`` artifact.
 
 This module is the ONLY entry point the offline gate needs. It imports no credentials
 and no HTTP client: loading a snapshot is a pure file read + pydantic validation, so the
@@ -17,7 +17,11 @@ from parrant.models.schema import MetabaseLineage
 
 # The schema versions this build knows how to read. A present-but-newer snapshot is a
 # hard error rather than a silent drop of dashboard reach.
-SUPPORTED_SCHEMA_VERSIONS = frozenset({1})
+#   v1 — full-snapshot; cards/dashboards carry no ``updated_at``.
+#   v2 — adds per-card / per-dashboard ``updated_at`` so a later extract can reuse
+#        unchanged entities (incremental).
+# Both are accepted: a v1 snapshot loads unchanged, with ``updated_at`` defaulting to None.
+SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2})
 
 
 class MetabaseArtifactError(Exception):

@@ -416,6 +416,9 @@ class MetabaseCard(BaseModel):
     ``precision`` is first-class: ``column`` cards give column-precise reach; ``table``
     cards degrade to "the changed column is in a table this card reads" (still a valid
     dashboard-reach signal); ``none`` means no relation resolved at all.
+
+    ``updated_at`` is the snapshot-time last-modified stamp (from ``/api/card``
+    ``updated_at``), used for incremental reuse; it is ``None`` in v1 snapshots.
     """
 
     card_id: int
@@ -430,6 +433,8 @@ class MetabaseCard(BaseModel):
     upstream_card_ids: List[int] = Field(default_factory=list)  # {{#id}} / card__<id> deps
     snippet_ids: List[int] = Field(default_factory=list)
     unresolved_reason: Optional[str] = None  # select_star | parse_failed | unknown_table | ...
+    # snapshot-time last-modified stamp (ISO-8601 UTC), used for incremental reuse
+    updated_at: Optional[str] = None
 
 
 class MetabaseDashboard(BaseModel):
@@ -438,6 +443,9 @@ class MetabaseDashboard(BaseModel):
     ``meta`` (tier/owner/...) is a CONSUMER-CONFIGURABLE input to the extract — the tool
     never hardcodes an org's taxonomy. Absent meta is ``{}``; the policy
     engine treats that per its ``MissingMetaPolicy`` (fail-closed by default).
+
+    ``updated_at`` is the snapshot-time last-modified stamp (from the ``/api/dashboard``
+    list shell), used for incremental reuse; it is ``None`` in v1 snapshots.
     """
 
     dashboard_id: int
@@ -446,6 +454,8 @@ class MetabaseDashboard(BaseModel):
     url: Optional[str] = None
     card_ids: List[int] = Field(default_factory=list)
     meta: Dict[str, Any] = Field(default_factory=dict)  # tier/owner/... for policy reach.where
+    # snapshot-time last-modified stamp (ISO-8601 UTC), used for incremental reuse
+    updated_at: Optional[str] = None
 
 
 class MetabaseLineage(BaseModel):
@@ -453,9 +463,13 @@ class MetabaseLineage(BaseModel):
 
     ``relations`` de-duplicates relation metadata; cards/dashboards reference relations
     and cards by key/id, mirroring the manifest's node/edge normalization (diff-friendly).
+
+    ``schema_version`` 2 adds incremental support: cards and dashboards carry an
+    ``updated_at`` last-modified stamp so a later extract can reuse unchanged entities.
+    v1 artifacts (no ``updated_at``) remain readable — the field defaults to ``None``.
     """
 
-    schema_version: int = 1
+    schema_version: int = 2
     provenance: MetabaseProvenance
     coverage: MetabaseCoverage
     relations: Dict[str, MetabaseRelation] = Field(default_factory=dict)
