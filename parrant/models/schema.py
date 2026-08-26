@@ -290,6 +290,55 @@ class Selection(BaseModel):
     widened_to_all_reachable: bool = False
 
 
+class ModelResolution(BaseModel):
+    """Per-reachable-model column-resolution disposition (display/emission only).
+
+    ``status`` retains, per model, the same partition the confidence pass already computes:
+    ``catalog_backed``/``parsed`` are *resolved* (parrant has this model's columns);
+    ``no_column_info``/``parse_failed``/``unresolved`` are *unanalyzable* (no columns to trace).
+    A model with a resolved status has ``reason == None``.
+
+    ``reason`` is a coarse, advisory hint at WHY an unanalyzable model could not be resolved —
+    a prioritization signal for closing resolution gaps, not a load-bearing one. It NEVER
+    upgrades a status and is NEVER consulted by the rebuild decision; stripping it leaves every
+    status and every rebuild/skippable membership unchanged.
+    """
+
+    status: Literal["catalog_backed", "parsed", "no_column_info", "parse_failed", "unresolved"]
+    # One of: star_off_cte, star_modifier, missing_catalog, python_model, unsupported_sql, other.
+    reason: Optional[str] = None
+
+
+class ResolutionReasonCount(BaseModel):
+    """One coarse resolution reason and how many unanalyzable models carry it."""
+
+    reason: str
+    count: int
+
+
+class ResolutionSummary(BaseModel):
+    """Aggregate roll-up of the per-model resolution statuses over the reachable set.
+
+    The per-status counts reconcile exactly with the confidence counts
+    (``no_column_info`` + ``unresolved`` == confidence ``no_column_info``;
+    ``parse_failed`` == confidence ``parse_failed``) and the total equals ``reachable``.
+    """
+
+    reachable: int = 0
+    catalog_backed: int = 0
+    parsed: int = 0
+    no_column_info: int = 0
+    parse_failed: int = 0
+    unresolved: int = 0
+    # |rebuild_models ∩ {models whose status is not catalog_backed/parsed}|: how many rebuilds
+    # are forced because parrant could not resolve the model, rather than by a proven reaching
+    # change. Consumers can log this as a fraction of |rebuild_models| to measure how much
+    # rebuild volume is driven by unresolved models rather than proven changes.
+    rebuild_forced_by_nonresolution: int = 0
+    # Coarse reasons ranked by frequency (advisory): the ranked resolution-gap backlog.
+    top_reasons: List[ResolutionReasonCount] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Metabase cross-boundary lineage artifact (metabase_lineage.json).
 #

@@ -1,15 +1,26 @@
 from pathlib import Path
 from typing import Dict, List, Literal, Set, Optional, Any, Tuple, Union, TYPE_CHECKING
 from dataclasses import dataclass, field
+from collections import Counter
 import logging
+import re
 
+from parrant.artifacts.exceptions import ModelNotFoundError
 from parrant.lineage.provider import LineageAndMetadataProvider
 from parrant.lineage.sqlglot_provider import build_sqlglot_provider
 
 if TYPE_CHECKING:
     from parrant.lineage.changeset import ColumnChange
     from parrant.metabase.reach import MetabaseReach
-from parrant.models.schema import ColumnLineage, Coverage, ImpactConfidence, Selection
+from parrant.models.schema import (
+    ColumnLineage,
+    Coverage,
+    ImpactConfidence,
+    ModelResolution,
+    ResolutionReasonCount,
+    ResolutionSummary,
+    Selection,
+)
 from parrant.parser.sql_parser_utils import strip_sql_comments
 
 logger = logging.getLogger(__name__)
@@ -198,6 +209,107 @@ def build_selection(
 
 
 @dataclass
+class _ReachPartition:
+    """The reachable set split by column-resolution outcome (computed once, reused).
+
+    ``resolved`` are models parrant has columns for; ``catalog_backed`` (real catalog truth)
+    and ``parsed`` (columns recovered from SQL) are its disjoint halves. ``no_column_info`` and
+    ``parse_failed`` are the unanalyzable halves. The five leaf sets — ``catalog_backed``,
+    ``parsed``, ``no_column_info``, ``parse_failed`` — partition ``reachable`` exactly.
+    """
+
+    resolved: Set[str]
+    no_column_info: Set[str]
+    parse_failed: Set[str]
+    catalog_backed: Set[str]
+    parsed: Set[str]
+
+
+# A ``SELECT *`` immediately followed by a column-set modifier (Snowflake EXCLUDE/RENAME/
+# REPLACE, BigQuery EXCEPT/REPLACE, DuckDB EXCLUDE/REPLACE). Best-effort, advisory: used only
+# to label WHY a star-sourced model is unanalyzable, never to change a status or a rebuild.
+_STAR_MODIFIER_RE = re.compile(r"\*\s*(?:exclude|except|replace|rename)\b", re.IGNORECASE)
+
+
+def _resolve_reason(
+    registry: LineageAndMetadataProvider, name: str
+) -> Tuple[Literal["no_column_info", "unresolved"], Optional[str]]:
+    """(status, reason) for a reachable model that has no column info.
+
+    Best-effort and advisory. A python model is surfaced as ``unresolved``/``python_model``;
+    every other no-column model keeps the ``no_column_info`` status and carries a coarse reason
+    inferred from star detection and catalog presence. The reason never upgrades the status and
+    is never consulted by the rebuild decision.
+    """
+    try:
+        model = registry.get_model(name)
+    except ModelNotFoundError:
+        return "no_column_info", "other"
+    if (model.language or "").lower() == "python":
+        return "unresolved", "python_model"
+    star_sources = (model.metadata or {}).get("star_sources") if model.metadata else None
+    if star_sources:
+        compiled = registry.get_compiled_sql(name) or ""
+        if _STAR_MODIFIER_RE.search(compiled):
+            return "no_column_info", "star_modifier"
+        return "no_column_info", "star_off_cte"
+    if not registry.is_catalog_backed(name):
+        return "no_column_info", "missing_catalog"
+    return "no_column_info", "other"
+
+
+def build_resolution(
+    registry: LineageAndMetadataProvider,
+    partition: _ReachPartition,
+    rebuild_models: Set[str],
+) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """Retain the reachable partition per model as a resolution status + advisory reason.
+
+    Pure emission over already-computed facts (the confidence partition, the catalog-backed
+    flag, and coarse language/SQL-shape hints) — it re-walks no lineage and consults no policy.
+    Returns ``(per_model_map, resolution_summary_dict)``. Every reachable model appears exactly
+    once in the map; the summary counts reconcile exactly with the confidence counts.
+    """
+    per_model: Dict[str, Dict[str, Any]] = {}
+    for name in partition.catalog_backed:
+        per_model[name] = ModelResolution(status="catalog_backed", reason=None).model_dump()
+    for name in partition.parsed:
+        per_model[name] = ModelResolution(status="parsed", reason=None).model_dump()
+    for name in partition.parse_failed:
+        per_model[name] = ModelResolution(
+            status="parse_failed", reason="unsupported_sql"
+        ).model_dump()
+    for name in partition.no_column_info:
+        status, reason = _resolve_reason(registry, name)
+        per_model[name] = ModelResolution(status=status, reason=reason).model_dump()
+
+    status_counts: Counter[str] = Counter(entry["status"] for entry in per_model.values())
+    reason_counts: Counter[str] = Counter(
+        entry["reason"] for entry in per_model.values() if entry["reason"] is not None
+    )
+    top_reasons = [
+        ResolutionReasonCount(reason=reason, count=count)
+        for reason, count in sorted(reason_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    forced = sum(
+        1
+        for name in rebuild_models
+        if name in per_model and per_model[name]["status"] not in ("catalog_backed", "parsed")
+    )
+    summary = ResolutionSummary(
+        reachable=len(per_model),
+        catalog_backed=status_counts.get("catalog_backed", 0),
+        parsed=status_counts.get("parsed", 0),
+        no_column_info=status_counts.get("no_column_info", 0),
+        parse_failed=status_counts.get("parse_failed", 0),
+        unresolved=status_counts.get("unresolved", 0),
+        rebuild_forced_by_nonresolution=forced,
+        top_reasons=top_reasons,
+    ).model_dump()
+    return per_model, summary
+
+
+@dataclass
 class LineageSelector:
     model: str
     column: Optional[str]
@@ -297,6 +409,40 @@ class LineageService:
                     queue.append(child)
         return reachable
 
+    def _partition_reachable(self, reachable: Set[str]) -> _ReachPartition:
+        """Split ``reachable`` by column-resolution outcome — the single source of truth.
+
+        Both the confidence block and the per-model resolution status consume this, so the two
+        surfaces reconcile by construction. A reachable model with columns is *resolved* (and is
+        ``catalog_backed`` when the catalog carries its column truth, else ``parsed``); otherwise
+        it is ``parse_failed`` (had SQL the parser could not read) or ``no_column_info``.
+        """
+        models = self.registry.get_models()
+        parse_failed_names = self.registry.get_parse_failed_models()
+
+        resolved: Set[str] = set()
+        parse_failed: Set[str] = set()
+        no_column_info: Set[str] = set()
+        for name in reachable:
+            model = models.get(name)
+            if model is not None and model.columns:
+                resolved.add(name)  # analyzable: we have columns to trace
+                continue
+            if name in parse_failed_names:
+                parse_failed.add(name)
+            else:
+                no_column_info.add(name)
+
+        catalog_backed = {name for name in resolved if self.registry.is_catalog_backed(name)}
+        parsed = resolved - catalog_backed
+        return _ReachPartition(
+            resolved=resolved,
+            no_column_info=no_column_info,
+            parse_failed=parse_failed,
+            catalog_backed=catalog_backed,
+            parsed=parsed,
+        )
+
     def _impact_confidence(self, reachable: Set[str], resolved_models: int) -> Dict[str, Any]:
         """Confidence block: "full" when every reachable model was analyzable, else "partial".
 
@@ -313,19 +459,9 @@ class LineageService:
           a non-table relation such as a semantic view, a python model, or a relation
           dbt has not built/compiled. We deliberately do NOT claim these are "not built".
         """
-        models = self.registry.get_models()
-        parse_failed_names = self.registry.get_parse_failed_models()
-
-        parse_failed: Set[str] = set()
-        no_column_info: Set[str] = set()
-        for name in reachable:
-            model = models.get(name)
-            if model is not None and model.columns:
-                continue  # analyzable: we have columns to trace
-            if name in parse_failed_names:
-                parse_failed.add(name)
-            else:
-                no_column_info.add(name)
+        partition = self._partition_reachable(reachable)
+        no_column_info = partition.no_column_info
+        parse_failed = partition.parse_failed
 
         unanalyzable_reachable = parse_failed | no_column_info
         level: Literal["full", "partial"] = "full" if not unanalyzable_reachable else "partial"
@@ -1052,6 +1188,8 @@ class LineageService:
         # Guarded so a stub service without a real registry omits confidence rather than erroring.
         confidence: Optional[Dict[str, Any]] = None
         selection: Optional[Dict[str, Any]] = None
+        resolution: Optional[Dict[str, Dict[str, Any]]] = None
+        resolution_summary: Optional[Dict[str, Any]] = None
         if getattr(self, "registry", None) is not None:
             reachable: Set[str] = set()
             for change in changes:
@@ -1062,6 +1200,13 @@ class LineageService:
             # the universe partitions cleanly against the (lowercased) reachable set.
             changed_models = {change.model.lower() for change in changes}
             selection = build_selection(reachable, changed_models, by_change, confidence)
+            # Per-model resolution status + aggregate summary: retain the confidence partition
+            # per model (advisory reason attached) so a consumer can measure how much of the
+            # rebuild set was forced by non-resolution rather than a proven reaching change.
+            partition = self._partition_reachable(reachable)
+            resolution, resolution_summary = build_resolution(
+                self.registry, partition, set(selection["rebuild_models"])
+            )
 
         return {
             "summary": {
@@ -1080,4 +1225,6 @@ class LineageService:
             "by_change": by_change,
             "confidence": confidence,
             "selection": selection,
+            "resolution": resolution,
+            "resolution_summary": resolution_summary,
         }

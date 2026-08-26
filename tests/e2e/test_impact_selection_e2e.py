@@ -217,3 +217,38 @@ def test_broad_unanalyzable_widens_to_all_reachable(broad_unanalyzable):
     # Every injected blind model parrant could not analyze is in the rebuild set.
     missing = set(broad_unanalyzable["blind_names"]) - set(selection["rebuild_models"])
     assert not missing, f"{len(missing)} unanalyzable models dropped from rebuild_models"
+
+
+def test_resolution_summary_bounds_forced_rebuilds(broad_unanalyzable):
+    result = _run(
+        [
+            "--manifest",
+            broad_unanalyzable["manifest"],
+            "--catalog",
+            broad_unanalyzable["catalog"],
+            "--base-manifest",
+            broad_unanalyzable["base_manifest"],
+            "--base-catalog",
+            broad_unanalyzable["base_catalog"],
+            "--format",
+            "json",
+        ]
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+    payload = json.loads(result.stdout)
+    selection = payload["selection"]
+    summary = payload["resolution_summary"]
+    forced = summary["rebuild_forced_by_nonresolution"]
+
+    # The non-resolution metric is present and bounded by the rebuild set size.
+    assert 0 <= forced <= len(selection["rebuild_models"])
+    # All 120 injected blind models are unanalyzable and in the rebuild set, so they are each
+    # counted as a rebuild forced by non-resolution.
+    assert forced >= _BLIND_COUNT
+    # Per-model resolution covers exactly the reachable set and reconciles with the counts.
+    resolution = payload["resolution"]
+    assert summary["reachable"] == len(resolution)
+    confidence = payload["confidence"]
+    assert summary["no_column_info"] + summary["unresolved"] == confidence["no_column_info"]
+    assert summary["parse_failed"] == confidence["parse_failed"]
