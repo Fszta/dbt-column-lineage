@@ -90,6 +90,12 @@ class LineageExplorer:
         # (model, column) -> the metabase dashboards THIS change reaches, each as
         # {name, via_columns, precision} so per-change reach stays column-precise (F4).
         self._metabase_reach_by_change: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+        # A MetabaseReach index for STATIC cross-boundary exploration (no changeset needed):
+        # "what Metabase cards/dashboards read this column?" is a lineage question, not an
+        # impact question, so it should answer for any browsed column. Populated on demand
+        # per explored column in pure-explore mode; the changeset path takes precedence.
+        self._metabase_static_reach: Optional[Any] = None
+        self._metabase_dashboard_names: Dict[int, str] = {}
 
         self._setup_templates_and_routes()
 
@@ -530,6 +536,7 @@ class LineageExplorer:
             self._add_rowset_dependents()
             self._attach_column_tests()
             self._annotate_nodes_with_semantic()
+            self._populate_static_reach(start_model, start_column)
             self._annotate_boundary_nodes()
 
         except Exception as e:
@@ -580,6 +587,56 @@ class LineageExplorer:
         if entry.get("url"):
             exposure_data["url"] = entry.get("url")
         return exposure_data
+
+    def attach_metabase_static(
+        self, reach: Any, dashboard_names: Optional[Dict[int, str]] = None
+    ) -> None:
+        """Attach a :class:`MetabaseReach` for STATIC cross-boundary exploration.
+
+        Unlike :meth:`set_change_context` (which only surfaces reach for *changed* columns),
+        this lets the explorer answer "which Metabase cards/dashboards read this column?" for
+        ANY browsed column — a lineage question that needs no change. The changeset path still
+        takes precedence when a change context is loaded. ``dashboard_names`` maps a Metabase
+        dashboard id to its human name, so injected nodes read "Revenue KPIs" not
+        "metabase.dashboard.137"."""
+        self._metabase_static_reach = reach
+        self._metabase_dashboard_names = dashboard_names or {}
+
+    def _populate_static_reach(self, model: str, column: str) -> None:
+        """In pure-explore mode, compute the reached Metabase dashboards for the browsed
+        column from the static reach index and stage them exactly like the changeset path,
+        so :meth:`_annotate_boundary_nodes` injects them with no other change."""
+        if self._metabase_static_reach is None or self._change_report is not None:
+            return
+        try:
+            entries = self._metabase_static_reach.reached_dashboards(
+                columns=[(model, column.lower())], models=[model]
+            )
+        except Exception:  # reach is best-effort; never break the graph over it
+            return
+        reach_list: List[Dict[str, Any]] = []
+        for entry in entries:
+            name = entry.get("name")
+            if not isinstance(name, str):
+                continue
+            # Resolve a human label ("metabase.dashboard.137" -> its real name) for display.
+            try:
+                did = int(name.rsplit(".", 1)[-1])
+                human = self._metabase_dashboard_names.get(did)
+                if human:
+                    entry = {**entry, "_label": human}
+            except ValueError:
+                pass
+            self._metabase_exposures[name] = entry
+            reach_list.append(
+                {
+                    "name": name,
+                    "via_columns": entry.get("via_columns") or [],
+                    "precision": entry.get("precision"),
+                }
+            )
+        if reach_list:
+            self._metabase_reach_by_change[(model, column)] = reach_list
 
     def _annotate_boundary_nodes(self) -> None:
         """Surface reached Metabase dashboards as graph nodes past the dbt/BI boundary.
@@ -653,10 +710,13 @@ class LineageExplorer:
             if reached_entry.get("precision"):
                 entry["precision"] = reached_entry["precision"]
             node_id = f"exposure_{name}"
+            # Display the human dashboard name when known (static path sets ``_label``); keep
+            # ``model=name`` as the stable id-based key used for edges/dedup.
+            display_label = base.get("_label") or name
             self.data.nodes.append(
                 GraphNode(
                     id=node_id,
-                    label=name,
+                    label=display_label,
                     type="exposure",
                     model=name,
                     resource_type="exposure",
