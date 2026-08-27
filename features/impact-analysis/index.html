@@ -724,6 +724,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#selective-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selective builds
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1468,6 +1479,14 @@ to wire it up.</p>
 <td><code>overrides_applied</code></td>
 <td>Number of honored <code>-- lineage:allow-*</code> override pragmas that lowered the ruling on this run (<code>0</code> when none).</td>
 </tr>
+<tr>
+<td><code>has_rebuild</code></td>
+<td>Whether any model must be rebuilt (<code>true</code>/<code>false</code>). Only emitted when the <code>emit-selector</code> input is <code>true</code> — see <a href="#selective-builds">Selective builds</a> below.</td>
+</tr>
+<tr>
+<td><code>rebuild_selector</code></td>
+<td>Space-joined dbt node-name selector for a selective <code>dbt build --select</code>; empty when <code>has_rebuild</code> is <code>false</code>. Only emitted when <code>emit-selector</code> is <code>true</code>.</td>
+</tr>
 </tbody>
 </table>
 <p>Give the action an <code>id</code> and read <code>steps.&lt;id&gt;.outputs.*</code> in a later step:</p>
@@ -1487,6 +1506,45 @@ to wire it up.</p>
 </code></pre></div>
 <p>The outputs are populated even when <code>fail-on</code> trips the gate, so a downstream step still
 runs on failure with <code>if: always()</code>.</p>
+<h3 id="selective-builds">Selective builds</h3>
+<p>Set the <code>emit-selector</code> input to <code>true</code> to have the action publish the <strong>minimal rebuild set</strong> for
+the change — the models CI must rebuild, and nothing more. This is derived purely from the diff
+(no policy required) and exposed as two outputs, <code>has_rebuild</code> and <code>rebuild_selector</code>, so a later
+step can run a selective <code>dbt build</code> instead of a full one.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Column-level impact assessment</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">impact</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Fszta/parrant@v0</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">          </span><span class="nt">manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/manifest.json</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">          </span><span class="nt">catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/head/catalog.json</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">          </span><span class="nt">base-manifest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/manifest.json</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">          </span><span class="nt">base-catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">artifacts/base/catalog.json</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">          </span><span class="nt">emit-selector</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">          </span><span class="nt">fail-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Selective rebuild</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">steps.impact.outputs.has_rebuild == 'true'</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dbt build --select ${{ steps.impact.outputs.rebuild_selector }}</span>
+</code></pre></div>
+<p>The rebuild set is <strong>fail-closed</strong>: it includes the edited models, every model reached by a change
+that is not provably additive, and every model parrant could not analyze. When confidence is
+partial it widens to every reachable model rather than risk skipping one. See
+<a href="../../reference/json-output/#selection-the-minimal-rebuild-set"><code>selection</code> in the JSON reference</a>
+for the exact rule and the honesty invariants.</p>
+<div class="admonition warning">
+<p class="admonition-title">Branch on <code>has_rebuild</code>, not on the selector string</p>
+<p>When nothing needs rebuilding, <code>has_rebuild</code> is <code>false</code> and <code>rebuild_selector</code> is empty. Always
+guard the build step with <code>if: steps.impact.outputs.has_rebuild == 'true'</code> — running
+<code>dbt build --select ""</code> selects <strong>nothing</strong> and exits green, silently skipping a build that may
+have been needed.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Validate the selector, fail closed on unknowns</p>
+<p>The selector uses dbt node names. Validate them against <code>dbt ls</code> and treat any name you cannot
+resolve (renamed, removed, new, or a Python model) as a model to rebuild. <code>emit-selector</code> is
+additive: it never posts a comment and never changes the exit code — gating stays with
+<code>fail-on</code>.</p>
+</div>
 <h2 id="use-cases">Use Cases</h2>
 <p><strong>Before modifying a column:</strong>
 - Understand which transformations depend on it

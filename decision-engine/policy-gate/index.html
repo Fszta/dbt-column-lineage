@@ -2955,6 +2955,16 @@ With no pragma present, the output is byte-identical to the default run.</p>
 <code>test_set_size</code> — for example, feed the build set into a selective <code>dbt build</code>. The action also
 emits <code>overrides_applied</code>: the number of honored override pragmas that lowered the ruling on this
 run (always present; <code>0</code> when none fired).</p>
+<div class="admonition note">
+<p class="admonition-title">Policy <code>build_set</code> vs. the policy-free rebuild selection</p>
+<p>The policy <code>build_set</code> is the <strong>policy overlay</strong> — the models your <code>add-to-build-set</code> rules
+chose. Beneath it sits a <strong>policy-independent</strong> rebuild set derived from the diff alone: the
+<code>selection</code> block in the JSON report and the <code>has_rebuild</code> / <code>rebuild_selector</code> action outputs
+(enabled with the <code>emit-selector</code> input). Use <code>selection</code> when you want the minimal fail-closed
+rebuild set with no policy authored; use <code>build_set</code> when you want exactly the models your rules
+selected. See <a href="../../features/impact-analysis/#selective-builds">Selective builds</a> and
+<a href="../../reference/json-output/#selection-the-minimal-rebuild-set"><code>selection</code> in the JSON reference</a>.</p>
+</div>
 <p>To evaluate the <strong>raw gate</strong> in CI — ignoring every <code>-- lineage:allow-*</code> pragma, e.g. to backtest
 override reliance — set the <code>no-overrides</code> input to <code>true</code> (threads through to <code>--no-overrides</code>).</p>
 
