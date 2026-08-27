@@ -28,9 +28,12 @@ def _extractor_version() -> str:
         return "0.0.0"
 
 
-def _resolve_dialect(manifest: str, adapter: Optional[str]) -> Optional[str]:
+def _resolve_dialect(manifest: Optional[str], adapter: Optional[str]) -> Optional[str]:
     if adapter:
         return adapter
+    # ``--manifest`` is optional only when ``--adapter`` supplies the dialect directly; the
+    # command validates that at least one is present before we get here.
+    assert manifest is not None
     reader = ManifestReader(manifest)
     reader.load()
     return reader.get_adapter()
@@ -57,11 +60,15 @@ def _load_dashboard_meta(path: Optional[str]) -> Dict:
 )
 @click.option(
     "--manifest",
-    required=True,
     type=click.Path(exists=True),
-    help="dbt manifest.json — supplies the SQL dialect for the native resolver.",
+    help="dbt manifest.json — supplies the SQL dialect for the native resolver. Optional when "
+    "--adapter is given (the adapter then supplies the dialect and the manifest is not read).",
 )
-@click.option("--adapter", help="Override the SQL dialect for the native resolver.")
+@click.option(
+    "--adapter",
+    help="SQL dialect for the native resolver (e.g. snowflake). Overrides the manifest adapter; "
+    "when set, --manifest may be omitted.",
+)
 @click.option("--output", "-o", default="metabase_lineage.json")
 @click.option("--include-archived", is_flag=True, default=False)
 @click.option(
@@ -101,7 +108,7 @@ def metabase_extract(
     metabase_username: Optional[str],
     metabase_password: Optional[str],
     database_ids: Tuple[int, ...],
-    manifest: str,
+    manifest: Optional[str],
     adapter: Optional[str],
     output: str,
     include_archived: bool,
@@ -112,6 +119,8 @@ def metabase_extract(
     fail_under: Optional[float],
 ) -> None:
     """Snapshot Metabase card→column and card→dashboard lineage into an offline artifact."""
+    if not manifest and not adapter:
+        raise click.UsageError("Provide --manifest or --adapter to supply the SQL dialect.")
     try:
         dialect = _resolve_dialect(manifest, adapter)
         client = MetabaseClient(
