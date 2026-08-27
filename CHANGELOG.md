@@ -1,3 +1,24 @@
+## [0.19.0](https://github.com/Fszta/parrant/compare/v0.18.1...v0.19.0) (2026-08-27)
+
+### Features
+
+* **metabase:** make --manifest optional when --adapter is set ([3b99e89](https://github.com/Fszta/parrant/commit/3b99e890245815a3b6ed69214fa50930c74c79cb))
+* **explore:** static cross-boundary Metabase reach (no changeset needed) ([996b45d](https://github.com/Fszta/parrant/commit/996b45dd46c3b8befebc4813c286528099a71557))
+* **metabase:** capture card/dashboard asset metadata ([ce4fc1d](https://github.com/Fszta/parrant/commit/ce4fc1d4eb21aad7a35c8fe0cd3a7b6e35d35772))
+* **metabase:** add --timeout for the large /api/card fetch ([7f4d9ba](https://github.com/Fszta/parrant/commit/7f4d9bac0f635a5f8d26437e3403c51e732d84e8))
+* **metabase:** support pMBQL (MBQL 5) card serialization ([983bb00](https://github.com/Fszta/parrant/commit/983bb00546429f1f0ddbe0e062bca62a3c84ea88))
+* **metabase:** scope cards to connection and reuse unchanged dashboards ([cb189be](https://github.com/Fszta/parrant/commit/cb189bed9ede33912a7b69c0b0d4965864e0d51f))
+* **metabase:** fetch dashboard details concurrently ([1172e9b](https://github.com/Fszta/parrant/commit/1172e9b07a6db576467ffda8db4c47af19acb8cf))
+* **metabase:** add schema_version 2 with per-entity updated_at ([0c6ad5e](https://github.com/Fszta/parrant/commit/0c6ad5e89b56576aca701afd023f70df1b0e3297))
+* **impact:** add per-model resolution status ([c8b44cb](https://github.com/Fszta/parrant/commit/c8b44cbe321993a32fef32a0898e79eb9e94f834))
+* **impact:** emit policy-independent rebuild selection ([9d020cf](https://github.com/Fszta/parrant/commit/9d020cf5b5d361c7ab3c1866d519df79811d07a2))
+
+### Bug Fixes
+
+* **metabase:** stop /api/card pagination re-fetching the whole list forever ([da8b601](https://github.com/Fszta/parrant/commit/da8b6014e73194b5108e5190fd768a2a0a6989d6))
+* **changeset:** fail safe on join/filter-only compiled-SQL change (#129) ([4b47ba0](https://github.com/Fszta/parrant/commit/4b47ba042d22d0e98cdc84f9ca586da3891c1648))
+* **impact:** emit complete unanalyzable model lists in machine output ([7cc30ea](https://github.com/Fszta/parrant/commit/7cc30eaa66d75f6253000c2b251b5cbe318c089d))
+
 ## [0.18.1](https://github.com/Fszta/parrant/compare/v0.18.0...v0.18.1) (2026-08-25)
 
 ### Bug Fixes
