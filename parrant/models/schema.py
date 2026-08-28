@@ -92,6 +92,38 @@ class ColumnLineage(BaseModel):
     description: Optional[str] = None
 
 
+class UnresolvedColumnEdge(BaseModel):
+    """A column whose upstream source parrant could NOT genuinely resolve.
+
+    Emitted instead of fabricating a confident-but-wrong source column, so that the
+    resolution/confidence pass can degrade the model out of the ``catalog_backed``-clean
+    partition and drop its downstream ``confidence.level`` to ``partial`` — see
+    ``UNRESOLVED_EDGES_PLAN.md`` §4a for the contract.
+
+    Fail-safe: a marker only ADDS information. It never removes a legitimately-resolved edge and
+    never raises confidence; its presence can only lower confidence / widen the rebuild set.
+
+    ``model`` is the dbt node this marker belongs to. The **parser** cannot know its own model
+    name (it only sees SQL), so it emits markers with ``model == ""``; the **registry** stamps the
+    real model name when it attaches the marker set to ``model.metadata["unresolved_edges"]``.
+    ``column`` is the model's own output column (lowercased) whose source is unresolved.
+    ``reason`` is the construct that defeated resolution; ``detail`` carries the raw fabricated
+    token that was dropped (e.g. ``"p.value"``) purely for the report.
+    """
+
+    model: str = ""
+    column: str
+    reason: Literal[
+        "phantom_alias",
+        "unexpandable_star",
+        "fabricated_column",
+        "star_rename",
+        "pivot_output",
+        "other",
+    ]
+    detail: Optional[str] = None
+
+
 class Column(BaseModel):
     name: str
     model_name: str
@@ -215,6 +247,12 @@ class SQLParseResult(BaseModel):
     # Upstream column -> the predicate condition text it appears in (the "why" for the
     # row-set impact, e.g. ``status = 'flagged'``).
     predicate_lineage: Dict[str, str] = Field(default_factory=dict)
+    # Columns whose upstream source parrant could not genuinely resolve — a phantom flatten
+    # alias, a quoted pivot literal, a ``select * rename`` output, or a ``select *`` off an
+    # unresolvable relation. The parser emits these INSTEAD of fabricating a source column, so
+    # the set is complete and uncapped (display layers may cap; the machine surface must not).
+    # ``model`` is left empty here (the parser has no model name); the registry stamps it.
+    unresolved_edges: List[UnresolvedColumnEdge] = Field(default_factory=list)
 
 
 class Coverage(BaseModel):
@@ -251,6 +289,16 @@ class ImpactConfidence(BaseModel):
     # below; the integer counts above remain the source of truth for totals.
     no_column_info_models: List[str] = Field(default_factory=list)
     parse_failed_models: List[str] = Field(default_factory=list)
+    # Reachable models that DO expose columns but carry at least one unresolved-edge marker
+    # (a phantom flatten alias, a quoted pivot literal, a ``select * rename`` output, or a
+    # ``select *`` off an unresolvable relation — see :class:`UnresolvedColumnEdge`). Unlike
+    # ``no_column_info`` / ``parse_failed`` these are analyzable at the column-LIST level, but
+    # at least one of their column EDGES could not be genuinely resolved, so they cannot be
+    # proven safe to skip. Their presence in a change's reachable set drops ``level`` to
+    # ``partial`` (which widens the rebuild). COMPLETE, uncapped machine list — a fail-closed
+    # consumer force-rebuilds every one, so len(partial_edges_models) == partial_edges always.
+    partial_edges: int = 0
+    partial_edges_models: List[str] = Field(default_factory=list)
     # Display-only truncation signals: False in machine output (lists are complete),
     # set True only by a display layer when it elided names from the rendered list.
     no_column_info_truncated: bool = False
@@ -304,8 +352,17 @@ class ModelResolution(BaseModel):
     status and every rebuild/skippable membership unchanged.
     """
 
-    status: Literal["catalog_backed", "parsed", "no_column_info", "parse_failed", "unresolved"]
+    status: Literal[
+        "catalog_backed",
+        "parsed",
+        "no_column_info",
+        "parse_failed",
+        "unresolved",
+        "partial_edges",
+    ]
     # One of: star_off_cte, star_modifier, missing_catalog, python_model, unsupported_sql, other.
+    # For a ``partial_edges`` status it is the marker construct (phantom_alias, unexpandable_star,
+    # fabricated_column, star_rename, pivot_output, other).
     reason: Optional[str] = None
 
 
@@ -319,9 +376,12 @@ class ResolutionReasonCount(BaseModel):
 class ResolutionSummary(BaseModel):
     """Aggregate roll-up of the per-model resolution statuses over the reachable set.
 
-    The per-status counts reconcile exactly with the confidence counts
-    (``no_column_info`` + ``unresolved`` == confidence ``no_column_info``;
-    ``parse_failed`` == confidence ``parse_failed``) and the total equals ``reachable``.
+    The per-status counts reconcile exactly with the reachable partition:
+    ``catalog_backed + parsed + no_column_info + parse_failed + unresolved == reachable``,
+    where ``unresolved`` now aggregates BOTH python models (no columns) AND ``partial_edges``
+    models (columns present but at least one phantom/unresolvable source edge). ``partial_edges``
+    below is the informational sub-count of the latter — it is a breakdown of ``unresolved``,
+    NOT an extra partition, so it must not be added again into the reconciliation total.
     """
 
     reachable: int = 0
@@ -329,7 +389,11 @@ class ResolutionSummary(BaseModel):
     parsed: int = 0
     no_column_info: int = 0
     parse_failed: int = 0
+    # Aggregate of models parrant could not resolve: python models with no columns PLUS
+    # ``partial_edges`` models (columns present, but a source edge could not be resolved).
     unresolved: int = 0
+    # Sub-count of ``unresolved``: reachable models with columns but >=1 unresolved-edge marker.
+    partial_edges: int = 0
     # |rebuild_models ∩ {models whose status is not catalog_backed/parsed}|: how many rebuilds
     # are forced because parrant could not resolve the model, rather than by a proven reaching
     # change. Consumers can log this as a fraction of |rebuild_models| to measure how much

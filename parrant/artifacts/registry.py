@@ -402,7 +402,7 @@ class ModelRegistry:
 
             try:
                 parse_result = self._sql_parser.parse_column_lineage(sql)
-                self._apply_column_lineage(model, parse_result)
+                self._apply_column_lineage(model, parse_result, models)
                 successful_parses += 1
             except Exception as e:
                 failed_parses += 1
@@ -436,7 +436,9 @@ class ModelRegistry:
         except Exception as e:
             logger.error(f"Failed to process star references: {e}", exc_info=True)
 
-    def _apply_column_lineage(self, model: Model, parse_result: SQLParseResult) -> None:
+    def _apply_column_lineage(
+        self, model: Model, parse_result: SQLParseResult, models: Dict[str, Model]
+    ) -> None:
         """Apply parsed lineage to model columns.
 
         For a catalog-missing model (present in the manifest but absent from the
@@ -464,6 +466,135 @@ class ModelRegistry:
         if parse_result.star_sources:
             model.metadata = model.metadata or {}
             model.metadata["star_sources"] = list(parse_result.star_sources)
+
+        self._declare_unresolved_edges(model, parse_result, models)
+
+    def _declare_unresolved_edges(
+        self, model: Model, parse_result: SQLParseResult, models: Dict[str, Model]
+    ) -> None:
+        """Finalize the model's unresolved-edge markers and stamp them onto its metadata.
+
+        Two sources are merged (see UnresolvedColumnEdge / UNRESOLVED_EDGES_PLAN.md §4a):
+
+        * **Parser markers** (``phantom_alias`` / ``pivot_output`` / ``star_rename``) — detectable
+          from the SQL alone. They arrive with ``model == ""``; we stamp the real node name.
+        * **Registry markers** (``unexpandable_star``) — a source token pulled through a
+          ``select *`` off a relation that is a *star base* (``metadata["star_sources"]``) yet is
+          NOT one of this model's declared upstream dependencies (``model.upstream``). The parser
+          cannot tell such a leaked base relation from a real source (both are bare relations); the
+          declared-dependency set is the ground truth that only exists here in the registry. When
+          the relation IS a declared upstream (the normal staging case, and this same model under a
+          full production manifest) the token is genuine and kept — so a legitimate edge is never
+          dropped (fail-safe).
+
+        * **Registry markers** (``fabricated_column``) — the DOMINANT phantom on macro-inlined
+          models (measured on the full prod catalog): a token qualified by a REAL declared upstream
+          relation that IS catalog-backed, but naming a column that does NOT exist in that
+          relation's catalog columns (e.g. ``stg_a.owner_id`` where
+          ``owner_id`` is a pivot/derived output mis-attributed onto the base relation).
+          Both ``phantom_alias`` and ``unexpandable_star`` miss it because the *relation* is real.
+          We can only prove absence when the upstream is catalog-backed; if it is NOT catalog-backed
+          (a source, or a deferred/unbuilt relation) we cannot prove the column is absent and SKIP
+          (never fabricate a marker — that would over-widen). A token whose column DOES exist in the
+          immediate upstream's catalog (a legitimate rename/passthrough) is kept, no marker.
+
+        The finalized set is stored on ``model.metadata["unresolved_edges"]`` as a list of dicts,
+        mirroring ``star_sources`` — the complete, uncapped machine surface the resolution/confidence pass consumes.
+        """
+        markers: List[Dict[str, Any]] = []
+
+        # 1. Parser markers: stamp the model name.
+        for edge in parse_result.unresolved_edges:
+            record = edge.model_dump()
+            record["model"] = model.name
+            markers.append(record)
+
+        # 2. Registry-detected phantom edges. Both checks need registry ground truth (the
+        #    declared-dependency set and the upstreams' catalog columns) that the parser lacks.
+        star_sources = set()
+        if model.metadata and model.metadata.get("star_sources"):
+            star_sources = {str(s).lower() for s in model.metadata["star_sources"]}
+        declared_upstreams = {str(u).lower() for u in (model.upstream or set())}
+        # A leaked ``select *`` base that is not a declared upstream (disjoint from declared).
+        phantom_bases = star_sources - declared_upstreams
+
+        for col_name, column in model.columns.items():
+            for lineage in column.lineage or []:
+                kept: Set[str] = set()
+                for token in lineage.source_columns:
+                    reason = self._registry_phantom_reason(
+                        token, phantom_bases, declared_upstreams, models
+                    )
+                    if reason is not None:
+                        markers.append(
+                            {
+                                "model": model.name,
+                                "column": col_name,
+                                "reason": reason,
+                                "detail": token,
+                            }
+                        )
+                    else:
+                        kept.add(token)
+                lineage.source_columns = kept
+
+        if markers:
+            model.metadata = model.metadata or {}
+            model.metadata["unresolved_edges"] = self._dedupe_edge_records(markers)
+
+    def _registry_phantom_reason(
+        self,
+        token: str,
+        phantom_bases: Set[str],
+        declared_upstreams: Set[str],
+        models: Dict[str, Model],
+    ) -> Optional[str]:
+        """Classify a source token against registry ground truth, or ``None`` to keep it.
+
+        * ``unexpandable_star`` — qualifier is a leaked ``select *`` base, not a declared upstream.
+        * ``fabricated_column`` — qualifier is a declared, catalog-backed upstream, but the column
+          does not exist in that upstream's catalog columns (a same-named output mis-attributed
+          onto a real relation). Fail-safe: only fires when absence is PROVABLE (upstream
+          catalog-backed); a column that exists upstream (legit rename/passthrough) is kept.
+        """
+        qualifier = self._token_qualifier(token)
+        if not qualifier:
+            return None
+        if qualifier in phantom_bases:
+            return "unexpandable_star"
+        if qualifier in declared_upstreams and self.is_catalog_backed(qualifier):
+            upstream = models.get(qualifier)
+            if upstream is not None and upstream.columns:
+                column_name = self._token_column(token)
+                upstream_columns = {name.lower() for name in upstream.columns}
+                if column_name and column_name not in upstream_columns:
+                    return "fabricated_column"
+        return None
+
+    @staticmethod
+    def _token_qualifier(token: str) -> str:
+        """The lowercased, unquoted table-qualifier of a source token (``p.value`` -> ``p``)."""
+        if "." not in token:
+            return ""
+        return token.rsplit(".", 1)[0].strip().strip('"').lower()
+
+    @staticmethod
+    def _token_column(token: str) -> str:
+        """The lowercased, unquoted column part of a source token (``a.b`` -> ``b``)."""
+        tail = token.rsplit(".", 1)[-1] if "." in token else token
+        return tail.strip().strip('"').lower()
+
+    @staticmethod
+    def _dedupe_edge_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Order-stable de-dup of marker dicts on (column, reason, detail)."""
+        seen: Set[Tuple[Any, Any, Any]] = set()
+        unique: List[Dict[str, Any]] = []
+        for record in records:
+            key = (record.get("column"), record.get("reason"), record.get("detail"))
+            if key not in seen:
+                seen.add(key)
+                unique.append(record)
+        return unique
 
     def _process_star_references(self, models: Dict[str, Model]) -> None:
         """Process star references between models."""

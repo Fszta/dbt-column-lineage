@@ -134,6 +134,43 @@ def _change_is_breaking(entry: Dict[str, Any]) -> bool:
     return not proven_additive
 
 
+def _unresolved_edges(model: Any) -> List[Dict[str, Any]]:
+    """The model's unresolved-edge markers, or ``[]`` if none.
+
+    Reads ``model.metadata["unresolved_edges"]`` — the complete, uncapped list the registry
+    stamps for phantom/unexpandable/pivot/rename source edges. A marker-carrying column may have
+    EMPTY ``source_columns`` (the parser drops phantom tokens), so empty sources must NOT be read
+    as "clean"; the marker is the signal.
+    """
+    metadata = getattr(model, "metadata", None) or {}
+    edges = metadata.get("unresolved_edges")
+    return list(edges) if edges else []
+
+
+def _has_unresolved_edges(model: Any) -> bool:
+    """Whether the model carries at least one unresolved-edge marker."""
+    return bool(_unresolved_edges(model))
+
+
+def _partial_edges_reason(registry: LineageAndMetadataProvider, name: str) -> str:
+    """The dominant marker construct for a ``partial_edges`` model (advisory footer reason).
+
+    Picks the most frequent ``reason`` across the model's markers (ties broken alphabetically for
+    determinism). Never load-bearing — like every other resolution reason it only labels WHY, and
+    never changes a status or a rebuild decision. Falls back to ``"unresolved_edge"`` if the
+    markers somehow carry no reason.
+    """
+    try:
+        model = registry.get_model(name)
+    except ModelNotFoundError:
+        return "unresolved_edge"
+    reasons = [edge.get("reason") for edge in _unresolved_edges(model) if edge.get("reason")]
+    if not reasons:
+        return "unresolved_edge"
+    counts = Counter(reasons)
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+
+
 def build_selection(
     reachable: Set[str],
     changed_models: Set[str],
@@ -150,10 +187,13 @@ def build_selection(
       - every edited model is rebuilt (folded into the universe explicitly, since
         ``_dag_reachable_models`` excludes the seed);
       - every model reached by a non-additive change is rebuilt (see :func:`_change_is_breaking`);
-      - every reachable model parrant could not analyze (``no_column_info`` / ``parse_failed``,
-        the COMPLETE machine lists) is rebuilt;
+      - every reachable model parrant could not analyze (``no_column_info`` / ``parse_failed``)
+        OR could not fully resolve (``partial_edges`` — columns present but a phantom/unresolvable
+        source edge) — the COMPLETE machine lists — is rebuilt;
       - if confidence is not ``full`` OR any display list was truncated, ``skippable_models`` is
-        empty and ``rebuild_models`` widens to the whole reachable universe.
+        empty and ``rebuild_models`` widens to the whole reachable universe. A reachable
+        marker-carrying model drives ``confidence.level`` to ``partial``, so it triggers this
+        widen automatically — the safe over-build.
 
     ``skippable_models`` is the reachable complement and is non-empty only at full confidence
     with nothing truncated. All emitted lists are sorted for determinism.
@@ -163,9 +203,15 @@ def build_selection(
     universe: Set[str] = set(reachable) | set(changed_models)
 
     # The COMPLETE unanalyzable lists (uncapped in machine output). A model parrant could not
-    # analyze is assumed affected — this is the whole reason the lists must be complete.
-    unanalyzable: Set[str] = set(confidence.get("no_column_info_models", [])) | set(
-        confidence.get("parse_failed_models", [])
+    # analyze is assumed affected — this is the whole reason the lists must be complete. Models
+    # carrying an unresolved-edge marker (``partial_edges_models``) are folded in here too: they
+    # have columns but a phantom/unresolvable source edge, so they must ALWAYS rebuild regardless
+    # of the widen branch below. This is a pure ADD (fail-safe) — a marker can only grow the
+    # rebuild set, never shrink it or let a marker-carrying model land in ``skippable``.
+    unanalyzable: Set[str] = (
+        set(confidence.get("no_column_info_models", []))
+        | set(confidence.get("parse_failed_models", []))
+        | set(confidence.get("partial_edges_models", []))
     )
     truncated = bool(
         confidence.get("no_column_info_truncated") or confidence.get("parse_failed_truncated")
@@ -212,10 +258,14 @@ def build_selection(
 class _ReachPartition:
     """The reachable set split by column-resolution outcome (computed once, reused).
 
-    ``resolved`` are models parrant has columns for; ``catalog_backed`` (real catalog truth)
-    and ``parsed`` (columns recovered from SQL) are its disjoint halves. ``no_column_info`` and
-    ``parse_failed`` are the unanalyzable halves. The five leaf sets — ``catalog_backed``,
-    ``parsed``, ``no_column_info``, ``parse_failed`` — partition ``reachable`` exactly.
+    ``resolved`` are models parrant has columns for AND whose column edges carry no unresolved
+    marker; ``catalog_backed`` (real catalog truth) and ``parsed`` (columns recovered from SQL)
+    are its disjoint halves. ``partial_edges`` are models that DO have columns but carry >=1
+    unresolved-edge marker — analyzable at the column-list level, but with a phantom/unresolvable
+    source edge, so they are pulled OUT of ``catalog_backed``/``parsed`` and can never be treated
+    as clean-skippable. ``no_column_info`` and ``parse_failed`` are the unanalyzable halves. The
+    five leaf sets — ``catalog_backed``, ``parsed``, ``partial_edges``, ``no_column_info``,
+    ``parse_failed`` — partition ``reachable`` exactly.
     """
 
     resolved: Set[str]
@@ -223,6 +273,7 @@ class _ReachPartition:
     parse_failed: Set[str]
     catalog_backed: Set[str]
     parsed: Set[str]
+    partial_edges: Set[str] = field(default_factory=set)
 
 
 # A ``SELECT *`` immediately followed by a column-set modifier (Snowflake EXCLUDE/RENAME/
@@ -275,6 +326,10 @@ def build_resolution(
         per_model[name] = ModelResolution(status="catalog_backed", reason=None).model_dump()
     for name in partition.parsed:
         per_model[name] = ModelResolution(status="parsed", reason=None).model_dump()
+    for name in partition.partial_edges:
+        per_model[name] = ModelResolution(
+            status="partial_edges", reason=_partial_edges_reason(registry, name)
+        ).model_dump()
     for name in partition.parse_failed:
         per_model[name] = ModelResolution(
             status="parse_failed", reason="unsupported_sql"
@@ -296,13 +351,18 @@ def build_resolution(
         for name in rebuild_models
         if name in per_model and per_model[name]["status"] not in ("catalog_backed", "parsed")
     )
+    partial_edges = status_counts.get("partial_edges", 0)
     summary = ResolutionSummary(
         reachable=len(per_model),
         catalog_backed=status_counts.get("catalog_backed", 0),
         parsed=status_counts.get("parsed", 0),
         no_column_info=status_counts.get("no_column_info", 0),
         parse_failed=status_counts.get("parse_failed", 0),
-        unresolved=status_counts.get("unresolved", 0),
+        # ``unresolved`` aggregates the two "could-not-resolve" statuses — python models (no
+        # columns) and ``partial_edges`` (columns present, phantom source edge) — so the
+        # reconciliation identity cb+parsed+nci+pf+unresolved == reachable still holds.
+        unresolved=status_counts.get("unresolved", 0) + partial_edges,
+        partial_edges=partial_edges,
         rebuild_forced_by_nonresolution=forced,
         top_reasons=top_reasons,
     ).model_dump()
@@ -423,10 +483,18 @@ class LineageService:
         resolved: Set[str] = set()
         parse_failed: Set[str] = set()
         no_column_info: Set[str] = set()
+        partial_edges: Set[str] = set()
         for name in reachable:
             model = models.get(name)
             if model is not None and model.columns:
-                resolved.add(name)  # analyzable: we have columns to trace
+                # A model carrying >=1 unresolved-edge marker has columns but at least
+                # one phantom/unresolvable source edge. Route it OUT of the resolved
+                # (catalog_backed/parsed) partition so it is never counted clean-skippable —
+                # fail-safe: a marker may only add to the rebuild set, never shrink it.
+                if _has_unresolved_edges(model):
+                    partial_edges.add(name)
+                else:
+                    resolved.add(name)  # analyzable: we have columns to trace
                 continue
             if name in parse_failed_names:
                 parse_failed.add(name)
@@ -441,6 +509,7 @@ class LineageService:
             parse_failed=parse_failed,
             catalog_backed=catalog_backed,
             parsed=parsed,
+            partial_edges=partial_edges,
         )
 
     def _impact_confidence(self, reachable: Set[str], resolved_models: int) -> Dict[str, Any]:
@@ -462,11 +531,19 @@ class LineageService:
         partition = self._partition_reachable(reachable)
         no_column_info = partition.no_column_info
         parse_failed = partition.parse_failed
+        partial_edges = partition.partial_edges
 
         unanalyzable_reachable = parse_failed | no_column_info
-        level: Literal["full", "partial"] = "full" if not unanalyzable_reachable else "partial"
+        # Degrade to ``partial`` when a reachable model either has no columns to inspect OR
+        # carries an unresolved-edge marker. This is naturally scoped to THIS change: ``reachable``
+        # is the change's DAG-downstream set (manifest-derived, uncorruptible), so only a marker a
+        # change can actually reach lowers its confidence — a change touching only clean models
+        # stays ``full`` and does NOT widen. The widen at ``build_selection`` fires on ``partial``.
+        level: Literal["full", "partial"] = (
+            "full" if not unanalyzable_reachable and not partial_edges else "partial"
+        )
         # Machine surface carries the COMPLETE name lists (no cap) so a fail-closed
-        # consumer can never miss a model we couldn't analyze; the display layer caps.
+        # consumer can never miss a model we couldn't analyze/resolve; the display layer caps.
         return ImpactConfidence(
             reachable_models=len(reachable),
             resolved_models=resolved_models,
@@ -475,6 +552,8 @@ class LineageService:
             parse_failed=len(parse_failed),
             no_column_info_models=sorted(no_column_info),
             parse_failed_models=sorted(parse_failed),
+            partial_edges=len(partial_edges),
+            partial_edges_models=sorted(partial_edges),
             no_column_info_truncated=False,
             parse_failed_truncated=False,
             level=level,

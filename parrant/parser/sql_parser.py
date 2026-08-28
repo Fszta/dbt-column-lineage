@@ -8,9 +8,11 @@ from parrant.models.schema import (
     OverrideDirective,
     OverrideVerb,
     SQLParseResult,
+    UnresolvedColumnEdge,
 )
 from parrant.parser.sql_parser_utils import (
     get_table_aliases,
+    get_lateral_flatten_aliases,
     get_table_context,
     get_all_tables_from_select,
     get_final_selects,
@@ -400,6 +402,10 @@ class SQLColumnParser:
 
         columns: Dict[str, List[ColumnLineage]] = {}
         star_sources: Set[str] = set()
+        # Unresolved-edge markers collected during this parse (see UnresolvedColumnEdge).
+        # ``model`` is left empty; the registry stamps the real node name.
+        markers: List[UnresolvedColumnEdge] = []
+        flatten_aliases = get_lateral_flatten_aliases(parsed)
 
         final_selects = get_final_selects(parsed)
         if not final_selects:
@@ -450,6 +456,11 @@ class SQLColumnParser:
 
             for expr in select.expressions:
                 if self._star_handler.is_star_expression(expr):
+                    # ``select * rename (old as new)``: parrant only reads ``except`` today, so a
+                    # renamed output column is silently dropped from the expansion and its edge
+                    # is unresolved. Declare it rather than leave a silent gap.
+                    if isinstance(expr, exp.Star):
+                        self._emit_star_rename_markers(expr, markers)
                     excluded_columns = (
                         self._star_handler.get_excluded_columns(expr)
                         if isinstance(expr, exp.Star)
@@ -508,6 +519,12 @@ class SQLColumnParser:
                 else:
                     columns[target_col] = list(lineage)
 
+        # Strip phantom/pivot-literal source tokens and declare them as unresolved edges,
+        # instead of laundering them into confident-but-wrong source columns. The model-level
+        # edge (star_sources / any real remaining token) is preserved — only the fabricated
+        # column-grain token is removed.
+        self._declare_phantom_edges(columns, flatten_aliases, markers)
+
         predicate_lineage = self._extract_predicate_lineage(
             parsed,
             cte_to_model,
@@ -522,7 +539,99 @@ class SQLColumnParser:
             star_sources=star_sources,
             predicate_sources=set(predicate_lineage.keys()),
             predicate_lineage=predicate_lineage,
+            unresolved_edges=self._dedupe_markers(markers),
         )
+
+    @staticmethod
+    def _dedupe_markers(markers: List[UnresolvedColumnEdge]) -> List[UnresolvedColumnEdge]:
+        """Order-stable de-duplication of markers (same column/reason/detail collapse to one)."""
+        seen: Set[Tuple[str, str, Optional[str]]] = set()
+        unique: List[UnresolvedColumnEdge] = []
+        for marker in markers:
+            key = (marker.column, marker.reason, marker.detail)
+            if key not in seen:
+                seen.add(key)
+                unique.append(marker)
+        return unique
+
+    def _emit_star_rename_markers(
+        self, star_expr: exp.Star, markers: List[UnresolvedColumnEdge]
+    ) -> None:
+        """Declare each ``select * rename (old as new)`` output as an unresolved edge.
+
+        The star expander reads only ``except`` (see StarExpressionHandler.get_excluded_columns),
+        so a ``rename`` modifier's output columns never make it into the lineage — a silent gap.
+        We can't correctly re-attribute them from the star alone, so we mark them ``star_rename``
+        (the ``new`` output name, with ``old->new`` detail) rather than leave them unresolved and
+        unflagged.
+        """
+        rename = star_expr.args.get("rename") if hasattr(star_expr, "args") else None
+        if not rename:
+            return
+        for item in rename:
+            new_name = getattr(item, "alias", None)
+            old_expr = getattr(item, "this", None)
+            if not new_name:
+                continue
+            old_name = str(getattr(old_expr, "name", old_expr) or "").strip().strip('"')
+            detail = f"{old_name} -> {new_name}" if old_name else str(new_name)
+            markers.append(
+                UnresolvedColumnEdge(
+                    column=str(new_name).lower(),
+                    reason="star_rename",
+                    detail=detail,
+                )
+            )
+
+    def _declare_phantom_edges(
+        self,
+        columns: Dict[str, List[ColumnLineage]],
+        flatten_aliases: Set[str],
+        markers: List[UnresolvedColumnEdge],
+    ) -> None:
+        """Remove fabricated source tokens from resolved columns and declare them unresolved.
+
+        Two constructs are detectable from the SQL alone (no registry needed):
+
+        * ``phantom_alias`` — the token's qualifier is a ``lateral flatten`` / table-function
+          pseudo-alias (``p.value``): ``p`` is no real upstream, so the edge is fabricated.
+        * ``pivot_output`` — the token's column part is a quoted pivot literal (``"'name'"``):
+          a Snowflake ``pivot`` synthesizes these column names; they exist in no upstream node.
+
+        Fail-safe: only these fabricated tokens are dropped; every genuinely-resolved token
+        (qualified by a real relation, or unqualified) is kept, so a legitimate edge is never
+        removed. If dropping empties a column, the model-level edge still survives via
+        ``star_sources`` and the column simply carries an unresolved marker instead of a lie.
+        """
+        for out_col, lineages in columns.items():
+            for lineage in lineages:
+                kept: Set[str] = set()
+                for token in lineage.source_columns:
+                    reason = self._phantom_token_reason(token, flatten_aliases)
+                    if reason is None:
+                        kept.add(token)
+                    else:
+                        markers.append(
+                            UnresolvedColumnEdge(column=out_col, reason=reason, detail=token)
+                        )
+                lineage.source_columns = kept
+
+    @staticmethod
+    def _phantom_token_reason(token: str, flatten_aliases: Set[str]) -> Optional[str]:
+        """Classify a source token as a fabricated edge, or ``None`` if it is genuine.
+
+        Returns ``"pivot_output"`` for a quoted pivot literal, ``"phantom_alias"`` for a
+        flatten/table-function-qualified token, else ``None`` (keep the token).
+        """
+        table_part, col = split_qualified_name(token)
+        qualifier = table_part.strip().strip('"').lower() if table_part else ""
+        col_clean = (col or "").strip().strip('"')
+        # A pivot output column is projected as a quoted string literal (e.g. "'name'").
+        if len(col_clean) >= 2 and col_clean.startswith("'") and col_clean.endswith("'"):
+            return "pivot_output"
+        if qualifier and qualifier in flatten_aliases:
+            return "phantom_alias"
+        return None
 
     def _extract_predicate_lineage(
         self,

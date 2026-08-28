@@ -709,12 +709,28 @@ def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> 
             )
         else:
             n = confidence.get("unanalyzable_models", 0)
+            partial_edges = confidence.get("partial_edges", 0)
             reachable = confidence.get("reachable_models", 0)
-            footer.append(
-                f"**Confidence: partial** — {n} of {_plural(reachable, 'downstream model')} "
-                f"couldn't be analyzed{_confidence_reason_words(confidence)}, so the impact above "
-                f"may be incomplete."
-            )
+            if n:
+                footer.append(
+                    f"**Confidence: partial** — {n} of {_plural(reachable, 'downstream model')} "
+                    f"couldn't be analyzed{_confidence_reason_words(confidence)}"
+                    + (
+                        f"; {partial_edges} more carried unresolved column edges"
+                        if partial_edges
+                        else ""
+                    )
+                    + ", so the impact above may be incomplete."
+                )
+            else:
+                # Degraded purely by unresolved column edges (phantom flatten alias, quoted pivot
+                # literal, select-* rename/subquery) — analyzable at the column-list level, but a
+                # source edge couldn't be resolved, so these are rebuilt, never skipped.
+                footer.append(
+                    f"**Confidence: partial** — {partial_edges} of "
+                    f"{_plural(reachable, 'downstream model')} carried unresolved column edges, "
+                    f"so they were rebuilt rather than proven safe to skip."
+                )
             unanalyzable_disclosure = _render_unanalyzable_names(confidence)
     coverage = report.get("coverage")
     if coverage and not coverage.get("complete", False):
