@@ -20,6 +20,7 @@ def _confidence(
     level: str = "full",
     no_column_info_models: Optional[List[str]] = None,
     parse_failed_models: Optional[List[str]] = None,
+    partial_edges_models: Optional[List[str]] = None,
     no_column_info_truncated: bool = False,
     parse_failed_truncated: bool = False,
 ) -> Dict[str, Any]:
@@ -27,6 +28,7 @@ def _confidence(
         "level": level,
         "no_column_info_models": no_column_info_models or [],
         "parse_failed_models": parse_failed_models or [],
+        "partial_edges_models": partial_edges_models or [],
         "no_column_info_truncated": no_column_info_truncated,
         "parse_failed_truncated": parse_failed_truncated,
     }
@@ -145,6 +147,41 @@ def test_unanalyzable_reachable_models_are_always_rebuilt() -> None:
 
     assert "blind" in selection["rebuild_models"]
     assert selection["skippable_models"] == ["parsed_ok"]
+    _assert_partition(selection, changed | reachable)
+
+
+def test_partial_edges_model_is_always_rebuilt_even_at_full_level() -> None:
+    # A model carrying an unresolved-edge marker is folded into the rebuild set exactly like an
+    # unanalyzable model — a marker may only ADD to the build (fail-safe). Pinned at level "full"
+    # to isolate the explicit fold-in from the level-driven widen: even reached only additively,
+    # the marker model must NOT be skippable.
+    changed = {"seed"}
+    reachable = {"phantom", "clean"}
+    by_change = [_change(kind="added", semantic=None, reached=["phantom", "clean"])]
+    conf = _confidence(level="full", partial_edges_models=["phantom"])
+    selection = build_selection(reachable, changed, by_change, conf)
+
+    assert "phantom" in selection["rebuild_models"]
+    assert "phantom" not in selection["skippable_models"]
+    # The genuinely-clean additive reach is still skippable — the marker only adds, never widens
+    # here (widening is the level="partial" path, exercised separately).
+    assert selection["skippable_models"] == ["clean"]
+    _assert_partition(selection, changed | reachable)
+
+
+def test_partial_edges_reach_widens_when_level_is_partial() -> None:
+    # The real propagation path: a reachable marker-carrying model drives confidence to "partial" (done in
+    # _impact_confidence); build_selection then widens the whole reachable universe — the safe
+    # over-build — so nothing is skipped alongside the phantom-edge model.
+    changed = {"seed"}
+    reachable = {"phantom", "a", "b"}
+    by_change = [_change(kind="added", semantic=None, reached=["a"])]
+    conf = _confidence(level="partial", partial_edges_models=["phantom"])
+    selection = build_selection(reachable, changed, by_change, conf)
+
+    assert selection["widened_to_all_reachable"] is True
+    assert selection["skippable_models"] == []
+    assert selection["rebuild_models"] == sorted(changed | reachable)
     _assert_partition(selection, changed | reachable)
 
 

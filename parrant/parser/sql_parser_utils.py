@@ -33,6 +33,27 @@ def get_table_aliases(parsed: Any) -> Dict[str, str]:
     return aliases
 
 
+def get_lateral_flatten_aliases(parsed: Any) -> set:
+    """Return the aliases of every ``lateral flatten`` / table-function in the query.
+
+    A Snowflake ``lateral flatten(x) p`` (and any table-valued function used the same way)
+    parses to an ``exp.Lateral`` carrying an alias (``p``) but is **not** a real table — it is
+    absent from :func:`get_table_aliases` (which only sees ``exp.Table``/``From``/``Join``). The
+    parser therefore cannot resolve ``p.value`` to any upstream node and would otherwise mint the
+    phantom token ``p.value``. These aliases are the ground truth for "this qualifier is a
+    flatten pseudo-relation, not an upstream" — a column source qualified by one is a
+    ``phantom_alias`` unresolved edge.
+
+    Aliases are lowercased to match the parser's case-insensitive qualifier handling.
+    """
+    aliases: set = set()
+    for lateral in parsed.find_all(exp.Lateral):
+        alias = lateral.alias
+        if alias:
+            aliases.add(str(alias).lower())
+    return aliases
+
+
 def get_table_context(select: Any) -> str:
     from_clause = select.find(exp.From)
     if from_clause:

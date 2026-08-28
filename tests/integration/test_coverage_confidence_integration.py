@@ -73,6 +73,8 @@ def test_json_impact_carries_confidence_block(dbt_artifacts):
         "parse_failed_models",
         "no_column_info_truncated",
         "parse_failed_truncated",
+        "partial_edges",
+        "partial_edges_models",
         "level",
     }
     # Everything reachable is in the catalog and parsed, so confidence is full even
