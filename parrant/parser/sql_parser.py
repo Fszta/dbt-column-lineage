@@ -13,6 +13,7 @@ from parrant.models.schema import (
 from parrant.parser.sql_parser_utils import (
     get_table_aliases,
     get_lateral_flatten_aliases,
+    get_flatten_alias_nodes,
     get_table_context,
     get_all_tables_from_select,
     get_final_selects,
@@ -406,6 +407,21 @@ class SQLColumnParser:
         # ``model`` is left empty; the registry stamps the real node name.
         markers: List[UnresolvedColumnEdge] = []
         flatten_aliases = get_lateral_flatten_aliases(parsed)
+        # flatten pseudo-alias -> the REAL upstream source columns of the expression it unnests
+        # (e.g. `flatten(payload:items) f` -> {`raw_events.payload`}). Lets a downstream
+        # `f.value:id` be attributed to the flattened column instead of the phantom `f` alias.
+        flatten_alias_sources = self._build_flatten_alias_sources(
+            parsed,
+            cte_to_model,
+            cte_sources,
+            cte_transformation_types,
+            cte_sql_expressions,
+            cte_base_tables,
+            cte_extra_sources,
+        )
+        # A `table(flatten(...))` alias is a flatten pseudo-relation too, but is not an
+        # `exp.Lateral`; fold its alias in so the phantom-token detection recognises it.
+        flatten_aliases |= set(flatten_alias_sources.keys())
 
         final_selects = get_final_selects(parsed)
         if not final_selects:
@@ -523,7 +539,7 @@ class SQLColumnParser:
         # instead of laundering them into confident-but-wrong source columns. The model-level
         # edge (star_sources / any real remaining token) is preserved — only the fabricated
         # column-grain token is removed.
-        self._declare_phantom_edges(columns, flatten_aliases, markers)
+        self._declare_phantom_edges(columns, flatten_aliases, flatten_alias_sources, markers)
 
         predicate_lineage = self._extract_predicate_lineage(
             parsed,
@@ -587,21 +603,27 @@ class SQLColumnParser:
         self,
         columns: Dict[str, List[ColumnLineage]],
         flatten_aliases: Set[str],
+        flatten_alias_sources: Dict[str, Set[str]],
         markers: List[UnresolvedColumnEdge],
     ) -> None:
-        """Remove fabricated source tokens from resolved columns and declare them unresolved.
+        """Resolve or declare fabricated source tokens on every resolved column.
 
         Two constructs are detectable from the SQL alone (no registry needed):
 
         * ``phantom_alias`` — the token's qualifier is a ``lateral flatten`` / table-function
-          pseudo-alias (``p.value``): ``p`` is no real upstream, so the edge is fabricated.
+          pseudo-alias (``f.value``): ``f`` is no real upstream. When the flattened expression is
+          traceable to real upstream columns (``flatten_alias_sources``), those columns REPLACE the
+          phantom token — the flatten unnests them, so they are its genuine source (a real edge).
+          Only when the flattened expression cannot be traced (e.g. ``flatten([1, 2, 3])``, or a
+          non-flatten ``lateral (subquery)``) do we fall back to the ``phantom_alias`` marker,
+          preserving the honesty of the un-resolvable tail rather than fabricating.
         * ``pivot_output`` — the token's column part is a quoted pivot literal (``"'name'"``):
           a Snowflake ``pivot`` synthesizes these column names; they exist in no upstream node.
 
-        Fail-safe: only these fabricated tokens are dropped; every genuinely-resolved token
+        Fail-safe: only fabricated tokens are dropped/re-attributed; every genuinely-resolved token
         (qualified by a real relation, or unqualified) is kept, so a legitimate edge is never
-        removed. If dropping empties a column, the model-level edge still survives via
-        ``star_sources`` and the column simply carries an unresolved marker instead of a lie.
+        removed. If a token is dropped without a replacement, the model-level edge still survives
+        via ``star_sources`` and the column carries an unresolved marker instead of a lie.
         """
         for out_col, lineages in columns.items():
             for lineage in lineages:
@@ -610,11 +632,107 @@ class SQLColumnParser:
                     reason = self._phantom_token_reason(token, flatten_aliases)
                     if reason is None:
                         kept.add(token)
-                    else:
-                        markers.append(
-                            UnresolvedColumnEdge(column=out_col, reason=reason, detail=token)
-                        )
+                        continue
+                    if reason == "phantom_alias":
+                        resolved = self._resolve_flatten_token(token, flatten_alias_sources)
+                        if resolved:
+                            # The flattened expression traces to real upstream columns: attribute
+                            # the downstream column to them instead of the phantom alias.
+                            kept.update(resolved)
+                            continue
+                    markers.append(
+                        UnresolvedColumnEdge(column=out_col, reason=reason, detail=token)
+                    )
                 lineage.source_columns = kept
+
+    @staticmethod
+    def _resolve_flatten_token(token: str, flatten_alias_sources: Dict[str, Set[str]]) -> Set[str]:
+        """Return the real upstream columns a flatten-qualified token (``f.value``) derives from.
+
+        ``f`` is looked up in the flatten-alias -> flattened-source map. An empty result means the
+        flattened expression was not traceable (the caller then keeps the honest marker)."""
+        table_part, _ = split_qualified_name(token)
+        qualifier = table_part.strip().strip('"').lower() if table_part else ""
+        return set(flatten_alias_sources.get(qualifier, set()))
+
+    def _build_flatten_alias_sources(
+        self,
+        parsed: Any,
+        cte_to_model: Optional[Dict[str, str]],
+        cte_sources: Dict[str, Dict[str, str]],
+        cte_transformation_types: Dict[str, Dict[str, str]],
+        cte_sql_expressions: Dict[str, Dict[str, Optional[str]]],
+        cte_base_tables: Dict[str, Set[str]],
+        cte_extra_sources: Dict[str, Dict[str, Set[str]]],
+    ) -> Dict[str, Set[str]]:
+        """Map each flatten pseudo-alias to the real upstream columns of the expression it unnests.
+
+        For every ``flatten(<expr>) alias`` in the query, resolve ``<expr>``'s columns through the
+        SAME CTE/alias machinery used for projections, evaluated in the flatten's own SELECT scope
+        (so an unqualified ``flatten(order_ids)`` binds to that SELECT's ``FROM`` table). The result
+        is what a downstream ``alias.value`` truly derives from.
+
+        Nested flatten (``flatten(outer.value) inner`` where ``outer`` is itself a flatten alias)
+        is expanded transitively: a raw source that is qualified by another flatten alias is
+        replaced by that alias's resolved sources, with a visited-set guard against cycles. An
+        alias whose expression traces to nothing real (a literal array, an untraceable path) maps
+        to the empty set, which keeps the honest ``phantom_alias`` marker downstream.
+        """
+        raw_sources: Dict[str, Set[str]] = {}
+        for alias, flattened_expr, select in get_flatten_alias_nodes(parsed):
+            if select is None:
+                raw_sources.setdefault(alias, set())
+                continue
+            # A flatten frequently unnests a column the SAME select derives on the fly
+            # (``flatten(parse_json(raw):items)`` projected as ``arr``, then ``flatten(arr)``).
+            # Populate column_definitions so forward-reference resolution follows such a derived
+            # column to its REAL upstream source instead of fabricating a same-name column on the
+            # base relation.
+            column_definitions: Dict[str, Any] = {}
+            for projected in select.expressions:
+                projected_name = strip_sql_comments(projected.alias_or_name).lower()
+                column_definitions[projected_name] = projected
+            context = ParserContext(
+                aliases=get_table_aliases(select),
+                table_context=get_table_context(select),
+                cte_sources=cte_sources,
+                cte_to_model=cte_to_model,
+                cte_transformation_types=cte_transformation_types,
+                cte_sql_expressions=cte_sql_expressions,
+                cte_base_tables=cte_base_tables,
+                cte_extra_sources=cte_extra_sources,
+                column_definitions=column_definitions,
+            )
+            resolved = self._extract_source_columns(flattened_expr, context)
+            # Same alias reused in two scopes: union rather than clobber (over-inclusive is
+            # honest here — both are genuine flattened sources; dropping one would hide an edge).
+            raw_sources.setdefault(alias, set()).update(resolved)
+
+        expanded: Dict[str, Set[str]] = {}
+        for alias in raw_sources:
+            expanded[alias] = self._expand_flatten_sources(alias, raw_sources, set())
+        return expanded
+
+    def _expand_flatten_sources(
+        self,
+        alias: str,
+        raw_sources: Dict[str, Set[str]],
+        visiting: Set[str],
+    ) -> Set[str]:
+        """Transitively resolve a flatten alias's sources, replacing nested-flatten qualifiers."""
+        if alias in visiting:
+            return set()
+        visiting.add(alias)
+        out: Set[str] = set()
+        for token in raw_sources.get(alias, set()):
+            table_part, _ = split_qualified_name(token)
+            qualifier = table_part.strip().strip('"').lower() if table_part else ""
+            if qualifier and qualifier in raw_sources and qualifier != alias:
+                out.update(self._expand_flatten_sources(qualifier, raw_sources, visiting))
+            else:
+                out.add(token)
+        visiting.discard(alias)
+        return out
 
     @staticmethod
     def _phantom_token_reason(token: str, flatten_aliases: Set[str]) -> Optional[str]:

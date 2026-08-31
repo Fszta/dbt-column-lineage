@@ -94,10 +94,13 @@ final as (
 select * from final
 """
 
-# phantom_alias: the `lateral flatten` alias `p` leaks as `p.value`, dropped; the coarse edge to
-# the real source `raw_x.attr_name` (a plain passthrough branch) survives. `raw_x` is a source
-# (not catalog-backed) -> its column absence is unprovable, so this stays phantom_alias only,
-# never fabricated_column.
+# phantom_alias: the `lateral flatten` alias `p` leaks as `p.value`. Here it flattens a literal
+# array — an expression with NO traceable upstream column — so it stays an honest phantom_alias
+# marker (the flatten-resolution pass only re-attributes when the flattened expression resolves to
+# a real upstream; see the parser's flatten-resolution tests for the resolved case). The coarse
+# edge to the real source `raw_x.attr_name` (a plain passthrough branch) survives independently.
+# `raw_x` is a source (not catalog-backed) -> its column absence is unprovable, so this stays
+# phantom_alias only, never fabricated_column.
 _SQL_STG_D = """
 with
 imported as (
@@ -111,7 +114,7 @@ phantom as (
         id,
         p.value:k::varchar as v_out
     from imported,
-        lateral flatten(attr_name) p
+        lateral flatten([1, 2, 3]) p
 ),
 final as (
     select
@@ -122,6 +125,7 @@ final as (
 )
 select * from final
 """
+
 
 def _manifest_node(
     *,
@@ -224,15 +228,11 @@ def build_manifest() -> Dict[str, Any]:
     }
 
 
-def _catalog_node(
-    *, name: str, schema: str, columns: List[str]
-) -> Tuple[str, Dict[str, Any]]:
+def _catalog_node(*, name: str, schema: str, columns: List[str]) -> Tuple[str, Dict[str, Any]]:
     unique_id = f"model.{_PROJECT}.{name}"
     return unique_id, {
         "metadata": {"name": name, "schema": schema, "database": _DB, "type": "BASE TABLE"},
-        "columns": {
-            c: {"name": c, "type": "VARCHAR", "index": i} for i, c in enumerate(columns)
-        },
+        "columns": {c: {"name": c, "type": "VARCHAR", "index": i} for i, c in enumerate(columns)},
     }
 
 

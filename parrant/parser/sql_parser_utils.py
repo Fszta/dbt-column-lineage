@@ -54,6 +54,68 @@ def get_lateral_flatten_aliases(parsed: Any) -> set:
     return aliases
 
 
+def _enclosing_select(node: Any) -> Optional[Any]:
+    """Walk up the parent chain to the SELECT that owns this node (``None`` if unattached)."""
+    parent = node.parent
+    while parent is not None and not isinstance(parent, exp.Select):
+        parent = parent.parent
+    return parent
+
+
+def _flatten_input_expression(explode: Any) -> Optional[Any]:
+    """Return the expression being unnested by a ``flatten`` (an ``exp.Explode``).
+
+    The flattened value is either passed positionally (``flatten(x)`` -> ``explode.this == x``)
+    or by keyword (``flatten(input => x, outer => true)`` -> ``explode.this`` is the ``input``
+    ``Kwarg``). Snowflake's ``flatten`` names the flattened value ``input``; any other keyword
+    (``path``, ``outer``, ``recursive``, ``mode``) is a modifier, not the source, so we select
+    the ``input`` Kwarg specifically and fall back to the first Kwarg's value.
+    """
+    inner = getattr(explode, "this", None)
+    if inner is None:
+        return None
+    if isinstance(inner, exp.Kwarg):
+        candidates = [inner]
+        candidates.extend(explode.args.get("expressions") or [])
+        for kwarg in candidates:
+            if not isinstance(kwarg, exp.Kwarg):
+                continue
+            key = kwarg.this
+            key_name = str(getattr(key, "this", key)).lower()
+            if key_name == "input":
+                return kwarg.expression
+        return inner.expression
+    return inner
+
+
+def get_flatten_alias_nodes(parsed: Any) -> List[tuple]:
+    """Return ``(alias, flattened_expression, enclosing_select)`` for each ``flatten`` in the query.
+
+    Covers the two shapes Snowflake ``flatten`` parses into: ``lateral flatten(...) a`` — an
+    ``exp.Lateral`` wrapping an ``exp.Explode`` — and ``table(flatten(...)) a`` — an
+    ``exp.TableFromRows`` wrapping an ``exp.Explode``. Each carries the flatten pseudo-alias
+    (``a``) and the expression it unnests; the enclosing SELECT is returned so the flattened
+    expression's columns can be resolved with that scope's table/alias context.
+
+    Aliases are lowercased to match the parser's case-insensitive qualifier handling. A node with
+    no alias, or whose inner is not an ``Explode`` (e.g. a ``lateral (subquery)``), is skipped —
+    only genuine flatten table-functions are returned.
+    """
+    nodes: List[tuple] = []
+    for holder in list(parsed.find_all(exp.Lateral)) + list(parsed.find_all(exp.TableFromRows)):
+        alias = holder.alias
+        if not alias:
+            continue
+        explode = holder.this
+        if not isinstance(explode, exp.Explode):
+            continue
+        flattened_expr = _flatten_input_expression(explode)
+        if flattened_expr is None:
+            continue
+        nodes.append((str(alias).lower(), flattened_expr, _enclosing_select(holder)))
+    return nodes
+
+
 def get_table_context(select: Any) -> str:
     from_clause = select.find(exp.From)
     if from_clause:

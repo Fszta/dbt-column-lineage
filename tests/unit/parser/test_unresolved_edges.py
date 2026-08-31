@@ -27,8 +27,21 @@ def _by_column(result):
     return out
 
 
-def test_flatten_alias_emits_phantom_marker_not_source():
-    """A column sourced from a ``lateral flatten`` alias must be declared, not fabricated."""
+def _all_sources(result):
+    return {
+        token
+        for lineages in result.column_lineage.values()
+        for lineage in lineages
+        for token in lineage.source_columns
+    }
+
+
+def test_flatten_alias_resolves_to_flattened_column_not_phantom():
+    """A column read off a ``lateral flatten`` alias is attributed to the flattened upstream column.
+
+    ``flatten(properties) f`` unnests ``properties`` (a column of ``raw_pages``); a downstream
+    ``f.value:country`` therefore derives from ``raw_pages.properties`` — a real edge, NOT a
+    ``phantom_alias`` marker."""
     sql = """
     with
     exploded as (
@@ -42,21 +55,102 @@ def test_flatten_alias_emits_phantom_marker_not_source():
     """
     result = SQLColumnParser(dialect="snowflake").parse_column_lineage(sql)
 
-    # The phantom flatten token `f.value` is gone from every resolved source set.
-    all_sources = {
-        token
-        for lineages in result.column_lineage.values()
-        for lineage in lineages
-        for token in lineage.source_columns
-    }
+    # No phantom flatten token survives, and no marker is minted — the edge is resolved.
+    all_sources = _all_sources(result)
     assert not any(token.startswith("f.") for token in all_sources), all_sources
+    assert result.unresolved_edges == []
+    # `country` is attributed to the flattened variant column of the real upstream.
+    assert result.column_lineage["country"][0].source_columns == {"raw_pages.properties"}
 
-    # ...and `country` carries a phantom_alias marker instead.
-    assert _by_column(result).get("country") == {"phantom_alias"}
-    detail = next(e.detail for e in result.unresolved_edges if e.column == "country")
-    assert detail.startswith("f.")
+
+def test_flatten_kwarg_input_variant_path_resolves():
+    """``flatten(input => base.payload:items)`` + ``f.value:id`` resolves to the payload column."""
+    sql = """
+    with base as (
+        select payload from raw_events
+    )
+    select
+        f.value:id::number as item_id,
+        f.value:name::string as item_name
+    from base,
+        lateral flatten(input => base.payload:items) f
+    """
+    result = SQLColumnParser(dialect="snowflake").parse_column_lineage(sql)
+
+    assert result.unresolved_edges == []
+    item_id = result.column_lineage["item_id"][0]
+    assert item_id.source_columns == {"raw_events.payload"}
+    # It is a genuine derived edge (the cast/variant-extract), not a passthrough of a phantom token.
+    assert item_id.transformation_type == "derived"
+    assert result.column_lineage["item_name"][0].source_columns == {"raw_events.payload"}
+
+
+def test_nested_flatten_resolves_transitively():
+    """``flatten(outer.value:items)`` where ``outer`` is itself a flatten alias resolves through."""
+    sql = """
+    with base as (
+        select payload from raw_events
+    )
+    select outer_f2.value:x::string as x
+    from base,
+        lateral flatten(input => base.payload:groups) outer_f1,
+        lateral flatten(input => outer_f1.value:items) outer_f2
+    """
+    result = SQLColumnParser(dialect="snowflake").parse_column_lineage(sql)
+
+    assert result.unresolved_edges == []
+    assert result.column_lineage["x"][0].source_columns == {"raw_events.payload"}
+
+
+def test_table_flatten_form_resolves():
+    """The ``table(flatten(...))`` spelling (not a ``LATERAL``) resolves the same way."""
+    sql = """
+    with base as (
+        select arr from raw_events
+    )
+    select f.value:x::string as x
+    from base, table(flatten(base.arr)) f
+    """
+    result = SQLColumnParser(dialect="snowflake").parse_column_lineage(sql)
+
+    assert result.unresolved_edges == []
+    assert result.column_lineage["x"][0].source_columns == {"raw_events.arr"}
+
+
+def test_unresolvable_flatten_still_emits_honest_marker():
+    """Honesty tail: a flatten over an untraceable expression (a literal array) stays a marker.
+
+    ``flatten([1, 2, 3]) rule`` has no upstream column, so ``rule.value`` cannot be attributed to
+    any real source — the parser must keep the honest ``phantom_alias`` marker, not fabricate."""
+    sql = """
+    select rule.value::number as rule_id
+    from some_ref,
+        lateral flatten([1, 2, 3]) as rule
+    """
+    result = SQLColumnParser(dialect="snowflake").parse_column_lineage(sql)
+
+    assert _by_column(result).get("rule_id") == {"phantom_alias"}
+    detail = next(e.detail for e in result.unresolved_edges if e.column == "rule_id")
+    assert detail.startswith("rule.")
+    # The fabricated token is gone from the resolved sources (no lie left behind).
+    assert not any(token.startswith("rule.") for token in _all_sources(result))
     # Parser leaves the model name empty (the registry stamps it).
     assert all(edge.model == "" for edge in result.unresolved_edges)
+
+
+def test_non_flatten_lateral_subquery_stays_honest_marker():
+    """A ``lateral (subquery) s`` is not a flatten (no Explode); ``s.col`` stays a marker."""
+    sql = """
+    select s.total as total
+    from orders,
+        lateral (
+            select sum(amount) as total from items where items.order_id = orders.id
+        ) s
+    """
+    result = SQLColumnParser(dialect="snowflake").parse_column_lineage(sql)
+
+    assert _by_column(result).get("total") == {"phantom_alias"}
+    assert not any(token.startswith("s.") for token in _all_sources(result))
 
 
 def test_pivot_literal_output_emits_pivot_marker():
