@@ -18,12 +18,16 @@ ratios plus ``reporting_month`` sourced from ``customers``). It carries no deriv
 keeps — so it is surfaced as a distinct ``filter`` (row-set) impact, not as a derived
 column and not silently dropped.
 
-Shape 2 — projecting, genuinely catalog-absent consumer (e.g. ``orders_fulfilment_flags``
-or ``orders_semantic_view``): projects an ``orders`` column
-value to its output AND is absent from the head catalog (deferred / not-built, so it is
-manifest-only). Before the fix it was dropped, mislabeled "not built", and reported as
-``removed``; after the fix it is reported as affected, ``removed`` is false, and it does
-not pollute the unanalyzable bucket.
+Shape 2 — projecting, genuinely catalog-absent consumer (``orders_fulfilment_flags``):
+projects an ``orders`` column value to its output AND is absent from the head catalog
+(deferred / not-built, so it is manifest-only). Before the fix it was dropped, mislabeled
+"not built", and reported as ``removed``; after the fix it is reported as affected,
+``removed`` is false, and it does not pollute the unanalyzable bucket.
+
+A ``materialized: semantic_view`` relation (``orders_semantic_view``) is a distinct case: it
+is column-OPAQUE by design — we do not trace its columns, but its model-level reach is kept
+from the manifest dependency graph, so a change to ``orders`` still reaches and rebuilds it at
+model grain. It is classified ``opaque`` (a deliberate choice), never a parse failure.
 
 A genuinely unanalyzable relation (no catalog columns AND no parseable compiled SQL) is
 honestly labelled ("no column-level information", never "not built").
@@ -376,15 +380,23 @@ def test_shape2_projecting_catalog_absent_consumer_is_included(tmp_path):
     assert "orders_fulfilment_flags" not in conf["parse_failed_models"]
 
 
-def test_shape2_semantic_view_projecting_orders_is_included(tmp_path):
-    """A ``materialized: semantic_view`` relation that is absent from the catalog but
-    whose compiled SQL projects an orders column is recovered and reported."""
+def test_shape2_semantic_view_is_opaque_with_model_grain_reach(tmp_path):
+    """A ``materialized: semantic_view`` relation is column-OPAQUE: we deliberately do not
+    trace its columns, but its MODEL-level reach is preserved, so a change to ``orders`` still
+    reaches and rebuilds it at model grain. It is classified ``opaque`` (a choice), never a
+    parse failure, and no column-level edge is fabricated for it."""
     base, head, changes, agg = _changeset_impact(tmp_path)
 
     sv = "orders_semantic_view"
     assert head.registry.is_catalog_backed(sv) is False
-    assert sv in {m["name"] for m in agg["affected_models"]}
-    assert (sv, "order_status") in {(c["model"], c["column"]) for c in agg["affected_columns"]}
+    confidence = agg["confidence"]
+    selection = agg["selection"]
+    # Opaque, not a failure, and folded into the rebuild set (model-grain reach preserved).
+    assert sv in confidence["opaque_models"]
+    assert sv not in confidence["parse_failed_models"]
+    assert sv in selection["rebuild_models"]
+    # No column-level edge is invented for an opaque node.
+    assert sv not in {c["model"] for c in agg["affected_columns"]}
     assert not any(c.model == sv and c.kind == ChangeKind.REMOVED for c in changes)
 
 

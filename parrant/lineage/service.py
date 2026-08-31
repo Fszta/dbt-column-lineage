@@ -187,9 +187,10 @@ def build_selection(
       - every edited model is rebuilt (folded into the universe explicitly, since
         ``_dag_reachable_models`` excludes the seed);
       - every model reached by a non-additive change is rebuilt (see :func:`_change_is_breaking`);
-      - every reachable model parrant could not analyze (``no_column_info`` / ``parse_failed``)
-        OR could not fully resolve (``partial_edges`` — columns present but a phantom/unresolvable
-        source edge) — the COMPLETE machine lists — is rebuilt;
+      - every reachable model parrant could not analyze (``no_column_info`` / ``parse_failed``),
+        could not fully resolve (``partial_edges`` — columns present but a phantom/unresolvable
+        source edge), OR deliberately does not column-analyze (``opaque`` — unparseable SQL such
+        as a semantic view) — the COMPLETE machine lists — is rebuilt;
       - if confidence is not ``full`` OR any display list was truncated, ``skippable_models`` is
         empty and ``rebuild_models`` widens to the whole reachable universe. A reachable
         marker-carrying model drives ``confidence.level`` to ``partial``, so it triggers this
@@ -212,6 +213,10 @@ def build_selection(
         set(confidence.get("no_column_info_models", []))
         | set(confidence.get("parse_failed_models", []))
         | set(confidence.get("partial_edges_models", []))
+        # Opaque nodes (unparseable SQL, e.g. semantic views) carry model-level reach but no
+        # column edges, so a reaching change can never be proven not to affect them — fold them
+        # into the always-rebuild set (fail-safe: this can only grow the rebuild set).
+        | set(confidence.get("opaque_models", []))
     )
     truncated = bool(
         confidence.get("no_column_info_truncated") or confidence.get("parse_failed_truncated")
@@ -274,6 +279,9 @@ class _ReachPartition:
     catalog_backed: Set[str]
     parsed: Set[str]
     partial_edges: Set[str] = field(default_factory=set)
+    # Nodes we deliberately do NOT column-analyze (unparseable SQL, e.g. semantic views):
+    # model-level reach preserved, column edges withheld. Pulled out of the resolved set.
+    opaque: Set[str] = field(default_factory=set)
 
 
 # A ``SELECT *`` immediately followed by a column-set modifier (Snowflake EXCLUDE/RENAME/
@@ -309,6 +317,26 @@ def _resolve_reason(
     return "no_column_info", "other"
 
 
+def _opaque_reason(registry: LineageAndMetadataProvider, name: str) -> str:
+    """Coarse, advisory hint at WHY a node is opaque: ``semantic_view`` or ``unparseable_sql``.
+
+    Best-effort — like every resolution reason it only labels WHY and never changes a status or
+    a rebuild decision. Detects a semantic view from the dbt materialization or the compiled SQL
+    shape; everything else the parser could not read falls back to the general reason.
+    """
+    try:
+        config = registry.get_model_config(name)
+    except Exception:
+        config = {}
+    materialized = str((config or {}).get("materialized") or "").lower()
+    if "semantic" in materialized:
+        return "semantic_view"
+    compiled = (registry.get_compiled_sql(name) or "").lstrip().lower()
+    if compiled.startswith("create") and "semantic view" in compiled:
+        return "semantic_view"
+    return "unparseable_sql"
+
+
 def build_resolution(
     registry: LineageAndMetadataProvider,
     partition: _ReachPartition,
@@ -333,6 +361,10 @@ def build_resolution(
     for name in partition.parse_failed:
         per_model[name] = ModelResolution(
             status="parse_failed", reason="unsupported_sql"
+        ).model_dump()
+    for name in partition.opaque:
+        per_model[name] = ModelResolution(
+            status="opaque", reason=_opaque_reason(registry, name)
         ).model_dump()
     for name in partition.no_column_info:
         status, reason = _resolve_reason(registry, name)
@@ -360,9 +392,10 @@ def build_resolution(
         parse_failed=status_counts.get("parse_failed", 0),
         # ``unresolved`` aggregates the two "could-not-resolve" statuses — python models (no
         # columns) and ``partial_edges`` (columns present, phantom source edge) — so the
-        # reconciliation identity cb+parsed+nci+pf+unresolved == reachable still holds.
+        # reconciliation identity cb+parsed+nci+pf+unresolved+opaque == reachable still holds.
         unresolved=status_counts.get("unresolved", 0) + partial_edges,
         partial_edges=partial_edges,
+        opaque=status_counts.get("opaque", 0),
         rebuild_forced_by_nonresolution=forced,
         top_reasons=top_reasons,
     ).model_dump()
@@ -479,12 +512,20 @@ class LineageService:
         """
         models = self.registry.get_models()
         parse_failed_names = self.registry.get_parse_failed_models()
+        opaque_names = self.registry.get_opaque_models()
 
         resolved: Set[str] = set()
         parse_failed: Set[str] = set()
         no_column_info: Set[str] = set()
         partial_edges: Set[str] = set()
+        opaque: Set[str] = set()
         for name in reachable:
+            # Opaque takes priority over any columns a catalog entry might supply: we have no
+            # column-level EDGES for these nodes (unparseable SQL), so they can never be treated
+            # as clean-skippable even when the catalog knows their column names.
+            if name in opaque_names:
+                opaque.add(name)
+                continue
             model = models.get(name)
             if model is not None and model.columns:
                 # A model carrying >=1 unresolved-edge marker has columns but at least
@@ -510,6 +551,7 @@ class LineageService:
             catalog_backed=catalog_backed,
             parsed=parsed,
             partial_edges=partial_edges,
+            opaque=opaque,
         )
 
     def _impact_confidence(self, reachable: Set[str], resolved_models: int) -> Dict[str, Any]:
@@ -532,15 +574,21 @@ class LineageService:
         no_column_info = partition.no_column_info
         parse_failed = partition.parse_failed
         partial_edges = partition.partial_edges
+        opaque = partition.opaque
 
         unanalyzable_reachable = parse_failed | no_column_info
-        # Degrade to ``partial`` when a reachable model either has no columns to inspect OR
-        # carries an unresolved-edge marker. This is naturally scoped to THIS change: ``reachable``
-        # is the change's DAG-downstream set (manifest-derived, uncorruptible), so only a marker a
-        # change can actually reach lowers its confidence — a change touching only clean models
-        # stays ``full`` and does NOT widen. The widen at ``build_selection`` fires on ``partial``.
+        # Degrade to ``partial`` when a reachable model either has no columns to inspect, carries
+        # an unresolved-edge marker, OR is opaque (unparseable SQL we chose not to column-analyze,
+        # e.g. a semantic view). This is naturally scoped to THIS change: ``reachable`` is the
+        # change's DAG-downstream set (manifest-derived, uncorruptible), so only a node a change
+        # can actually reach lowers its confidence — a change touching only clean models stays
+        # ``full`` and does NOT widen. Opaque degrades (fail-closed): we cannot see column edges
+        # through it, so we widen the rebuild rather than prove anything downstream skippable. The
+        # widen at ``build_selection`` fires on ``partial``.
         level: Literal["full", "partial"] = (
-            "full" if not unanalyzable_reachable and not partial_edges else "partial"
+            "full"
+            if not unanalyzable_reachable and not partial_edges and not opaque
+            else "partial"
         )
         # Machine surface carries the COMPLETE name lists (no cap) so a fail-closed
         # consumer can never miss a model we couldn't analyze/resolve; the display layer caps.
@@ -554,8 +602,11 @@ class LineageService:
             parse_failed_models=sorted(parse_failed),
             partial_edges=len(partial_edges),
             partial_edges_models=sorted(partial_edges),
+            opaque=len(opaque),
+            opaque_models=sorted(opaque),
             no_column_info_truncated=False,
             parse_failed_truncated=False,
+            opaque_truncated=False,
             level=level,
         ).model_dump()
 

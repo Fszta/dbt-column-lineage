@@ -157,16 +157,23 @@ def _render_unanalyzable_names(confidence: Dict[str, Any]) -> List[str]:
     flags). Returns an empty list when there are no unanalyzable models."""
     no_column_info = confidence.get("no_column_info_models") or []
     parse_failed = confidence.get("parse_failed_models") or []
-    if not no_column_info and not parse_failed:
+    opaque = confidence.get("opaque_models") or []
+    if not no_column_info and not parse_failed and not opaque:
         return []
-    total = len(no_column_info) + len(parse_failed)
+    total = len(no_column_info) + len(parse_failed) + len(opaque)
     body: List[str] = []
     nci_lines, nci_truncated = _capped_name_lines(no_column_info, "No column info")
     pf_lines, pf_truncated = _capped_name_lines(parse_failed, "Parse failed")
+    # Opaque is a deliberate choice, not a failure — labelled distinctly from the others.
+    opaque_lines, opaque_truncated = _capped_name_lines(
+        opaque, "Not column-analyzed by choice (e.g. semantic views)"
+    )
     body.extend(nci_lines)
     body.extend(pf_lines)
+    body.extend(opaque_lines)
     confidence["no_column_info_truncated"] = nci_truncated
     confidence["parse_failed_truncated"] = pf_truncated
+    confidence["opaque_truncated"] = opaque_truncated
     return [
         "<details>",
         f"<summary>Models that couldn't be analyzed ({total})</summary>",
@@ -710,25 +717,35 @@ def render_changeset_markdown(report: Dict[str, Any], explain: bool = False) -> 
         else:
             n = confidence.get("unanalyzable_models", 0)
             partial_edges = confidence.get("partial_edges", 0)
+            opaque = confidence.get("opaque", 0)
             reachable = confidence.get("reachable_models", 0)
+            # Additional degradation clauses, kept distinct so the reviewer can tell a parser
+            # *failure* apart from a deliberate *choice* not to analyze (opaque, e.g. semantic
+            # views). Both are rebuilt rather than proven safe to skip.
+            extra_clauses: List[str] = []
+            if partial_edges:
+                extra_clauses.append(f"{partial_edges} more carried unresolved column edges")
+            if opaque:
+                extra_clauses.append(
+                    f"{opaque} more are not column-analyzed by choice "
+                    f"(unparseable SQL, e.g. semantic views)"
+                )
+            extra = ("; " + "; ".join(extra_clauses)) if extra_clauses else ""
             if n:
                 footer.append(
                     f"**Confidence: partial** — {n} of {_plural(reachable, 'downstream model')} "
                     f"couldn't be analyzed{_confidence_reason_words(confidence)}"
-                    + (
-                        f"; {partial_edges} more carried unresolved column edges"
-                        if partial_edges
-                        else ""
-                    )
+                    + extra
                     + ", so the impact above may be incomplete."
                 )
             else:
-                # Degraded purely by unresolved column edges (phantom flatten alias, quoted pivot
-                # literal, select-* rename/subquery) — analyzable at the column-list level, but a
-                # source edge couldn't be resolved, so these are rebuilt, never skipped.
+                # Degraded purely by unresolved column edges and/or opaque nodes — analyzable at
+                # most at the column-list level (or deliberately not at all), so these are rebuilt
+                # rather than proven safe to skip, never dropped.
+                joined = "; ".join(extra_clauses) if extra_clauses else "some downstream models"
                 footer.append(
-                    f"**Confidence: partial** — {partial_edges} of "
-                    f"{_plural(reachable, 'downstream model')} carried unresolved column edges, "
+                    f"**Confidence: partial** — {joined} "
+                    f"(of {_plural(reachable, 'downstream model')}), "
                     f"so they were rebuilt rather than proven safe to skip."
                 )
             unanalyzable_disclosure = _render_unanalyzable_names(confidence)
