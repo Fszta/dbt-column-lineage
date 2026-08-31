@@ -1,3 +1,13 @@
+## [0.20.0](https://github.com/Fszta/parrant/compare/v0.19.0...v0.20.0) (2026-08-31)
+
+### Features
+
+* **impact:** declare unresolved column edges to prevent silent CI under-builds ([1f6cff1](https://github.com/Fszta/parrant/commit/1f6cff1e1176c23ce23120977e06999cd19a54fb))
+
+### Bug Fixes
+
+* **deps:** declare jinja2 as a runtime dependency ([ba9fc92](https://github.com/Fszta/parrant/commit/ba9fc92b30b17a71514cc3c9d36c51494cf0fe8b))
+
 ## [0.19.0](https://github.com/Fszta/parrant/compare/v0.18.1...v0.19.0) (2026-08-27)
 
 ### Features
