@@ -133,3 +133,129 @@ def test_canonical_key_unparseable_namespaced() -> None:
 def test_canonical_key_none_namespaced() -> None:
     key = canonical_key(None, _DIALECT)
     assert key.startswith(_UNPARSEABLE_PREFIX)
+
+
+# --------------------------------------------------------------------------------------
+# Comment / whitespace changes must ALWAYS be EQUIVALENT, even when parse_one fails.
+# --------------------------------------------------------------------------------------
+
+# A realistic-but-synthetic multi-CTE model with a join and a window function. It also uses
+# Snowflake semi-structured access (``payload:total::number``), which parse_one CANNOT build
+# an AST for under the generic dialect — exercising the parse-failure fallback path that,
+# before the fix, misclassified a comment-only edit as INDETERMINATE (the CI repro).
+_MODEL_SQL = """with
+orders as (
+    select
+        order_id,
+        customer_id,
+        payload:total::number as order_total,
+        created_at
+    from raw_events.orders
+),
+
+customers as (
+    select customer_id, region from raw_events.customers
+),
+
+joined as (
+    select
+        orders.order_id,
+        orders.order_total,
+        customers.region
+    from orders
+    left join customers
+        on orders.customer_id = customers.customer_id
+),
+
+final as (
+    select
+        order_id,
+        order_total,
+        region,
+        sum(order_total) over (partition by region) as region_total
+    from joined
+)
+
+select * from final"""
+
+
+# (id, head) — each head differs from _MODEL_SQL ONLY by comments and/or whitespace.
+_COMMENT_WHITESPACE_HEADS: list[tuple[str, str]] = [
+    ("trailing_line_comment", _MODEL_SQL + " -- expose region_total for the weekly rollup"),
+    ("leading_comment", "-- weekly regional totals\n" + _MODEL_SQL),
+    (
+        "inline_mid_expression_comment",
+        _MODEL_SQL.replace(
+            "sum(order_total) over",
+            "sum(order_total) /* running per region */ over",
+        ),
+    ),
+    (
+        "block_comment",
+        _MODEL_SQL.replace("select * from final", "select * from final /* terminal passthrough */"),
+    ),
+    (
+        "whitespace_and_indentation",
+        _MODEL_SQL.replace("    ", "        ").replace("\n\n", "\n\n\n"),
+    ),
+    ("trailing_newline", _MODEL_SQL + "\n"),
+]
+
+
+@pytest.mark.parametrize(
+    "head",
+    [head for _, head in _COMMENT_WHITESPACE_HEADS],
+    ids=[name for name, _ in _COMMENT_WHITESPACE_HEADS],
+)
+@pytest.mark.parametrize("dialect", [None, "snowflake"], ids=["generic_dialect", "snowflake"])
+def test_comment_and_whitespace_only_changes_are_equivalent(head: str, dialect: str | None) -> None:
+    """A change that only adds/removes/edits comments or whitespace has no semantic value.
+
+    Parametrized over the generic dialect (where parse_one fails on the semi-structured
+    access and the OLD code fell to INDETERMINATE) and Snowflake (where the AST path already
+    proved EQUIVALENT). Both must now be EQUIVALENT — comments and formatting carry no meaning.
+    """
+    result = compare_expressions(_MODEL_SQL, head, dialect=dialect)
+    assert (
+        result.kind is SemanticChangeKind.EQUIVALENT
+    ), f"comment/whitespace-only change classified {result.kind.value}, expected equivalent"
+    assert result.equal is True
+
+
+def test_comment_only_change_survives_parse_failure() -> None:
+    """Regression (CI repro): the model uses SQL parse_one cannot AST under the generic dialect,
+    so the ONLY route to a correct verdict is the lexical comment-stripped comparison.
+
+    Guards the parse-failure precondition explicitly so this stays a real regression test.
+    """
+    assert canonical_key(_MODEL_SQL, None).startswith(
+        _UNPARSEABLE_PREFIX
+    ), "precondition: _MODEL_SQL must be unparseable under the generic dialect for this repro"
+    head = _MODEL_SQL + " -- trailing note added by a downstream consumer"
+    result = compare_expressions(_MODEL_SQL, head, dialect=None)
+    assert result.equal is True
+    assert result.kind is SemanticChangeKind.EQUIVALENT
+
+
+def test_string_literal_dashes_are_not_treated_as_comments() -> None:
+    """Soundness: a ``--`` (or ``/* */``) INSIDE a string literal is data, not a comment.
+
+    Changing such a literal is a real meaning change and must NOT be swallowed by comment
+    stripping. The tokenizer keeps string contents intact, so this stays MEANING_CHANGED.
+    """
+    base = "select label from t where note = '-- not a comment'"
+    head = "select label from t where note = '-- different literal'"
+    result = compare_expressions(base, head, dialect=_DIALECT)
+    assert result.equal is False
+    assert result.kind is SemanticChangeKind.MEANING_CHANGED
+
+
+def test_comment_only_change_collapses_unparseable_canonical_keys() -> None:
+    """Two byte-different-but-comment-only-different UNPARSEABLE fragments share a canonical key,
+    so a per-column signature over them suppresses the cosmetic edit instead of flagging it."""
+    base = "a +"  # unparseable fragment
+    head = "a + -- dangling note"
+    assert canonical_key(base, _DIALECT).startswith(_UNPARSEABLE_PREFIX)
+    assert canonical_key(base, _DIALECT) == canonical_key(head, _DIALECT)
+    # ...but a real token change still differs.
+    assert canonical_key(base, _DIALECT) != canonical_key("a + b +", _DIALECT)
