@@ -36,8 +36,15 @@ class ParseStats:
 
     parsed_ok: int = 0
     parse_failed: int = 0
+    # Nodes whose compiled SQL the parser could not read and that we deliberately do NOT
+    # analyze at the column level (semantic views chief among them; generally any unparseable
+    # node). Kept OUT of ``parse_failed`` on purpose: opaque is a choice, not a failure, so it
+    # neither drags the coverage floor nor reads as a parser bug. Model-level reach through
+    # them is preserved from the manifest dependency graph.
+    opaque: int = 0
     skipped_no_sql: int = 0
     failed_model_names: List[str] = field(default_factory=list)
+    opaque_model_names: List[str] = field(default_factory=list)
     skipped_model_names: List[str] = field(default_factory=list)
 
 
@@ -384,9 +391,9 @@ class ModelRegistry:
             raise RegistryError("SQL parser not initialized. Call load() first.")
 
         successful_parses = 0
-        failed_parses = 0
+        opaque_parses = 0
         skipped_models = 0
-        failed_model_names = []
+        opaque_model_names = []
         skipped_model_names = []
 
         # First pass: Process explicit column references
@@ -400,34 +407,58 @@ class ModelRegistry:
                 skipped_model_names.append(model_name)
                 continue
 
+            # Nodes we deliberately do NOT column-analyze, detected by shape even when the parser
+            # would silently accept them into a structure with no usable column lineage (a
+            # ``CREATE SEMANTIC VIEW`` is the motivating case: some parser versions raise on it,
+            # others parse it into an opaque command). Treating it as opaque up front — rather
+            # than as a node that "parsed" into zero columns — keeps its model-level reach and
+            # keeps it out of the resolved/blind buckets.
+            if self._is_opaque_node(model_name, sql):
+                opaque_parses += 1
+                opaque_model_names.append(model_name)
+                self._mark_opaque(model)
+                continue
+
             try:
                 parse_result = self._sql_parser.parse_column_lineage(sql)
                 self._apply_column_lineage(model, parse_result, models)
                 successful_parses += 1
             except Exception as e:
-                failed_parses += 1
-                failed_model_names.append(model_name)
-                logger.warning(
-                    f"Failed to process lineage for model {model_name}: {type(e).__name__}: {str(e)}"
+                # The parser could not read this compiled SQL (a semantic view, or generally any
+                # node sqlglot cannot parse). We deliberately do NOT column-analyze it: mark it
+                # OPAQUE rather than a parse failure. Column-level lineage is withheld, but the
+                # node's MODEL-level reach is preserved from the manifest dependency graph
+                # (``depends_on.nodes`` — already materialized onto ``model.upstream`` and the
+                # manifest downstream map), so a change to an upstream still reaches and rebuilds
+                # it at model grain.
+                opaque_parses += 1
+                opaque_model_names.append(model_name)
+                self._mark_opaque(model)
+                logger.info(
+                    f"Model {model_name} is opaque to the column parser "
+                    f"({type(e).__name__}); model-level reach preserved from the manifest"
                 )
                 continue
 
         self._parse_stats = ParseStats(
             parsed_ok=successful_parses,
-            parse_failed=failed_parses,
+            parse_failed=0,
+            opaque=opaque_parses,
             skipped_no_sql=skipped_models,
-            failed_model_names=failed_model_names,
+            failed_model_names=[],
+            opaque_model_names=opaque_model_names,
             skipped_model_names=skipped_model_names,
         )
 
         logger.info(
             f"SQL parsing summary: {successful_parses} successful, "
-            f"{failed_parses} failed, {skipped_models} skipped (no SQL)"
+            f"{opaque_parses} opaque (unparseable, not column-analyzed), "
+            f"{skipped_models} skipped (no SQL)"
         )
 
-        if failed_model_names:
+        if opaque_model_names:
             logger.info(
-                f"Failed models ({len(failed_model_names)}): {', '.join(failed_model_names)}"
+                f"Opaque models ({len(opaque_model_names)}): {', '.join(opaque_model_names)}"
             )
 
         # Second pass: Process star references
@@ -435,6 +466,39 @@ class ModelRegistry:
             self._process_star_references(models)
         except Exception as e:
             logger.error(f"Failed to process star references: {e}", exc_info=True)
+
+    def _is_opaque_node(self, model_name: str, sql: str) -> bool:
+        """Whether a node should be treated as column-opaque by its shape, not a parse outcome.
+
+        A semantic view is the motivating case: it has no relational column projection to trace,
+        and depending on the parser version it either fails to parse or parses into an opaque
+        command with no usable lineage. We detect it from the dbt materialization or the compiled
+        SQL shape so it is classified ``opaque`` up front. The general parse-exception fallback in
+        :meth:`_process_lineage` still catches any *other* unparseable node.
+        """
+        config = self._manifest_reader.get_model_config(model_name) or {}
+        materialized = str(config.get("materialized") or "").lower()
+        if "semantic" in materialized:
+            return True
+        head = (sql or "").lstrip().lower()
+        return head.startswith("create") and "semantic view" in head
+
+    def _mark_opaque(self, model: Model) -> None:
+        """Flag a node as opaque and (re)synthesize its MODEL-level upstream edges.
+
+        An opaque node has no column-level lineage (we chose not to parse it), but its
+        model-grain dependencies must still hold so downstream reach flows *through* it. Those
+        edges come from the manifest's ``depends_on.nodes`` — dbt's own dependency graph, which
+        a semantic view's ``TABLES`` clause resolves to ``ref()``s at compile time. They are
+        already materialized onto ``model.upstream`` by :meth:`_apply_dependencies`; here we
+        re-affirm them from the manifest so the reach is guaranteed even if the upstream set was
+        empty, and stamp ``metadata["opaque"]`` so consumers can classify the node.
+        """
+        model.metadata = model.metadata or {}
+        model.metadata["opaque"] = True
+        manifest_upstream = self._manifest_reader.get_model_upstream().get(model.name, set())
+        if manifest_upstream:
+            model.upstream = set(model.upstream or set()) | set(manifest_upstream)
 
     def _apply_column_lineage(
         self, model: Model, parse_result: SQLParseResult, models: Dict[str, Model]
@@ -785,6 +849,9 @@ class ModelRegistry:
         not_in_catalog_count = max(models_in_manifest - models_in_catalog, 0)
 
         stats = self._parse_stats
+        # ``opaque`` nodes are intentionally not column-analyzed (unparseable SQL, e.g. semantic
+        # views). They are NOT a coverage failure, so they are excluded from the ``complete``
+        # denominator — only genuine parse failures, missing SQL, and catalog gaps count.
         complete = (
             not_in_catalog_count == 0 and stats.parse_failed == 0 and stats.skipped_no_sql == 0
         )
@@ -798,18 +865,35 @@ class ModelRegistry:
             not_in_catalog_count=not_in_catalog_count,
             failed_models=sorted(stats.failed_model_names)[:_COVERAGE_NAME_CAP],
             skipped_models=sorted(stats.skipped_model_names)[:_COVERAGE_NAME_CAP],
+            opaque=stats.opaque,
+            opaque_models=sorted(stats.opaque_model_names)[:_COVERAGE_NAME_CAP],
             complete=complete,
         )
 
     def get_unparsed_models(self) -> set:
-        """Names of catalog models whose SQL failed to parse or was missing."""
-        return set(self._parse_stats.failed_model_names) | set(
-            self._parse_stats.skipped_model_names
+        """Names of models whose SQL failed to parse, is opaque, or was missing."""
+        return (
+            set(self._parse_stats.failed_model_names)
+            | set(self._parse_stats.opaque_model_names)
+            | set(self._parse_stats.skipped_model_names)
         )
 
     def get_parse_failed_models(self) -> set:
-        """Names of models whose compiled SQL was present but failed to parse."""
+        """Names of models whose compiled SQL was present but genuinely failed to parse.
+
+        Opaque nodes (unparseable SQL we deliberately do NOT column-analyze, e.g. semantic
+        views) are NOT parse failures and are reported separately by :meth:`get_opaque_models`.
+        """
         return set(self._parse_stats.failed_model_names)
+
+    def get_opaque_models(self) -> set:
+        """Names of nodes we deliberately do not column-analyze (unparseable SQL).
+
+        Semantic views chief among them; generally any node the parser cannot read. These are
+        classified ``opaque`` (a choice), distinct from ``parse_failed`` (a failure). Their
+        model-level reach is preserved from the manifest dependency graph.
+        """
+        return set(self._parse_stats.opaque_model_names)
 
     def is_catalog_backed(self, model_name: str) -> bool:
         """Whether a model has a real catalog entry (known column types)."""

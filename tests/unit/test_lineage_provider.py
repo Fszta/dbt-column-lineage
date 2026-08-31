@@ -58,6 +58,7 @@ class InMemoryProvider:
         column_tests: Optional[Dict[tuple, List[TestNode]]] = None,
         catalog_backed: Optional[Set[str]] = None,
         parse_failed: Optional[Set[str]] = None,
+        opaque: Optional[Set[str]] = None,
     ) -> None:
         self._models = {name.lower(): model for name, model in models.items()}
         self._exposures = exposures or {}
@@ -69,6 +70,7 @@ class InMemoryProvider:
             {n.lower() for n in catalog_backed} if catalog_backed is not None else set(self._models)
         )
         self._parse_failed = {n.lower() for n in (parse_failed or set())}
+        self._opaque = {n.lower() for n in (opaque or set())}
         self._loaded = False
 
     # --- lifecycle ---------------------------------------------------------
@@ -121,6 +123,8 @@ class InMemoryProvider:
             parse_failed=len(self._parse_failed),
             skipped_no_sql=0,
             not_in_catalog_count=max(len(self._models) - len(self._catalog_backed), 0),
+            opaque=len(self._opaque),
+            opaque_models=sorted(self._opaque),
             complete=not self._parse_failed,
         )
 
@@ -129,6 +133,9 @@ class InMemoryProvider:
 
     def get_parse_failed_models(self) -> Set[str]:
         return set(self._parse_failed)
+
+    def get_opaque_models(self) -> Set[str]:
+        return set(self._opaque)
 
     def get_compiled_sql(self, model_name: str) -> Optional[str]:
         return self._compiled.get(model_name.lower())

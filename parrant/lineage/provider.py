@@ -124,7 +124,19 @@ class LineageProvider(Protocol):
         """Nodes whose lineage the backend could not compute (had input, failed to derive).
 
         Feeds the ``partial`` confidence level. A backend with no notion of parse failure
-        returns an empty set.
+        returns an empty set. Distinct from :meth:`get_opaque_models` — a genuine failure,
+        not a deliberate choice not to analyze.
+        """
+
+    def get_opaque_models(self) -> Set[str]:
+        """Nodes the backend deliberately does NOT column-analyze (unparseable SQL).
+
+        Semantic views chief among them; generally any node whose compiled SQL the backend
+        cannot parse. Column lineage is withheld, but MODEL-level reach through them is still
+        preserved from the manifest dependency graph, so a change to an upstream reaches (and
+        rebuilds) them at model grain. Classified ``opaque`` — a *choice*, not a *failure* —
+        so they do not drag the coverage floor. A backend with no notion of opaqueness returns
+        an empty set.
         """
 
     # --- raw SQL (leaky capability) ---------------------------------------

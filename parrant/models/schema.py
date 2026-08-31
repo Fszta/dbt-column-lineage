@@ -264,6 +264,13 @@ class Coverage(BaseModel):
     not_in_catalog_count: int
     failed_models: List[str] = Field(default_factory=list)
     skipped_models: List[str] = Field(default_factory=list)
+    # Nodes whose compiled SQL the parser cannot read and that we deliberately do NOT
+    # analyze at the column level (semantic views chief among them; more generally any
+    # unparseable node). These are NOT a coverage failure — we chose not to parse them, so
+    # they are excluded from the ``complete`` denominator and never counted as ``parse_failed``.
+    # Model-level reach through them is still preserved from the manifest dependency graph.
+    opaque: int = 0
+    opaque_models: List[str] = Field(default_factory=list)
     complete: bool
 
 
@@ -299,10 +306,22 @@ class ImpactConfidence(BaseModel):
     # consumer force-rebuilds every one, so len(partial_edges_models) == partial_edges always.
     partial_edges: int = 0
     partial_edges_models: List[str] = Field(default_factory=list)
+    # Reachable nodes we deliberately do NOT analyze at the column level: their compiled SQL
+    # is unparseable (semantic views chief among them; generally any node the parser cannot
+    # read). Distinct from ``parse_failed`` (a node we *tried* and failed to derive lineage
+    # for): opaque is a *choice*, not a failure — so these do not drag the coverage floor.
+    # Model-level reach through them is still preserved from the manifest dependency graph, so
+    # a change to an upstream still reaches (and rebuilds) them at model grain. Their presence
+    # in a change's reachable set drops ``level`` to ``partial`` (fail-closed: we cannot see
+    # column edges through them, so we widen the rebuild rather than prove anything skippable).
+    # COMPLETE, uncapped machine list — len(opaque_models) == opaque always in machine output.
+    opaque: int = 0
+    opaque_models: List[str] = Field(default_factory=list)
     # Display-only truncation signals: False in machine output (lists are complete),
     # set True only by a display layer when it elided names from the rendered list.
     no_column_info_truncated: bool = False
     parse_failed_truncated: bool = False
+    opaque_truncated: bool = False
     level: Literal["full", "partial"]
 
 
@@ -359,10 +378,12 @@ class ModelResolution(BaseModel):
         "parse_failed",
         "unresolved",
         "partial_edges",
+        "opaque",
     ]
     # One of: star_off_cte, star_modifier, missing_catalog, python_model, unsupported_sql, other.
     # For a ``partial_edges`` status it is the marker construct (phantom_alias, unexpandable_star,
-    # fabricated_column, star_rename, pivot_output, other).
+    # fabricated_column, star_rename, pivot_output, other). For an ``opaque`` status it names WHY
+    # we did not parse it (``semantic_view`` or the general ``unparseable_sql``).
     reason: Optional[str] = None
 
 
@@ -394,6 +415,10 @@ class ResolutionSummary(BaseModel):
     unresolved: int = 0
     # Sub-count of ``unresolved``: reachable models with columns but >=1 unresolved-edge marker.
     partial_edges: int = 0
+    # Reachable nodes we deliberately do NOT column-analyze (unparseable SQL, e.g. semantic
+    # views). A distinct partition, so the reconciliation identity becomes
+    # ``catalog_backed + parsed + no_column_info + parse_failed + unresolved + opaque == reachable``.
+    opaque: int = 0
     # |rebuild_models ∩ {models whose status is not catalog_backed/parsed}|: how many rebuilds
     # are forced because parrant could not resolve the model, rather than by a proven reaching
     # change. Consumers can log this as a fraction of |rebuild_models| to measure how much
