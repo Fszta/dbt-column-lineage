@@ -1,3 +1,14 @@
+## [0.21.0](https://github.com/Fszta/parrant/compare/v0.20.0...v0.21.0) (2026-09-02)
+
+### Features
+
+* **parser:** resolve lateral-flatten aliases to the flattened column ([59fc288](https://github.com/Fszta/parrant/commit/59fc288f8ec0ae9bf6d7fbd9389b0f9879e63b1b))
+* **engine:** classify unparseable nodes as column-opaque, not parse failures ([679c67b](https://github.com/Fszta/parrant/commit/679c67b1e14d9a59574504fa7ec3b7b64741d4a6))
+
+### Bug Fixes
+
+* **semantic-diff:** classify comment/whitespace-only edits EQUIVALENT even when parse fails ([ea550a5](https://github.com/Fszta/parrant/commit/ea550a580e9ffad00365f392cda05d1570750a9d))
+
 ## [0.20.0](https://github.com/Fszta/parrant/compare/v0.19.0...v0.20.0) (2026-08-31)
 
 ### Features
